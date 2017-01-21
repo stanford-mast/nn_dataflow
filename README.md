@@ -15,10 +15,12 @@ accelerator; ordering then decides the order between all 2D convolutions. We
 currently only support row stationary mapping, and support exhaustive search
 over all loop blocking and reordering schemes.
 
-See the details in our ASPLOS'17 paper (reference below).
+See the details in our ASPLOS'17 paper.
 
 If you use this tool in your work, we kindly request that you reference our
-ASPLOS'17 paper (see reference below), and send us a citation of your work.
+ASPLOS'17 paper (Gao et al., "TETRIS: Scalable and Efficient Neural Network
+Acceleration with 3D Memory", ASPLOS, April 2017), and send us a citation of
+your work.
 
 
 Find optimal schedule
@@ -51,8 +53,19 @@ Use the output results to draw the energy breakdown and compare against Figure
 10 in the Eyeriss paper.
 
 
+Copyright & License
+-------------------
+`nn_dataflow` is free software; you can redistribute it and/or modify it under
+the terms of the [BSD License](LICENSE) as published by the Open Source
+Initiative, revised version.
+
+`nn_dataflow` was originally written by Mingyu Gao at Stanford University, and
+per Stanford University policy, the copyright of this original code remains
+with the Board of Trustees of Leland Stanford Junior University.
+
+
 Reference
 ---------
-Gao, Pu, Yang, Horowitz, and Kozyrakis, *Scalable and Efficient Neural Network
-Acceleration with 3D Memory*, in ASPLOS'17. April, 2017.
+Gao, Pu, Yang, Horowitz, and Kozyrakis, *TETRIS: Scalable and Efficient Neural
+Network Acceleration with 3D Memory*, in ASPLOS'17. April, 2017.
 
