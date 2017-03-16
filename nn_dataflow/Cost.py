@@ -27,8 +27,8 @@ from collections import namedtuple
 from . import MemHierEnum as me
 
 
-class Cost(namedtuple('_Cost', ['cost_memhier', 'cost_nochop', 'cost_macop',
-                                'cost_unit_static'])):
+class Cost(namedtuple('Cost', ['cost_memhier', 'cost_nochop', 'cost_macop',
+                               'cost_unit_static'])):
     '''
     Cost specification, including memory hierarchy cost, NoC hop cost, MAC
     operation cost, and unit-time static cost.
