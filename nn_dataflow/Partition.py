@@ -101,14 +101,15 @@ def gen_layer_partition2d(layer, dim_nodes):
         # Require partition is approximately dividable of total size.
         if not Util.approx_dividable(layer.nofm, partition2d[pe.OUTP].size()):
             continue
-        if not Util.approx_dividable(layer.sofm, partition2d[pe.OFMP].h) \
-            or not Util.approx_dividable(layer.sofm, partition2d[pe.OFMP].w):
+        if not Util.approx_dividable(layer.hofm, partition2d[pe.OFMP].h) \
+            or not Util.approx_dividable(layer.wofm, partition2d[pe.OFMP].w):
             continue
 
         # Partitioned layer spec.
         layer_part = Layer(layer.nifm,
                            Util.idivc(layer.nofm, partition2d[pe.OUTP].size()),
-                           Util.idivc(layer.sofm, partition2d[pe.OFMP].h),
+                           (Util.idivc(layer.hofm, partition2d[pe.OFMP].h),
+                            Util.idivc(layer.wofm, partition2d[pe.OFMP].w)),
                            layer.sfil,
                            layer.strd)
 
@@ -133,7 +134,7 @@ def gen_layer_naive_partition2d(layer, dim_nodes):
     Return a tuple of the partition scheme and the partitioned layer
     parameters.
     '''
-    if layer.sofm == 1:
+    if layer.hofm == 1 and layer.wofm == 1:
         # FC layer: all OUTP.
         partition2d = [0] * pe.NUM
         partition2d[pe.OUTP] = dim_nodes
@@ -150,14 +151,15 @@ def gen_layer_naive_partition2d(layer, dim_nodes):
 
     layer_part = Layer(layer.nifm,
                        Util.idivc(layer.nofm, partition2d[pe.OUTP].size()),
-                       Util.idivc(layer.sofm, partition2d[pe.OFMP].h),
+                       (Util.idivc(layer.hofm, partition2d[pe.OFMP].h),
+                        Util.idivc(layer.wofm, partition2d[pe.OFMP].w)),
                        layer.sfil,
                        layer.strd)
 
     yield (Partition2dScheme(order, partition2d), layer_part)
 
 
-def get_layer_range(nfmap, sfmap, part, index):
+def get_layer_range(nfmap, hfmap, wfmap, part, index):
     '''
     Get the range of the layer for the given partition index.
 
@@ -170,13 +172,13 @@ def get_layer_range(nfmap, sfmap, part, index):
     n_end = nfmap * (idx_chn + 1) // part[pe.OUTP].size()
     assert n_end <= nfmap
     # fmap height tiling.
-    h_beg = sfmap * index[pe.OFMP].h // part[pe.OFMP].h
-    h_end = sfmap * (index[pe.OFMP].h + 1) // part[pe.OFMP].h
-    assert h_end <= sfmap
+    h_beg = hfmap * index[pe.OFMP].h // part[pe.OFMP].h
+    h_end = hfmap * (index[pe.OFMP].h + 1) // part[pe.OFMP].h
+    assert h_end <= hfmap
     # fmap width tiling.
-    w_beg = sfmap * index[pe.OFMP].w // part[pe.OFMP].w
-    w_end = sfmap * (index[pe.OFMP].w + 1) // part[pe.OFMP].w
-    assert w_end <= sfmap
+    w_beg = wfmap * index[pe.OFMP].w // part[pe.OFMP].w
+    w_end = wfmap * (index[pe.OFMP].w + 1) // part[pe.OFMP].w
+    assert w_end <= wfmap
     return (n_beg, n_end), (h_beg, h_end), (w_beg, w_end)
 
 
@@ -201,8 +203,8 @@ def unit_nhops_layer_partition2d(layer, batch_size, part_lcurr, part_lprev):
         return nhops
 
     # Record all dest coordinates that need this element.
-    req_lists_lprev = [[[[] for _ in range(layer.sifm)]
-                        for _ in range(layer.sifm)]
+    req_lists_lprev = [[[[] for _ in range(layer.wifm)]
+                        for _ in range(layer.hifm)]
                        for _ in range(layer.nifm)]
 
     for index_lcurr in part_lcurr.gen_all_indexes2d():
@@ -211,7 +213,8 @@ def unit_nhops_layer_partition2d(layer, batch_size, part_lcurr, part_lprev):
 
         # Range of current layer for this index.
         _, h_lcurr_rng, w_lcurr_rng = get_layer_range(
-            layer.nofm, layer.sofm, part_lcurr.partition2d, index_lcurr)
+            layer.nofm, layer.hofm, layer.wofm,
+            part_lcurr.partition2d, index_lcurr)
 
         # Range of previous layer, i.e., input for this pidx
         # ifmap channels. All.
@@ -221,11 +224,11 @@ def unit_nhops_layer_partition2d(layer, batch_size, part_lcurr, part_lprev):
         # xy_i = xy_o * stride + (0 ... sfil-1)
         h_lprev_beg = h_lcurr_rng[0] * layer.strd
         h_lprev_end = (h_lcurr_rng[1] - 1) * layer.strd + layer.sfil
-        assert h_lprev_end <= layer.sifm
+        assert h_lprev_end <= layer.hifm
         # ifmap width tiling.
         w_lprev_beg = w_lcurr_rng[0] * layer.strd
         w_lprev_end = (w_lcurr_rng[1] - 1) * layer.strd + layer.sfil
-        assert w_lprev_end <= layer.sifm
+        assert w_lprev_end <= layer.wifm
 
         for n_lprev, h_lprev, w_lprev in itertools.product(
                 range(n_lprev_beg, n_lprev_end),
@@ -244,7 +247,8 @@ def unit_nhops_layer_partition2d(layer, batch_size, part_lcurr, part_lprev):
 
         # Range of previous layer for this index.
         n_lprev_rng, h_lprev_rng, w_lprev_rng = get_layer_range(
-            layer.nifm, layer.sifm, part_lprev.partition2d, index_lprev)
+            layer.nifm, layer.hifm, layer.wifm,
+            part_lprev.partition2d, index_lprev)
 
         for n_lprev, h_lprev, w_lprev in itertools.product(
                 range(*n_lprev_rng), range(*h_lprev_rng), range(*w_lprev_rng)):

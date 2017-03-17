@@ -28,20 +28,33 @@ class Layer(object):
 
     nifm (C): # ifmap channels
     nofm (M): # ofmap channels
-    sifm (H): ifmap width/height
-    sofm (E): ofmap width/height
+    hifm, wifm (H): ifmap height/width
+    hofm, wofm (E): ofmap height/width
     sfil (R): weight filter width/height
     strd (U): stride size
     '''
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, nifm, nofm, sofm, sfil, strd=1):
         self.nifm = nifm
         self.nofm = nofm
-        self.sofm = sofm
-        self.sifm = sfil + (sofm - 1) * strd
+        if isinstance(sofm, int):
+            hofm = sofm
+            wofm = sofm
+        elif len(sofm) == 2:
+            hofm = sofm[0]
+            wofm = sofm[1]
+        else:
+            raise ValueError('Layer: sofm is invalid ({}), '
+                             'needs to be either one integer or '
+                             'a pair of integers'.format(sofm))
+        self.hofm = hofm
+        self.hifm = sfil + (hofm - 1) * strd
+        self.wofm = wofm
+        self.wifm = sfil + (wofm - 1) * strd
         self.sfil = sfil
         self.strd = strd
-        assert self.sofm > 0
+        assert self.hofm > 0 and self.wofm > 0
 
     def ifmap_size(self, word_size=1):
         '''
@@ -49,7 +62,7 @@ class Layer(object):
 
         If `word_size` is set to word byte size, return size in bytes.
         '''
-        return self.sifm * self.sifm * word_size
+        return self.hifm * self.wifm * word_size
 
     def total_ifmap_size(self, word_size=1):
         '''
@@ -65,7 +78,7 @@ class Layer(object):
 
         If `word_size` is set to word byte size, return size in bytes.
         '''
-        return self.sofm * self.sofm * word_size
+        return self.hofm * self.wofm * word_size
 
     def total_ofmap_size(self, word_size=1):
         '''
@@ -95,7 +108,7 @@ class Layer(object):
         '''
         Get total number of MAC ops.
         '''
-        return self.sofm * self.sofm * self.sfil * self.sfil \
+        return self.hofm * self.wofm * self.sfil * self.sfil \
                 * self.nofm * self.nifm * batch_size
 
 
@@ -103,11 +116,11 @@ class FCLayer(Layer):
     '''
     NN fully-connected layer parameters.
 
-    sifm = sfil, strd = 1, sofm = 1
+    hifm = wifm = sfil, strd = 1, hofm = wofm = 1
     '''
 
     def __init__(self, nifm, nofm, sfil):
         Layer.__init__(self, nifm, nofm, 1, sfil)
-        assert self.sofm == 1
+        assert self.hofm == 1 and self.wofm == 1
 
 

@@ -39,10 +39,10 @@ def gen_nested_loop_desc(layer, batch_size, dim_array):
     '''
 
     # Logic PE set.
-    dim_lpeset = PhyDim2(layer.sfil, layer.sofm)
+    dim_lpeset = PhyDim2(layer.sfil, layer.hofm)
     cnt_lpeset = batch_size * layer.nofm * layer.nifm
 
-    ops_lpe = layer.sfil * layer.sofm
+    ops_lpe = layer.sfil * layer.wofm
     ops_lpeset = ops_lpe * dim_lpeset.size()
     ops_logic_total = ops_lpeset * cnt_lpeset
 
@@ -157,9 +157,9 @@ def gen_nested_loop_desc(layer, batch_size, dim_array):
     # Entire fil row per PE, also store all folded fil.
     usize_total_regf[de.FIL] *= layer.sfil * cnt_ppesets_per_procpass
     # Entire ifm row per PE.
-    usize_total_regf[de.IFM] *= layer.sifm
+    usize_total_regf[de.IFM] *= layer.wifm
     # Entire ofm row per PE.
-    usize_total_regf[de.OFM] *= layer.sofm
+    usize_total_regf[de.OFM] *= layer.wofm
 
     # Number of rows needed in frac ppeset.
     num_rows_ppeset_frac = [0] * de.NUM
@@ -205,10 +205,10 @@ def gen_nested_loop_desc(layer, batch_size, dim_array):
                             * (cnt_ifms_per_ppeset * cnt_ofms_per_ppeset
                                * cnt_ppesets_per_procpass)
         usize_gbuf[de.IFM] = num_rows_ppeset_frac[de.IFM] \
-                            * layer.sifm \
+                            * layer.wifm \
                             * cnt_ifms_per_ppeset
         usize_gbuf[de.OFM] = num_rows_ppeset_frac[de.OFM] \
-                            * layer.sofm \
+                            * layer.wofm \
                             * cnt_ofms_per_ppeset
 
         ## Number of data element accesses for physical PE set.
