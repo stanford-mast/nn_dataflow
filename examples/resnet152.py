@@ -33,7 +33,10 @@ LAYERS = OrderedDict()
 LAYERS['conv1'] = Layer(3, 64, 112, 7, 2)
 
 for i in range(1, 4):
-    LAYERS['conv2_' + str(i) + '_a'] = Layer(64, 64, 56, 1)
+    if i == 1:
+        LAYERS['conv2_' + str(i) + '_a'] = Layer(64, 64, 56, 1)
+    else:
+        LAYERS['conv2_' + str(i) + '_a'] = Layer(256, 64, 56, 1)
     LAYERS['conv2_' + str(i) + '_b'] = Layer(64, 64, 56, 3)
     LAYERS['conv2_' + str(i) + '_c'] = Layer(64, 256, 56, 1)
 
