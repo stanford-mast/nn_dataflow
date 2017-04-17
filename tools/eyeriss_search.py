@@ -62,10 +62,10 @@ def do_scheduling(args):
     hier_cost[me.GBUF] = args.hier_cost[1]
     hier_cost[me.ITCN] = args.hier_cost[2]
     hier_cost[me.REGF] = args.hier_cost[3]
-    cost = Cost(cost_memhier=hier_cost,
-                cost_nochop=args.hop_cost,
-                cost_macop=args.op_cost,
-                cost_unit_static=args.unit_static_cost)
+    cost = Cost(mac_op=args.op_cost,
+                mem_hier=tuple(hier_cost),
+                noc_hop=args.hop_cost,
+                unit_static=args.unit_static_cost)
 
     bypass = [True] * de.NUM
     bypass[de.IFM] = 'i' not in args.disable_bypass
@@ -113,15 +113,15 @@ def do_scheduling(args):
 
     stats['average_active_pes'] = stats['total_ops_per_node'] \
             / float(stats['total_time'])
-    stats['total_static_cost'] = stats['total_time'] * cost.unit_static() \
+    stats['total_static_cost'] = stats['total_time'] * cost.unit_static \
             * resource.dim_nodes.size()
 
     sum_cost = 0
     num_nodes = resource.dim_nodes.size()
-    sum_cost += stats['total_ops_per_node'] * num_nodes * cost.macop()
+    sum_cost += stats['total_ops_per_node'] * num_nodes * cost.mac_op
     sum_cost += sum([a * c * num_nodes
                      for a, c in zip(stats['total_accesses_per_node'],
-                                     cost.memhier())])
+                                     cost.mem_hier)])
     sum_cost += stats['total_static_cost']
     sum_cost += stats['total_noc_cost']
     assert abs(sum_cost / stats['total_cost'] - 1) < 0.001

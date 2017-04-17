@@ -90,7 +90,7 @@ def _combine_search_lpbl_part2d(resource, cost, nested_loop_desc, layer_part,
             total_nhops = [nh * r for nh, r in zip(unit_nhops, access_runs)]
 
             # Partition cost.
-            cost_part = cost.nochop() * sum(total_nhops)
+            cost_part = cost.noc_hop * sum(total_nhops)
             dict_part = {'unit_nhops': unit_nhops,
                          'total_nhops': total_nhops,
                          'part_lprev': part_lprev.as_pod_type(),

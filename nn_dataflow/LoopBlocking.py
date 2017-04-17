@@ -284,9 +284,9 @@ def cost_loopblocking_gbuf_regf(tifm, tofm, tbat, orders,
     ## Cost.
 
     access_total = [sum(a) for a in access]
-    cost_loop = np.dot(cost.memhier(), access_total) \
-            + ops_total * cost.macop() \
-            + time_total * cost.unit_static()
+    cost_loop = np.dot(cost.mem_hier, access_total) \
+            + ops_total * cost.mac_op \
+            + time_total * cost.unit_static
 
     dict_loop = {'ops': ops_total,
                  'time': time_total,
