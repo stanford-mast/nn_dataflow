@@ -24,6 +24,31 @@ Hardware resource specification.
 
 from collections import namedtuple
 
-Resource = namedtuple('Resource',
-                      ['dim_nodes', 'dim_array', 'size_gbuf', 'size_regf'])
+from .PhyDim2 import PhyDim2
+
+RESOURCE_LIST = ['dim_nodes',
+                 'dim_array',
+                 'size_gbuf',
+                 'size_regf',
+                ]
+
+class Resource(namedtuple('Resource', RESOURCE_LIST)):
+    '''
+    Hardware resource specification.
+    '''
+
+    def __new__(cls, *args, **kwargs):
+        ntp = super(Resource, cls).__new__(cls, *args, **kwargs)
+
+        if not isinstance(ntp.dim_nodes, PhyDim2):
+            raise TypeError('Resource: dim_nodes must be a PhyDim2 object.')
+        if not isinstance(ntp.dim_array, PhyDim2):
+            raise TypeError('Resource: dim_array must be a PhyDim2 object.')
+
+        if hasattr(ntp.size_gbuf, '__len__'):
+            raise TypeError('Cost: size_gbuf must be a scalar')
+        if hasattr(ntp.size_regf, '__len__'):
+            raise TypeError('Cost: size_regf must be a scalar')
+
+        return ntp
 
