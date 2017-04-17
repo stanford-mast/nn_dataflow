@@ -322,7 +322,7 @@ def gen_loopblocking_gbuf_regf(resource, cost, nested_loop_desc, options):
     # reside_dce_list is a list of DataCategoryEnum, each element is a config
     # with only that data category in gbuf, i.e., the others are all bypassed.
     for reside_dce in range(de.NUM):
-        if all([denum == reside_dce or options.allow_gbuf_bypass[denum]
+        if all([denum == reside_dce or options.sw_gbuf_bypass[denum]
                 for denum in range(de.NUM)]):
             reside_dce_list.append(reside_dce)
 

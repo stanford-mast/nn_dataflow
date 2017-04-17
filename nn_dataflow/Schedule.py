@@ -40,7 +40,7 @@ from .PhyDim2 import PhyDim2
 
 def _get_loopblocking_genfunc(options):
     ''' Get the generator function for loop blocking. '''
-    if options.solve_loopblocking:
+    if options.sw_solve_loopblocking:
         return Solver.gen_loopblocking_gbuf_regf
     else:
         return LoopBlocking.gen_loopblocking_gbuf_regf
@@ -48,7 +48,7 @@ def _get_loopblocking_genfunc(options):
 
 def _get_partition2d_genfunc(options):
     ''' Get the generator function for parallel partition. '''
-    if options.hybrid_partition2d:
+    if options.partition_hybrid:
         return Partition.gen_layer_partition2d
     else:
         return Partition.gen_layer_naive_partition2d

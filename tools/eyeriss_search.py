@@ -71,9 +71,9 @@ def do_scheduling(args):
     bypass[de.IFM] = 'i' not in args.disable_bypass
     bypass[de.OFM] = 'o' not in args.disable_bypass
     bypass[de.FIL] = 'f' not in args.disable_bypass
-    options = Option(allow_gbuf_bypass=bypass,
-                     solve_loopblocking=args.solve_loopblocking,
-                     hybrid_partition2d=args.hybrid_partition,
+    options = Option(sw_gbuf_bypass=tuple(bypass),
+                     sw_solve_loopblocking=args.solve_loopblocking,
+                     partition_hybrid=args.hybrid_partition,
                      ntops=1,
                      nprocesses=args.processes)
 

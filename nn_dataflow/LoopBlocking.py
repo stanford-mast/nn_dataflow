@@ -251,7 +251,7 @@ def cost_loopblocking_gbuf_regf(tifm, tofm, tbat, orders,
     stored_in_gbuf = [1] * de.NUM
     # Only store in gbuf if having reuse.
     for deum in range(de.NUM):
-        stored_in_gbuf[deum] = 1 if not options.allow_gbuf_bypass[deum] \
+        stored_in_gbuf[deum] = 1 if not options.sw_gbuf_bypass[deum] \
                 or reuse[BL.GBUF][deum] > reuse[BL.REGF][deum] \
                 else 0
 
