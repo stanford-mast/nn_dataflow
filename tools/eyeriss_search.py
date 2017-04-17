@@ -73,7 +73,7 @@ def do_scheduling(args):
     bypass[de.FIL] = 'f' not in args.disable_bypass
     options = Option(allow_gbuf_bypass=bypass,
                      solve_loopblocking=args.solve_loopblocking,
-                     hybrid_partition2d=args.hybrid_partition2d,
+                     hybrid_partition2d=args.hybrid_partition,
                      ntops=1,
                      nprocesses=args.processes)
 
@@ -130,7 +130,7 @@ def do_scheduling(args):
     res_map = OrderedDict()
     for argname in ['net', 'batch', 'word', 'nodes', 'array', 'regf', 'gbuf',
                     'op_cost', 'hier_cost', 'hop_cost', 'unit_static_cost',
-                    'solve_loopblocking', 'hybrid_partition2d',
+                    'solve_loopblocking', 'hybrid_partition',
                     'disable_bypass']:
         res_map[argname] = getattr(args, argname)
     for statname in ['total_time', 'total_cost', 'total_static_cost',
@@ -188,11 +188,13 @@ if __name__ == '__main__':
                     choices=['i', 'o', 'f'],
                     help='whether disallowing gbuf bypass for i (input), o '
                          '(output), or f (filter)')
-
     ap.add_argument('--solve-loopblocking', action='store_true',
                     help='Use analytical solver to choose loop blocking. '
                          'Otherwise use exhaustive search.')
-    ap.add_argument('--hybrid-partition2d', action='store_true',
+
+    ap.add_argument('--hybrid-partition',
+                    '--hybrid-partition2d',  # deprecated old name
+                    action='store_true',
                     help='Use hybrid partition for layer for node mapping. '
                          'Otherwise use naive method based on layer type.')
 
