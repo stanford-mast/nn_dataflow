@@ -66,6 +66,8 @@ with the Board of Trustees of Leland Stanford Junior University.
 
 Reference
 ---------
-Gao, Pu, Yang, Horowitz, and Kozyrakis, *TETRIS: Scalable and Efficient Neural
-Network Acceleration with 3D Memory*, in ASPLOS'17. April, 2017.
+Gao, Pu, Yang, Horowitz, and Kozyrakis, *[TETRIS: Scalable and Efficient Neural
+Network Acceleration with 3D
+Memory](//dl.acm.org/citation.cfm?id=3037697.3037702)*, in ASPLOS'17. April,
+2017.
 
