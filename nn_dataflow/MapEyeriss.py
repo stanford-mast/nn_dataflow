@@ -28,9 +28,9 @@ import warnings
 from operator import sub, mul
 
 from . import DataCategoryEnum as de
-from . import LoopBlocking
 from . import MemHierEnum as me
 from . import Util
+from .NestedLoopDesc import NestedLoopDesc
 from .PhyDim2 import PhyDim2
 
 def gen_nested_loop_desc(layer, batch_size, dim_array):
@@ -242,7 +242,12 @@ def gen_nested_loop_desc(layer, batch_size, dim_array):
 
         unit_time = cnt_ppesets_per_procpass * ops_lpe
 
-        yield LoopBlocking.NestedLoopDesc(lcnt_ifm, lcnt_ofm, lcnt_bat,
-                                          usize_gbuf, usize_regf,
-                                          unit_access, unit_ops, unit_time)
+        usz_gbuf = tuple(usize_gbuf)
+        usz_regf = tuple(usize_regf)
+        uaccess = tuple(tuple(acc) for acc in unit_access)
+
+        yield NestedLoopDesc(loopcnt_ifm=lcnt_ifm, loopcnt_ofm=lcnt_ofm,
+                             loopcnt_bat=lcnt_bat, usize_gbuf=usz_gbuf,
+                             usize_regf=usz_regf, unit_access=uaccess,
+                             unit_ops=unit_ops, unit_time=unit_time)
 

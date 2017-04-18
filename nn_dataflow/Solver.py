@@ -84,30 +84,30 @@ def _solve_lpbl_iofmap_gbuf_reside(resource, nested_loop_desc, reside_dce):
     dce_y = reside_dce
     if dce_y == de.OFM:
         dce_x = de.IFM
-        nfmaps_x = nested_loop_desc.loopcnt_ifm()
-        nfmaps_y = nested_loop_desc.loopcnt_ofm()
+        nfmaps_x = nested_loop_desc.loopcnt_ifm
+        nfmaps_y = nested_loop_desc.loopcnt_ofm
         facc_x = 1
         facc_y = 2
     elif dce_y == de.IFM:
         dce_x = de.OFM
-        nfmaps_x = nested_loop_desc.loopcnt_ofm()
-        nfmaps_y = nested_loop_desc.loopcnt_ifm()
+        nfmaps_x = nested_loop_desc.loopcnt_ofm
+        nfmaps_y = nested_loop_desc.loopcnt_ifm
         facc_x = 2
         facc_y = 1
     else:
         raise RuntimeError('Solver: only allow ifmap or ofmap to bypass.')
 
-    nbats = nested_loop_desc.loopcnt_bat()
+    nbats = nested_loop_desc.loopcnt_bat
 
-    usize_gbuf_x = nested_loop_desc.usize_gbuf(dce_x)
-    usize_gbuf_y = nested_loop_desc.usize_gbuf(dce_y)
-    usize_gbuf_fil = nested_loop_desc.usize_gbuf(de.FIL)
+    usize_gbuf_x = nested_loop_desc.usize_gbuf_of(dce_x)
+    usize_gbuf_y = nested_loop_desc.usize_gbuf_of(dce_y)
+    usize_gbuf_fil = nested_loop_desc.usize_gbuf_of(de.FIL)
 
     max_size_gbuf = resource.size_gbuf
 
-    usize_regf_x = nested_loop_desc.usize_regf(dce_x)
-    usize_regf_y = nested_loop_desc.usize_regf(dce_y)
-    usize_regf_fil = nested_loop_desc.usize_regf(de.FIL)
+    usize_regf_x = nested_loop_desc.usize_regf_of(dce_x)
+    usize_regf_y = nested_loop_desc.usize_regf_of(dce_y)
+    usize_regf_fil = nested_loop_desc.usize_regf_of(de.FIL)
 
     max_size_regf = resource.size_regf
 
@@ -237,30 +237,30 @@ def _solve_lpbl_filter_gbuf_reside(resource, nested_loop_desc):
     for dce_y in [de.IFM, de.OFM]:
         if dce_y == de.OFM:
             dce_x = de.IFM
-            nfmaps_x = nested_loop_desc.loopcnt_ifm()
-            nfmaps_y = nested_loop_desc.loopcnt_ofm()
+            nfmaps_x = nested_loop_desc.loopcnt_ifm
+            nfmaps_y = nested_loop_desc.loopcnt_ofm
             facc_x = 1
             facc_y = 2
         elif dce_y == de.IFM:
             dce_x = de.OFM
-            nfmaps_x = nested_loop_desc.loopcnt_ofm()
-            nfmaps_y = nested_loop_desc.loopcnt_ifm()
+            nfmaps_x = nested_loop_desc.loopcnt_ofm
+            nfmaps_y = nested_loop_desc.loopcnt_ifm
             facc_x = 2
             facc_y = 1
         else:
             raise RuntimeError('Solver: only allow ifmap or ofmap to bypass.')
 
-        nbats = nested_loop_desc.loopcnt_bat()
+        nbats = nested_loop_desc.loopcnt_bat
 
-        usize_gbuf_x = nested_loop_desc.usize_gbuf(dce_x)
-        usize_gbuf_y = nested_loop_desc.usize_gbuf(dce_y)
-        usize_gbuf_fil = nested_loop_desc.usize_gbuf(de.FIL)
+        usize_gbuf_x = nested_loop_desc.usize_gbuf_of(dce_x)
+        usize_gbuf_y = nested_loop_desc.usize_gbuf_of(dce_y)
+        usize_gbuf_fil = nested_loop_desc.usize_gbuf_of(de.FIL)
 
         max_size_gbuf = resource.size_gbuf
 
-        usize_regf_x = nested_loop_desc.usize_regf(dce_x)
-        usize_regf_y = nested_loop_desc.usize_regf(dce_y)
-        usize_regf_fil = nested_loop_desc.usize_regf(de.FIL)
+        usize_regf_x = nested_loop_desc.usize_regf_of(dce_x)
+        usize_regf_y = nested_loop_desc.usize_regf_of(dce_y)
+        usize_regf_fil = nested_loop_desc.usize_regf_of(de.FIL)
 
         max_size_regf = resource.size_regf
 

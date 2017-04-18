@@ -34,86 +34,6 @@ from . import MemHierEnum as me
 from . import Util
 
 
-class NestedLoopDesc(object):
-    '''
-    Naive 3-nested loop (nifm, nofm, batch) description.
-    '''
-
-    def __init__(self, lifms, lofms, lbats, ugbuf, uregf, uacc, uops, utime):
-        self.loopcnts = (lifms, lofms, lbats)
-        self.usize = (ugbuf, uregf)
-        self.uacc = uacc
-        self.uops = uops
-        self.utime = utime
-
-        for usz in self.usize:
-            assert len(usz) == de.NUM
-
-        assert len(self.uacc) == me.NUM
-        for ua in range(me.NUM):
-            assert len(self.uacc[ua]) == de.NUM
-
-    def loopcnt_ifm(self):
-        ''' Get nifm loop count. '''
-        return self.loopcnts[0]
-
-    def loopcnt_ofm(self):
-        ''' Get nofm loop count. '''
-        return self.loopcnts[1]
-
-    def loopcnt_bat(self):
-        ''' Get batch loop count. '''
-        return self.loopcnts[2]
-
-    def usize_gbuf(self, dce=None):
-        '''
-        Get occupied gbuf size of one innermost loop by data category `dce`.
-
-        If None, return entire list of occupied gbuf sizes for all categories.
-        '''
-        return self.usize[0][dce] if dce is not None else self.usize[0]
-
-    def usize_regf(self, dce=None):
-        '''
-        Get occupied regf size of one innermost loop by data category `dce`.
-
-        If None, return entire list of occupied regf sizes for all categories.
-        '''
-        return self.usize[1][dce] if dce is not None else self.usize[1]
-
-    def unit_access(self, mhe=None, dce=None):
-        '''
-        Get number of accesses of one innermost loop by memory hierarchy `mhe`
-        of data category `dce`.
-
-        If None, return entire list of accesses for the entire hierarchy.
-        '''
-        try:
-            return self.uacc[mhe][dce]
-        except (TypeError, IndexError):
-            try:
-                return self.uacc[mhe]
-            except (TypeError, IndexError):
-                return self.uacc
-
-    def unit_num_ops(self):
-        ''' Get number of ops of one innermost loop. '''
-        return self.uops
-
-    def unit_time(self):
-        ''' Get execution time of one innermost loop. '''
-        return self.utime
-
-    def __str__(self):
-        ''' Print. '''
-        str_ = 'loopcnts={}'.format(self.loopcnts)
-        str_ += ', usize={}'.format(self.usize)
-        str_ += ', uacc={}'.format(self.uacc)
-        str_ += ', uops={}'.format(self.uops)
-        str_ += ', utime={}'.format(self.utime)
-        return str_
-
-
 def cost_loopblocking_gbuf_regf(tifm, tofm, tbat, orders,
                                 resource, cost, nested_loop_desc, options):
     '''
@@ -158,13 +78,13 @@ def cost_loopblocking_gbuf_regf(tifm, tofm, tbat, orders,
         REGF = 1
         NUM = 2
 
-    if tip < nested_loop_desc.loopcnt_ifm():
+    if tip < nested_loop_desc.loopcnt_ifm:
         raise ValueError('LoopBlocking: invalid blocking for ifm: {}'
                          .format(ti))
-    if top < nested_loop_desc.loopcnt_ofm():
+    if top < nested_loop_desc.loopcnt_ofm:
         raise ValueError('LoopBlocking: invalid blocking for ofm: {}'
                          .format(to))
-    if tbp < nested_loop_desc.loopcnt_bat():
+    if tbp < nested_loop_desc.loopcnt_bat:
         raise ValueError('LoopBlocking: invalid blocking for bat: {}'
                          .format(tb))
 
@@ -181,16 +101,16 @@ def cost_loopblocking_gbuf_regf(tifm, tofm, tbat, orders,
 
     lcnt_total = tip * top * tbp
 
-    ops_total = nested_loop_desc.unit_num_ops() * lcnt_total
+    ops_total = nested_loop_desc.unit_ops * lcnt_total
 
-    time_total = nested_loop_desc.unit_time() * lcnt_total
+    time_total = nested_loop_desc.unit_time * lcnt_total
 
     ## Basic size and reuse.
 
     assert BL.GBUF == 0
     assert BL.REGF == 1
-    unit_size = [[x for x in nested_loop_desc.usize_gbuf()],
-                 [x for x in nested_loop_desc.usize_regf()]]
+    unit_size = [[x for x in nested_loop_desc.usize_gbuf],
+                 [x for x in nested_loop_desc.usize_regf]]
     reuse = [None for _ in range(BL.NUM)]
     for bl in range(BL.NUM):
         reuse[bl] = [0] * de.NUM
@@ -266,19 +186,19 @@ def cost_loopblocking_gbuf_regf(tifm, tofm, tbat, orders,
     access = [0] * me.NUM
 
     access[me.REGF] = [v * lcnt_total for v
-                       in nested_loop_desc.unit_access(me.REGF)]
+                       in nested_loop_desc.unit_access[me.REGF]]
 
     access[me.ITCN] = [v * lcnt_total // r for v, r
-                       in zip(nested_loop_desc.unit_access(me.ITCN),
+                       in zip(nested_loop_desc.unit_access[me.ITCN],
                               reuse[BL.REGF])]
 
     access[me.GBUF] = [v * lcnt_total // r * s for v, r, s
-                       in zip(nested_loop_desc.unit_access(me.GBUF),
+                       in zip(nested_loop_desc.unit_access[me.GBUF],
                               reuse[BL.REGF],
                               stored_in_gbuf)]
 
     access[me.DRAM] = [v * lcnt_total // r for v, r
-                       in zip(nested_loop_desc.unit_access(me.DRAM),
+                       in zip(nested_loop_desc.unit_access[me.DRAM],
                               reuse[BL.GBUF])]
 
     ## Cost.
@@ -306,9 +226,9 @@ def gen_loopblocking_gbuf_regf(resource, cost, nested_loop_desc, options):
     Generator for loop blocking schemes.
     '''
     for ti, to, tb, orders in itertools.product( \
-            Util.factorize(nested_loop_desc.loopcnt_ifm(), 3),
-            Util.factorize(nested_loop_desc.loopcnt_ofm(), 3),
-            Util.factorize(nested_loop_desc.loopcnt_bat(), 3),
+            Util.factorize(nested_loop_desc.loopcnt_ifm, 3),
+            Util.factorize(nested_loop_desc.loopcnt_ofm, 3),
+            Util.factorize(nested_loop_desc.loopcnt_bat, 3),
             itertools.product([None],
                               itertools.permutations((de.IFM, de.OFM)),
                               [None],
