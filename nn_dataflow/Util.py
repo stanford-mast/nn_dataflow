@@ -100,3 +100,12 @@ def closest_factor(value, factor):
 
     return res
 
+
+def assert_float_eq_int(vfloat, vint, message=''):
+    '''
+    Check the given float value is equal to the given int value. Print the
+    optional message if not equal.
+    '''
+    if abs(vfloat - vint) > 1:
+        raise AssertionError(message + ' {} != {}'.format(vfloat, vint))
+
