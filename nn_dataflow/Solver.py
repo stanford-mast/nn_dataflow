@@ -26,11 +26,10 @@ import math
 import itertools
 
 from . import DataCategoryEnum as de
-from . import LoopBlocking
 from . import Util
 
 
-def _solve_lpbl_iofmap_gbuf_reside(resource, nested_loop_desc, reside_dce):
+def _solve_lpbl_iofmap_gbuf_reside(nested_loop_desc, resource, reside_dce):
     '''
     Given data category (ifm or ofm, according to `reside_dce` which is a
     DataCategortyEnum) is the only one in gbuf; the other data category and
@@ -204,7 +203,7 @@ def _solve_lpbl_iofmap_gbuf_reside(resource, nested_loop_desc, reside_dce):
     return ti, to, tb, orders
 
 
-def _solve_lpbl_filter_gbuf_reside(resource, nested_loop_desc):
+def _solve_lpbl_filter_gbuf_reside(nested_loop_desc, resource):
     '''
     The fil is the only one in gbuf; both ifm and ofm bypass gbuf. Solve the
     analytical optimal loop blocking. Return ti, to, tb, and orders, same
@@ -313,7 +312,7 @@ def _solve_lpbl_filter_gbuf_reside(resource, nested_loop_desc):
     return ti, to, tb, orders
 
 
-def gen_loopblocking_gbuf_regf(resource, cost, nested_loop_desc, options):
+def gen_loopblocking_gbuf_regf(nested_loop_desc, resource, options):
     '''
     Generator for loop blocking schemes that are solved from iofmap gbuf bypass
     analytical models.
@@ -329,13 +328,11 @@ def gen_loopblocking_gbuf_regf(resource, cost, nested_loop_desc, options):
     for reside_dce in reside_dce_list:
         if reside_dce == de.FIL:
             ti, to, tb, orders = _solve_lpbl_filter_gbuf_reside(
-                resource, nested_loop_desc)
+                nested_loop_desc, resource)
         else:
             assert reside_dce == de.IFM or reside_dce == de.OFM
             ti, to, tb, orders = _solve_lpbl_iofmap_gbuf_reside(
-                resource, nested_loop_desc, reside_dce)
-        yield LoopBlocking.cost_loopblocking_gbuf_regf(
-            ti, to, tb, orders, resource=resource, cost=cost,
-            nested_loop_desc=nested_loop_desc, options=options)
+                nested_loop_desc, resource, reside_dce)
+        yield ti, to, tb, orders
 
 

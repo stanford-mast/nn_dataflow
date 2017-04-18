@@ -30,6 +30,7 @@ from . import Partition
 from . import Solver
 from .Cost import Cost
 from .Layer import Layer, FCLayer
+from .LoopBlockingScheme import LoopBlockingScheme
 from .NestedLoopDesc import NestedLoopDesc
 from .Option import Option
 from .Partition import Partition2dScheme

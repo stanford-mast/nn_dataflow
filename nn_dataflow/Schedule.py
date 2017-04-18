@@ -33,17 +33,8 @@ from . import LoopBlocking
 from . import MemHierEnum as me
 from . import ParallelEnum as pe
 from . import Partition
-from . import Solver
 from .Partition import Partition2dScheme
 from .PhyDim2 import PhyDim2
-
-
-def _get_loopblocking_genfunc(options):
-    ''' Get the generator function for loop blocking. '''
-    if options.sw_solve_loopblocking:
-        return Solver.gen_loopblocking_gbuf_regf
-    else:
-        return LoopBlocking.gen_loopblocking_gbuf_regf
 
 
 def _get_partition2d_genfunc(options):
@@ -74,8 +65,11 @@ def _combine_search_lpbl_part2d(resource, cost, nested_loop_desc, layer_part,
 
     def sweep(): # pylint: disable=missing-docstring
 
-        for cost_loop, dict_loop in _get_loopblocking_genfunc(options)(
-                resource, cost, nested_loop_desc, options):
+        for lbs in LoopBlocking.gen_loopblocking(nested_loop_desc, resource,
+                                                 options):
+
+            cost_loop = lbs.get_cost(cost)
+            dict_loop = lbs.get_scheme_dict()
 
             if math.isinf(cost_loop):
                 continue
