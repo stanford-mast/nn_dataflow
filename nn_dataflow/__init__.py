@@ -29,6 +29,7 @@ from . import MemHierEnum
 from . import ParallelEnum
 from . import Partition
 from .Cost import Cost
+from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
 from .Layer import Layer, FCLayer
 from .LoopBlockingScheme import LoopBlockingScheme
 from .MapStrategy import MapStrategyEyeriss
