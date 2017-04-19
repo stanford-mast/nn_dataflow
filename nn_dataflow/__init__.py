@@ -31,13 +31,12 @@ from . import Solver
 from .Cost import Cost
 from .Layer import Layer, FCLayer
 from .LoopBlockingScheme import LoopBlockingScheme
+from .MapStrategy import MapStrategyEyeriss
 from .NestedLoopDesc import NestedLoopDesc
 from .Option import Option
 from .Partition import Partition2dScheme
 from .PhyDim2 import PhyDim2
 from .Resource import Resource
-
-from . import MapEyeriss
 
 from .Schedule import schedule_search
 

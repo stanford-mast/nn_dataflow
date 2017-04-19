@@ -25,19 +25,17 @@ Search optimal schedule and partitioning.
 import argparse
 import json
 import multiprocessing
-import numpy as np
 import sys
 from collections import OrderedDict
 
 from nn_dataflow import Cost
 from nn_dataflow import DataCategoryEnum as de
+from nn_dataflow import MapStrategyEyeriss
 from nn_dataflow import MemHierEnum as me
 from nn_dataflow import Option
 from nn_dataflow import PhyDim2
 from nn_dataflow import Resource
 from nn_dataflow import schedule_search
-
-from nn_dataflow import MapEyeriss
 
 from examples import import_network_layers
 
@@ -55,7 +53,7 @@ def do_scheduling(args):
     resource = Resource(dim_nodes=PhyDim2(*args.nodes),
                         dim_array=PhyDim2(*args.array),
                         size_gbuf=args.gbuf/word,
-                        size_regf=args.regf/word*np.prod(args.array))
+                        size_regf=args.regf/word)
 
     hier_cost = [0] * me.NUM
     hier_cost[me.DRAM] = args.hier_cost[0]
@@ -79,7 +77,7 @@ def do_scheduling(args):
 
     # Search schedules.
     tops = schedule_search(layers, batch_size, resource, cost,
-                           MapEyeriss.gen_nested_loop_desc, options)
+                           MapStrategyEyeriss, options)
 
     top_mapping = tops[0]
 

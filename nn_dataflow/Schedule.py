@@ -100,7 +100,7 @@ def _combine_search_lpbl_part2d(resource, cost, nested_loop_desc, layer_part,
 
 
 def layer_schedule_search(layer, batch_size, resource, cost,
-                          part_lprev, gen_nested_loop_desc, options):
+                          part_lprev, map_strategy_class, options):
     '''
     Search the best schedule for given layer and batch size.
     '''
@@ -115,9 +115,11 @@ def layer_schedule_search(layer, batch_size, resource, cost,
         unit_nhops = Partition.unit_nhops_layer_partition2d(
             layer, batch_size, part_lcurr, part_lprev)
 
+        map_strategy = map_strategy_class(layer_part, batch_size,
+                                          resource.dim_array)
+
         # Search loop blocking using partitioned layer.
-        for nested_loop_desc in gen_nested_loop_desc(layer_part, batch_size,
-                                                     resource.dim_array):
+        for nested_loop_desc in map_strategy.gen_nested_loop_desc():
 
             r = pool.apply_async(_combine_search_lpbl_part2d,
                                  (resource, cost, nested_loop_desc, layer_part,
@@ -137,7 +139,7 @@ def layer_schedule_search(layer, batch_size, resource, cost,
     return list(tops)
 
 
-def schedule_search(layers, batch_size, resource, cost, gen_nested_loop_desc,
+def schedule_search(layers, batch_size, resource, cost, map_strategy_class,
                     options):
     '''
     Search the best schedule for given network and batch size.
@@ -167,7 +169,7 @@ def schedule_search(layers, batch_size, resource, cost, gen_nested_loop_desc,
                 # For each previous layer partition scheme, search top schedules
                 # for the current layer.
                 tops = layer_schedule_search(layer, batch_size, resource, cost,
-                                             part_lprev, gen_nested_loop_desc,
+                                             part_lprev, map_strategy_class,
                                              options)
             except Exception as e:
                 sys.stderr.write('Failed when scheduling layer {}'.format(name))
