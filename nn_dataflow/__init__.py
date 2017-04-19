@@ -24,10 +24,10 @@ nn_dataflow module.
 
 from . import DataCategoryEnum
 from . import LoopBlocking
+from . import LoopBlockingSolver
 from . import MemHierEnum
 from . import ParallelEnum
 from . import Partition
-from . import Solver
 from .Cost import Cost
 from .Layer import Layer, FCLayer
 from .LoopBlockingScheme import LoopBlockingScheme

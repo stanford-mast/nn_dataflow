@@ -29,7 +29,7 @@ For our problem, only deal with nifm, nofm, and batch loops.
 import itertools
 
 from . import DataCategoryEnum as de
-from . import Solver
+from . import LoopBlockingSolver
 from . import Util
 from .LoopBlockingScheme import LoopBlockingScheme
 
@@ -56,7 +56,7 @@ def gen_loopblocking(nested_loop_desc, resource, options):
     Generator for loop blocking.
     '''
     if options.sw_solve_loopblocking:
-        gen = Solver.gen_loopblocking_gbuf_regf
+        gen = LoopBlockingSolver.gen_loopblocking_gbuf_regf
     else:
         gen = gen_loopblocking_gbuf_regf
 

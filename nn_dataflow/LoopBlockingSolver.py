@@ -19,7 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 '''
-Analytical models and solvers.
+Analytical solvers for loop blocking.
 '''
 
 import math
@@ -94,7 +94,8 @@ def _solve_lpbl_iofmap_gbuf_reside(nested_loop_desc, resource, reside_dce):
         facc_x = 2
         facc_y = 1
     else:
-        raise RuntimeError('Solver: only allow ifmap or ofmap to bypass.')
+        raise RuntimeError('LoopBlockingSolver: only allow ifmap or ofmap '
+                           'to bypass.')
 
     nbats = nested_loop_desc.loopcnt_bat
 
@@ -247,7 +248,8 @@ def _solve_lpbl_filter_gbuf_reside(nested_loop_desc, resource):
             facc_x = 2
             facc_y = 1
         else:
-            raise RuntimeError('Solver: only allow ifmap or ofmap to bypass.')
+            raise RuntimeError('LoopBlockingSolver: only allow ifmap or ofmap '
+                               'to bypass.')
 
         nbats = nested_loop_desc.loopcnt_bat
 
