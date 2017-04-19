@@ -101,6 +101,17 @@ def closest_factor(value, factor):
     return res
 
 
+def get_ith_range(rng, idx, num):
+    '''
+    Divide the full range `rng` into `num` parts, and get the `idx`-th range.
+    '''
+    length = rng[1] - rng[0]
+    beg = rng[0] + idx * length / num
+    end = rng[0] + (idx + 1) * length / num
+    assert end <= rng[1]
+    return beg, end
+
+
 def assert_float_eq_int(vfloat, vint, message=''):
     '''
     Check the given float value is equal to the given int value. Print the
