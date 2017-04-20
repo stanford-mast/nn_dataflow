@@ -39,12 +39,16 @@ def gen_partition(layer, batch_size, dim_nodes, options):
     Generator for all possible partitioning schemes that partition `layer` into
     2D `dim_nodes` nodes.
     '''
-    del batch_size
-
     for ph, pw in itertools.product(Util.factorize(dim_nodes.h, pe.NUM),
                                     Util.factorize(dim_nodes.w, pe.NUM)):
 
         pdims = [PhyDim2(h, w) for h, w in zip(ph, pw)]
+
+        # Batch partitoning.
+        if (not options.partition_batch) and pdims[pe.BATP].size() > 1:
+            continue
+        elif batch_size % pdims[pe.BATP].size() != 0:
+            continue
 
         if options.partition_hybrid:
             # Require partition is approximately dividable of total size.
@@ -69,6 +73,10 @@ def gen_partition(layer, batch_size, dim_nodes, options):
             # relevant. Force them at the beginning.
             no_part = [v for v in range(pe.NUM) if pdims[v].size() == 1]
             if not all([order[i] == no_part[i] for i in range(len(no_part))]):
+                continue
+
+            # Batch parallelism should be at the top.
+            if pe.BATP not in no_part and order[len(no_part)] != pe.BATP:
                 continue
 
             part = PartitionScheme(order, pdims)

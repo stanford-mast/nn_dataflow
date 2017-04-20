@@ -111,7 +111,7 @@ class PartitionScheme(object):
                         layer.sfil,
                         layer.strd)
 
-        p_batch_size = batch_size
+        p_batch_size = batch_size / self.pdims[pe.BATP].size()
 
         p_occ = 1. * layer.total_ops(batch_size) \
                 / (p_layer.total_ops(p_batch_size) * self.size())
@@ -125,8 +125,10 @@ class PartitionScheme(object):
         index.
         '''
         # Batch partition.
-        b_beg = 0
-        b_end = batch_size
+        idx_bat = pidx[pe.BATP].h * self.pdims[pe.BATP].w + pidx[pe.BATP].w
+        b_beg, b_end = Util.get_ith_range((0, batch_size),
+                                          idx_bat,
+                                          self.pdims[pe.BATP].size())
 
         # Fmap channel partition.
         idx_chn = pidx[pe.OUTP].h * self.pdims[pe.OUTP].w + pidx[pe.OUTP].w

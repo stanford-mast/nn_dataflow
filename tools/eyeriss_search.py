@@ -72,6 +72,7 @@ def do_scheduling(args):
     options = Option(sw_gbuf_bypass=tuple(bypass),
                      sw_solve_loopblocking=args.solve_loopblocking,
                      partition_hybrid=args.hybrid_partition,
+                     partition_batch=args.batch_partition,
                      ntops=1,
                      nprocesses=args.processes)
 
@@ -195,6 +196,9 @@ if __name__ == '__main__':
                     action='store_true',
                     help='Use hybrid partition for layer for node mapping. '
                          'Otherwise use naive method based on layer type.')
+    ap.add_argument('--batch-partition', action='store_true',
+                    help='Allow partitioning batch, i.e., consider data '
+                         'parallelism.')
 
     ap.add_argument('-p', '--processes', type=int,
                     default=multiprocessing.cpu_count()/2,

@@ -55,6 +55,7 @@ def main(args):
             disable_bypass='i o f'.split(),
             solve_loopblocking=False,
             hybrid_partition=False,
+            batch_partition=False,
             processes=args.processes)
 
         results = do_scheduling(mapping_args)
@@ -82,6 +83,7 @@ def main(args):
             disable_bypass='i o f'.split(),
             solve_loopblocking=False,
             hybrid_partition=False,
+            batch_partition=False,
             processes=args.processes)
 
         results = do_scheduling(mapping_args)

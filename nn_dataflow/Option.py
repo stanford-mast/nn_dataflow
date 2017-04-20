@@ -29,6 +29,7 @@ from . import DataCategoryEnum as de
 OPTION_LIST = ['sw_gbuf_bypass',
                'sw_solve_loopblocking',
                'partition_hybrid',
+               'partition_batch',
                'ntops',
                'nprocesses',
               ]
