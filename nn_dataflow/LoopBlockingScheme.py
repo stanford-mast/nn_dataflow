@@ -184,6 +184,15 @@ class LoopBlockingScheme(object):
 
         return size
 
+    def scale_by_occupation(self, occupation):
+        '''
+        Scale the computation and regf access by the given occupation.
+
+        Other accesses are not affected.
+        '''
+        self.ops *= occupation
+        self.access[me.REGF] = [a * occupation for a in self.access[me.REGF]]
+
     def get_access(self):
         '''
         Get number of accesses of each data category to each hierarchy.
