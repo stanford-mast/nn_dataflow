@@ -28,6 +28,7 @@ from . import LoopBlockingSolver
 from . import MemHierEnum
 from . import ParallelEnum
 from . import Partition
+from . import RemoteAccess
 from .Cost import Cost
 from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
 from .Layer import Layer, FCLayer
@@ -35,7 +36,7 @@ from .LoopBlockingScheme import LoopBlockingScheme
 from .MapStrategy import MapStrategyEyeriss
 from .NestedLoopDesc import NestedLoopDesc
 from .Option import Option
-from .Partition import Partition2dScheme
+from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
 from .Resource import Resource
 

@@ -33,16 +33,9 @@ from . import LoopBlocking
 from . import MemHierEnum as me
 from . import ParallelEnum as pe
 from . import Partition
-from .Partition import Partition2dScheme
+from . import RemoteAccess
+from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
-
-
-def _get_partition2d_genfunc(options):
-    ''' Get the generator function for parallel partition. '''
-    if options.partition_hybrid:
-        return Partition.gen_layer_partition2d
-    else:
-        return Partition.gen_layer_naive_partition2d
 
 
 def _combine_search_lpbl_part2d(resource, cost, nested_loop_desc, layer_part,
@@ -87,8 +80,8 @@ def _combine_search_lpbl_part2d(resource, cost, nested_loop_desc, layer_part,
             cost_part = cost.noc_hop * sum(total_nhops)
             dict_part = {'unit_nhops': unit_nhops,
                          'total_nhops': total_nhops,
-                         'part_lprev': part_lprev.as_pod_type(),
-                         'part_lcurr': part_lcurr.as_pod_type()}
+                         'part_lprev': part_lprev.__dict__,
+                         'part_lcurr': part_lcurr.__dict__}
 
             # Combine.
             dict_loop.update({'cost': cost_loop})
@@ -109,21 +102,23 @@ def layer_schedule_search(layer, batch_size, resource, cost,
     results = []
 
     # Search NoC partition.
-    for part_lcurr, layer_part in _get_partition2d_genfunc(options)(
-            layer, resource.dim_nodes):
+    for part_lcurr in Partition.gen_partition(layer, batch_size, resource.dim_nodes, options):
 
-        unit_nhops = Partition.unit_nhops_layer_partition2d(
-            layer, batch_size, part_lcurr, part_lprev)
+        part_layer, part_batch_size, _ = part_lcurr.part_layer(layer, batch_size)
 
-        map_strategy = map_strategy_class(layer_part, batch_size,
+        unit_nhops = RemoteAccess.part_layer_unit_nhops(
+            layer, batch_size, part_lcurr, part_lprev, PhyDim2(0, 0),
+            None, PhyDim2(0, 0), options)
+
+        map_strategy = map_strategy_class(part_layer, part_batch_size,
                                           resource.dim_array)
 
         # Search loop blocking using partitioned layer.
         for nested_loop_desc in map_strategy.gen_nested_loop_desc():
 
             r = pool.apply_async(_combine_search_lpbl_part2d,
-                                 (resource, cost, nested_loop_desc, layer_part,
-                                  batch_size, part_lcurr, part_lprev,
+                                 (resource, cost, nested_loop_desc, part_layer,
+                                  part_batch_size, part_lcurr, part_lprev,
                                   unit_nhops, options))
             results.append(r)
 
@@ -148,13 +143,12 @@ def schedule_search(layers, batch_size, resource, cost, map_strategy_class,
     aggr_tops = [(0, OrderedDict()) for _ in range(options.ntops)]
 
     # Assume the first layer input is fully fmap partitioned (image tiled).
-    partition2d_all_ofmp = [0] * pe.NUM
-    partition2d_all_ofmp[pe.OUTP] = PhyDim2(1, 1)
+    partition2d_all_ofmp = [PhyDim2(1, 1) for _ in range(pe.NUM)]
     partition2d_all_ofmp[pe.OFMP] = resource.dim_nodes
 
     # Keep all previous layer partition schemes appeared in the top schedules.
     # Explore all of them for next layer.
-    part_lprev_list = [Partition2dScheme(range(pe.NUM), partition2d_all_ofmp)]
+    part_lprev_list = [PartitionScheme(range(pe.NUM), partition2d_all_ofmp)]
     # The corresponding indexes of schedules in aggr_tops for the previous layer
     # partition scheme.
     aggr_top_indexes_list = [range(options.ntops)]
@@ -181,7 +175,7 @@ def schedule_search(layers, batch_size, resource, cost, map_strategy_class,
                 if t_idx >= len(tops):
                     break
                 # 2: dict_part.
-                assert tops[t_idx][2]['part_lprev'] == part_lprev.as_pod_type()
+                assert tops[t_idx][2]['part_lprev'] == part_lprev.__dict__
                 for at_idx in aggr_top_indexes:
                     new_schedule = aggr_tops[at_idx][1].copy()
                     new_schedule.update({name: tops[t_idx]})
@@ -199,8 +193,9 @@ def schedule_search(layers, batch_size, resource, cost, map_strategy_class,
                 break
             # 1: list of schedules for layers; name: last layer; 2: dict_part.
             # Translate back to Partition2dScheme.
-            part_lprev_pod = aggr_tops[at_idx][1][name][2]['part_lcurr']
-            part_lprev = Partition2dScheme(*part_lprev_pod)
+            part_lprev_dict = aggr_tops[at_idx][1][name][2]['part_lcurr']
+            part_lprev = PartitionScheme(part_lprev_dict['order'],
+                                         part_lprev_dict['pdims'])
             try:
                 i = part_lprev_list.index(part_lprev)
             except ValueError:
