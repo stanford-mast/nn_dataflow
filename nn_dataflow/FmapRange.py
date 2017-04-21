@@ -18,18 +18,15 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-A position or a range in a batched fmap.
-'''
-
 from collections import namedtuple, Counter
 import itertools
 import numpy as np
 
-
 _FMAP_POSITION_ATTRS = ['b', 'n', 'h', 'w']
 
-
+'''
+A position in a batched fmap.
+'''
 FmapPosition = namedtuple('FmapPosition', _FMAP_POSITION_ATTRS)
 
 
@@ -51,7 +48,7 @@ class FmapRange(object):
         Extract the begin values and end values for the given attributes. Not
         specifying means all attributes.
         '''
-        if len(attrs) == 0:
+        if not attrs:
             begs = self.fp_beg
             ends = self.fp_end
         else:

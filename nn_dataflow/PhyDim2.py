@@ -18,10 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Physical 2D dimension.
-'''
-
 from collections import namedtuple
 from operator import add, sub, mul
 
@@ -53,5 +49,4 @@ class PhyDim2(namedtuple('PhyDim2', ['h', 'w'])):
         return PhyDim2(*map(mul, self, other))
 
     __rmul__ = __mul__
-
 

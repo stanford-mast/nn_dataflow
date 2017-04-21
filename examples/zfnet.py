@@ -18,15 +18,15 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from collections import OrderedDict
+
+from nn_dataflow import Layer, FCLayer
+
 '''
 ZFNet
 
 Zeiler and Fergus, 2013
 '''
-
-from collections import OrderedDict
-
-from nn_dataflow import Layer, FCLayer
 
 LAYERS = OrderedDict()
 

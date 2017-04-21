@@ -18,16 +18,11 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Reproduce optimal schedule for Eyeriss paper.
-'''
-
 import argparse
 import multiprocessing
 import sys
 
 from eyeriss_search import do_scheduling
-
 
 class _Namespace(object):  # pylint: disable=too-few-public-methods
     def __init__(self, **kwargs):
@@ -35,7 +30,7 @@ class _Namespace(object):  # pylint: disable=too-few-public-methods
 
 
 def main(args):
-    ''' Main function. '''
+    ''' Reproduce optimal schedule for Eyeriss paper. '''
 
     hier_cost = [200, 6, 2, 1]
 

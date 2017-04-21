@@ -18,16 +18,15 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Analytical solvers for loop blocking.
-'''
-
 import math
 import itertools
 
 from . import DataCategoryEnum as de
 from . import Util
 
+'''
+Analytical solvers for loop blocking.
+'''
 
 def _solve_lpbl_iofmap_gbuf_reside(nested_loop_desc, resource, reside_dce):
     '''
@@ -336,5 +335,4 @@ def gen_loopblocking_gbuf_regf(nested_loop_desc, resource, options):
             ti, to, tb, orders = _solve_lpbl_iofmap_gbuf_reside(
                 nested_loop_desc, resource, reside_dce)
         yield ti, to, tb, orders
-
 

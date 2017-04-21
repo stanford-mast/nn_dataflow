@@ -18,12 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Naive 3-nested loop (nifm, nofm, batch) description.
-
-For our problem, only deal with nifm, nofm, and batch loops.
-'''
-
 from collections import namedtuple
 
 from . import DataCategoryEnum as de
@@ -42,7 +36,10 @@ NESTED_LOOP_DESC_LIST = ['loopcnt_ifm',
 class NestedLoopDesc(namedtuple('NestedLoopDesc', NESTED_LOOP_DESC_LIST)):
     '''
     Naive 3-nested loop (nifm, nofm, batch) description.
+
+    For our problem, only deal with nifm, nofm, and batch loops.
     '''
+
     def __new__(cls, *args, **kwargs):
         ntp = super(NestedLoopDesc, cls).__new__(cls, *args, **kwargs)
 
@@ -94,5 +91,4 @@ class NestedLoopDesc(namedtuple('NestedLoopDesc', NESTED_LOOP_DESC_LIST)):
         if dce is None:
             return sum(self.unit_access[mhe])
         return self.unit_access[mhe][dce]
-
 

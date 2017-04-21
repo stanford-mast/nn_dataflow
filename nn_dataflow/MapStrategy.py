@@ -18,12 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Mapping strategy.
-
-Map is the procedure to map the 2D convolution computation onto the 2D PE array.
-'''
-
 import math
 import warnings
 
@@ -34,10 +28,11 @@ from .Layer import Layer
 from .NestedLoopDesc import NestedLoopDesc
 from .PhyDim2 import PhyDim2
 
-
 class MapStrategy(object):
     '''
-    Base mapping class.
+    Base mapping strategy.
+
+    Map is the procedure to map the 2D convolution computation onto the 2D PE array.
     '''
 
     def __init__(self, layer, batch_size, dim_array):

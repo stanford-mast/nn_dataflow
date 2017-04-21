@@ -18,14 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Loop blocking optimization.
-
-Include loop blocking and reordering.
-
-For our problem, only deal with nifm, nofm, and batch loops.
-'''
-
 import itertools
 
 from . import DataCategoryEnum as de
@@ -33,6 +25,13 @@ from . import LoopBlockingSolver
 from . import Util
 from .LoopBlockingScheme import LoopBlockingScheme
 
+'''
+Loop blocking optimization.
+
+Include loop blocking and reordering.
+
+For our problem, only deal with nifm, nofm, and batch loops.
+'''
 
 def gen_loopblocking_gbuf_regf(nested_loop_desc, resource, options):
     '''
@@ -65,5 +64,4 @@ def gen_loopblocking(nested_loop_desc, resource, options):
                                  resource, options)
         if lbs.is_valid():
             yield lbs
-
 

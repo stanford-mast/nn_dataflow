@@ -18,10 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-NN Layer specification.
-'''
-
 class Layer(object):
     '''
     NN layer parameters.
@@ -122,5 +118,4 @@ class FCLayer(Layer):
     def __init__(self, nifm, nofm, sfil):
         Layer.__init__(self, nifm, nofm, 1, sfil)
         assert self.hofm == 1 and self.wofm == 1
-
 

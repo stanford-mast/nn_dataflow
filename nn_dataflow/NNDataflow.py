@@ -18,10 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Top-level scheduling interface.
-'''
-
 import sys
 from collections import OrderedDict
 
@@ -30,6 +26,9 @@ from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
 from .Scheduling import SchedulingCondition, Scheduling
 
+'''
+Top-level scheduling interface.
+'''
 
 def schedule_search(layers, batch_size, resource, cost, map_strategy_class,
                     options):

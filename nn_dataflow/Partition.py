@@ -18,14 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Parallel process partitioning.
-
-Partition among multiple copies of the PE arrays.
-
-For our case, only deal with up to 2D layout of PE arrays.
-'''
-
 import itertools
 
 from . import ParallelEnum as pe
@@ -33,6 +25,13 @@ from . import Util
 from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
 
+'''
+Parallel process partitioning.
+
+Partition among multiple copies of the PE arrays.
+
+For our case, only deal with up to 2D layout of PE arrays.
+'''
 
 def gen_partition(layer, batch_size, dim_nodes, options):
     '''

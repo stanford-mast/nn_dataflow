@@ -18,10 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Search optimal schedule and partitioning.
-'''
-
 import argparse
 import json
 import multiprocessing
@@ -38,7 +34,6 @@ from nn_dataflow import Resource
 from nn_dataflow import schedule_search
 
 from examples import import_network_layers
-
 
 def do_scheduling(args):
     '''

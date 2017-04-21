@@ -18,16 +18,15 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Parallel process partitioning among multiple 2D nodes.
-'''
-
 import itertools
 
 from . import DataCategoryEnum as de
 from .FmapRange import FmapRangeMap
 from .PhyDim2 import PhyDim2
 
+'''
+Parallel process partitioning among multiple 2D nodes.
+'''
 
 def get_nhops(coord1, coord2=PhyDim2(0, 0)):
     ''' Get number of hops from `coord1` to `coord2`. '''

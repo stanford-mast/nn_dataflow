@@ -18,15 +18,15 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from collections import OrderedDict
+
+from nn_dataflow import Layer
+
 '''
 ResNet-152
 
 He, Zhang, Ren, and Sun, 2015
 '''
-
-from collections import OrderedDict
-
-from nn_dataflow import Layer
 
 LAYERS = OrderedDict()
 
@@ -52,7 +52,6 @@ for i in range(1, 37):
         LAYERS['conv4_' + str(i) + '_a'] = Layer(1024, 256, 14, 1)
     LAYERS['conv4_' + str(i) + '_b'] = Layer(256, 256, 14, 3)
     LAYERS['conv4_' + str(i) + '_c'] = Layer(256, 1024, 14, 1)
-
 
 for i in range(1, 4):
     if i == 1:

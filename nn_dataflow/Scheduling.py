@@ -18,10 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Scheduling interface for a layer.
-'''
-
 import heapq
 import math
 from collections import OrderedDict, namedtuple
@@ -37,7 +33,6 @@ from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
 from .Resource import Resource
 
-
 def _apply_loopblocking_search(scheduling, *args):
     '''
     Make function pickle-able for multiprocessing.Pool.
@@ -52,6 +47,7 @@ class SchedulingCondition(namedtuple('SchedulingCondition',
     '''
     Layer scheduling condition (constraints).
     '''
+
     def __new__(cls, *args, **kwargs):
         ntp = super(SchedulingCondition, cls).__new__(cls, *args, **kwargs)
 
@@ -73,6 +69,7 @@ class SchedulingResult(namedtuple('SchedulingResult',
     '''
     Layer scheduling result.
     '''
+
     def __new__(cls, *args, **kwargs):
         ntp = super(SchedulingResult, cls).__new__(cls, *args, **kwargs)
 

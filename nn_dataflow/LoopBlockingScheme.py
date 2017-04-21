@@ -18,20 +18,11 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Loop blocking optimization.
-
-Include loop blocking and reordering.
-
-For our problem, only deal with nifm, nofm, and batch loops.
-'''
-
-import numpy as np
 from collections import OrderedDict
+import numpy as np
 
 from . import DataCategoryEnum as de
 from . import MemHierEnum as me
-
 
 class LoopBlockingScheme(object):
     '''
@@ -48,7 +39,6 @@ class LoopBlockingScheme(object):
         GBUF = 0
         REGF = 1
         NUM = 2
-
 
     def __init__(self, nested_loop_desc, tifm, tofm, tbat, orders,
                  resource, options):
@@ -278,7 +268,7 @@ class LoopBlockingScheme(object):
             # inner level.
             # See the outer level.
             assert len(bls_outer) == len(orders_outer)
-            if len(bls_outer) > 0:
+            if bls_outer:
                 self._adjust_reuse(reuse_, bls_outer[0], orders_outer[0],
                                    bls_outer[1:], orders_outer[1:])
 
@@ -327,5 +317,4 @@ class LoopBlockingScheme(object):
                     < self.orders[me.GBUF].index(de.IFM):
             self.fetches[de.OFM] = self.ti[BL.GBUF]
         assert self.fetches[de.OFM] * self.reuse[BL.GBUF][de.OFM] == tip
-
 

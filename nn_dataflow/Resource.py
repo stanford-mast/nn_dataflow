@@ -18,10 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Hardware resource specification.
-'''
-
 from collections import namedtuple
 
 from .PhyDim2 import PhyDim2

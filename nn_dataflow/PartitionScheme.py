@@ -18,10 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Parallel processing partitioning scheme.
-'''
-
 import itertools
 
 from . import ParallelEnum as pe
@@ -30,10 +26,9 @@ from .FmapRange import FmapPosition, FmapRange
 from .Layer import Layer
 from .PhyDim2 import PhyDim2
 
-
 class PartitionScheme(object):
     '''
-    A partitioning scheme.
+    A parallel processing partitioning scheme.
     '''
 
     def __init__(self, order, pdims):
@@ -60,7 +55,7 @@ class PartitionScheme(object):
         Get the partitioning dimension for the given parallelisms. If not given,
         return total dimension.
         '''
-        if len(paes) == 0:
+        if not paes:
             return self.dim(*range(pe.NUM))
 
         dim = PhyDim2(1, 1)
