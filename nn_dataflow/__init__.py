@@ -39,6 +39,7 @@ from .Option import Option
 from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
 from .Resource import Resource
+from .Scheduling import SchedulingCondition, SchedulingResult, Scheduling
 
-from .Schedule import schedule_search
+from .NNDataflow import schedule_search
 
