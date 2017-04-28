@@ -88,13 +88,6 @@ class FmapRange(object):
 
         return np.prod(lens)
 
-    def contains(self, fpos):
-        '''
-        Whether the given FmapPosition is in the FmapRange.
-        '''
-        return all(p >= b and p < e for p, b, e
-                   in zip(fpos, self.fp_beg, self.fp_end))
-
     def overlap(self, other):
         '''
         Get the overlap FmapRange of the two.
@@ -141,6 +134,13 @@ class FmapRange(object):
                                       h=h_src_beg, w=w_src_beg),
                          FmapPosition(b=b_src_end, n=n_src_end,
                                       h=h_src_end, w=w_src_end))
+
+    def __contains__(self, fpos):
+        '''
+        Whether the given FmapPosition is in the FmapRange.
+        '''
+        return all(p >= b and p < e for p, b, e
+                   in zip(fpos, self.fp_beg, self.fp_end))
 
     def __cmp__(self, other):
         if not isinstance(other, FmapRange):
@@ -198,7 +198,7 @@ class FmapRangeMap(object):
         Get the value corresponding to the given FmapPosition.
         '''
         for kv in self.keyvals:
-            if kv[0].contains(fpos):
+            if fpos in kv[0]:
                 return kv[1]
         raise KeyError('FmapRangeMap: key {} is not found.'.format(fpos))
 
