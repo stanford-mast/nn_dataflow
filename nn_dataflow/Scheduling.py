@@ -25,7 +25,6 @@ from multiprocessing import Pool
 
 from . import LoopBlocking
 from . import Partition
-from . import RemoteAccess
 from .Cost import Cost
 from .Layer import Layer
 from .MapStrategy import MapStrategy
@@ -135,7 +134,7 @@ class Scheduling(object):
                                             condition.resource.dim_nodes,
                                             options):
             # Partition NoC hop cost.
-            unit_nhops = RemoteAccess.part_layer_unit_nhops(
+            unit_nhops = Partition.part_layer_unit_nhops(
                 self.layer, self.batch_size, part, condition.part_src,
                 PhyDim2(0, 0), None, PhyDim2(0, 0), options)
             if math.isinf(sum(unit_nhops)):

@@ -30,6 +30,13 @@ class PhyDim2(namedtuple('PhyDim2', ['h', 'w'])):
         ''' Total size. '''
         return int(reduce(mul, self, 1))
 
+    def hop_dist(self, other):
+        ''' Hop distance between twn coordinate. '''
+        if not isinstance(other, PhyDim2):
+            raise TypeError('PhyDim2: hop_dist only applies on two PhyDim2 '
+                            'instances.')
+        return abs(self.h - other.h) + abs(self.w - other.w)
+
     def __add__(self, other):
         ''' Return element-wise `self + other`. '''
         if not isinstance(other, PhyDim2):

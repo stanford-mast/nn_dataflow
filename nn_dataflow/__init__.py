@@ -24,7 +24,6 @@ from . import LoopBlockingSolver
 from . import MemHierEnum
 from . import ParallelEnum
 from . import Partition
-from . import RemoteAccess
 from .Cost import Cost
 from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
 from .Layer import Layer, FCLayer

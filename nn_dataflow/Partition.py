@@ -20,8 +20,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import itertools
 
+from . import DataCategoryEnum as de
 from . import ParallelEnum as pe
 from . import Util
+from .FmapRange import FmapRangeMap
 from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
 
@@ -82,4 +84,82 @@ def gen_partition(layer, batch_size, dim_nodes, options):
             assert part.dim() == dim_nodes
 
             yield part
+
+
+def part_layer_unit_nhops(layer, batch_size, part, part_src, offset_src,
+                          part_dst, offset_dst, options):
+    '''
+    Get total number of hops for each data category when partitioning the given
+    layer with `part` and partitioning the source (previous layer) with
+    `part_src`. The node region origin offset of src is `offset_src`. In
+    addition, optionally (set to None if not used), the destination (next layer
+    or memory storage for current layer) is partitioned with `part_dst`, and
+    the node region origin offset of dst is `offset_dst`.
+
+    Return a tuple with each element being the number of hops for each data
+    category.
+    '''
+
+    nhops = [0] * de.NUM
+
+    del options
+
+    # Prepare mapping from FmapPosition to coordinate for src. Coordinate is
+    # translated to current origin.
+    fp2c_src = FmapRangeMap()
+    for pidx in part_src.gen_pidx():
+        coord = part_src.coordinate(pidx)
+        frng = part_src.part_fmap_range(
+            batch_size, layer.nifm, layer.hifm, layer.wifm, pidx)
+        fp2c_src.add(frng, coord + offset_src)
+
+    # Prepare mapping from FmapPosition to coordinate for dst. Coordinate is
+    # translated to current origin.
+    if part_dst is None:
+        # Set to be same as layer partition if None.
+        part_dst = part
+        offset_dst = PhyDim2(0, 0)
+    fp2c_dst = FmapRangeMap()
+    for pidx in part_dst.gen_pidx():
+        coord = part_dst.coordinate(pidx)
+        frng = part_dst.part_fmap_range(
+            batch_size, layer.nofm, layer.hofm, layer.wofm, pidx)
+        fp2c_dst.add(frng, coord + offset_dst)
+
+    # Filters are read-only and known beforehand, can be easily replicated
+    # in all memory nodes. Read from the nearest one.
+    fil_coords_src = []
+    dim_nodes_src = part_src.dim()
+    for h, w in itertools.product(range(dim_nodes_src.h),
+                                  range(dim_nodes_src.w)):
+        fil_coords_src.append(PhyDim2(h, w) + offset_src)
+
+    for pidx in part.gen_pidx():
+        coord = part.coordinate(pidx)
+        frng = part.part_fmap_range(
+            batch_size, layer.nofm, layer.hofm, layer.wofm, pidx)
+
+        frng_src = frng.corresponding_input_fmap_range(layer)
+
+        ## ifmap access.
+
+        coord_src_counts = fp2c_src.rget_counter(frng_src)
+        assert sum(coord_src_counts.values()) == frng_src.size()
+        for coord_src, cnt in coord_src_counts.items():
+            nhops[de.IFM] += cnt * coord.hop_dist(coord_src)
+
+        ## ofmap access.
+
+        coord_dst_counts = fp2c_dst.rget_counter(frng)
+        assert sum(coord_dst_counts.values()) == frng.size()
+        for coord_dst, cnt in coord_dst_counts.items():
+            nhops[de.OFM] += cnt * coord.hop_dist(coord_dst)
+
+        ## filter access.
+
+        fil_size = frng.size('n') * frng_src.size('n') * layer.filter_size()
+        min_hops = min(coord.hop_dist(cfil) for cfil in fil_coords_src)
+        nhops[de.FIL] += fil_size * min_hops
+
+    return nhops
 
