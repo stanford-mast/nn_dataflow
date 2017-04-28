@@ -40,7 +40,7 @@ def schedule_search(network, batch_size, resource, cost, map_strategy_class,
 
     # Assume the first layer input is fully fmap partitioned (image tiled).
     partition2d_all_ofmp = [PhyDim2(1, 1) for _ in range(pe.NUM)]
-    partition2d_all_ofmp[pe.OFMP] = resource.dim_nodes
+    partition2d_all_ofmp[pe.OFMP] = resource.mem_region_src().dim
 
     # Keep all previous layer partition schemes appeared in the top schedules.
     # Explore all of them for next layer.
@@ -94,7 +94,7 @@ def schedule_search(network, batch_size, resource, cost, map_strategy_class,
                 break
             # 1: list of schedules for layers; name: last layer; 2: dict_part.
             # Translate back to Partition2dScheme.
-            part_lprev_dict = aggr_tops[at_idx][1][name].dict_part['part']
+            part_lprev_dict = aggr_tops[at_idx][1][name].dict_part['part_dst']
             part_lprev = PartitionScheme(part_lprev_dict['order'],
                                          part_lprev_dict['pdims'])
             try:

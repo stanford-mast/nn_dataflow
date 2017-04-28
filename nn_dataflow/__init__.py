@@ -34,7 +34,7 @@ from .Network import Network
 from .Option import Option
 from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
-from .Resource import Resource
+from .Resource import NodeRegion, Resource
 from .Scheduling import SchedulingCondition, SchedulingResult, Scheduling
 
 from .NNDataflow import schedule_search

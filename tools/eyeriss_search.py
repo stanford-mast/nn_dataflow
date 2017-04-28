@@ -28,6 +28,7 @@ from nn_dataflow import Cost
 from nn_dataflow import DataCategoryEnum as de
 from nn_dataflow import MapStrategyEyeriss
 from nn_dataflow import MemHierEnum as me
+from nn_dataflow import NodeRegion
 from nn_dataflow import Option
 from nn_dataflow import PhyDim2
 from nn_dataflow import Resource
@@ -45,8 +46,21 @@ def do_scheduling(args):
     batch_size = args.batch
     word = (args.word + 7) / 8
 
-    resource = Resource(dim_nodes=PhyDim2(*args.nodes),
+    dim_nodes = PhyDim2(*args.nodes)
+
+    if args.mem_type == '2D':
+        # Memory nodes are on two sides.
+        mem_regions = (NodeRegion(dim=PhyDim2(h=dim_nodes.h, w=1),
+                                  origin=PhyDim2(h=0, w=0)),
+                       NodeRegion(dim=PhyDim2(h=dim_nodes.h, w=1),
+                                  origin=PhyDim2(h=0, w=dim_nodes.w - 1)))
+    elif args.mem_type == '3D':
+        # All nodes have memory.
+        mem_regions = (NodeRegion(dim=dim_nodes, origin=PhyDim2(0, 0)),)
+
+    resource = Resource(dim_nodes=dim_nodes,
                         dim_array=PhyDim2(*args.array),
+                        mem_regions=mem_regions,
                         size_gbuf=args.gbuf/word,
                         size_regf=args.regf/word)
 
@@ -177,6 +191,10 @@ if __name__ == '__main__':
                     help='cost of access through one NoC hop')
     ap.add_argument('--unit-static-cost', type=float, default=0,
                     help='static cost for unit execution time')
+
+    ap.add_argument('--mem-type', default='2D', choices=['2D', '3D'],
+                    help='memory type. "2D" has memory only on edge nodes; '
+                         '"3D" has memory vertially on top of all nodes.')
 
     ap.add_argument('--disable-bypass', nargs='*', default=[],
                     choices=['i', 'o', 'f'],

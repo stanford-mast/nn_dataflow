@@ -29,7 +29,6 @@ from .Cost import Cost
 from .Layer import Layer
 from .MapStrategy import MapStrategy
 from .PartitionScheme import PartitionScheme
-from .PhyDim2 import PhyDim2
 from .Resource import Resource
 
 def _apply_loopblocking_search(scheduling, *args):
@@ -129,14 +128,30 @@ class Scheduling(object):
             apply_func = apply
             retrieve_func = retrieve_result_st()
 
+        mem_region_src = condition.resource.mem_region_src()
+        mem_region_dst = condition.resource.mem_region_dst()
+
         # Explore parallel partitioning schemes.
         for part in Partition.gen_partition(self.layer, self.batch_size,
                                             condition.resource.dim_nodes,
                                             options):
+            # Ifmap partitioning.
+            part_src = condition.part_src
+            if not all(sd <= mrsd for sd, mrsd
+                       in zip(part_src.dim(), mem_region_src.dim)):
+                raise ValueError('Scheduling: ifmap partitioning {} is '
+                                 'invalid within memory region {}.'
+                                 .format(part_src, str(mem_region_src)))
+
+            # Ofmap partitioning.
+            part_dst = Partition.get_ofmap_part(part, mem_region_dst)
+
             # Partition NoC hop cost.
             unit_nhops = Partition.part_layer_unit_nhops(
-                self.layer, self.batch_size, part, condition.part_src,
-                PhyDim2(0, 0), None, PhyDim2(0, 0), options)
+                self.layer, self.batch_size, part,
+                part_src, mem_region_src.origin,
+                part_dst, mem_region_dst.origin,
+                options)
             if math.isinf(sum(unit_nhops)):
                 continue
 
@@ -154,7 +169,7 @@ class Scheduling(object):
                 # Explore loop blocking schemes.
                 r = apply_func(_apply_loopblocking_search,
                                (self, nested_loop_desc, part, unit_nhops,
-                                p_occ, condition, options))
+                                p_occ, part_dst, condition, options))
                 results.append(r)
 
         tops = heapq.nsmallest(options.ntops, retrieve_func, key=lambda x: x[0])
@@ -174,7 +189,7 @@ class Scheduling(object):
         return list(tops)
 
     def loopblocking_search(self, nested_loop_desc, part, unit_nhops, part_occ,
-                            condition, options):
+                            part_dst, condition, options):
         '''
         Search the loop blocking schemes. Return the best schedule results.
         '''
@@ -183,11 +198,12 @@ class Scheduling(object):
                                                      condition.resource,
                                                      options):
                 yield self._get_result(lbs, part, unit_nhops, part_occ,
-                                       condition, options)
+                                       part_dst, condition, options)
 
         return heapq.nsmallest(options.ntops, _sweep(), key=lambda x: x[0])
 
-    def _get_result(self, lbs, part, unit_nhops, part_occ, condition, options):
+    def _get_result(self, lbs, part, unit_nhops, part_occ, part_dst, condition,
+                    options):
         '''
         Make the schedule result from loop blocking and partitioning.
         '''
@@ -212,6 +228,7 @@ class Scheduling(object):
                                  ('total_nhops', total_nhops),
                                  ('part', part.__dict__),
                                  ('part_src', condition.part_src.__dict__),
+                                 ('part_dst', part_dst.__dict__),
                                  ('unit_nhops', unit_nhops),
                                  ('part_occ', part_occ)])
 

@@ -22,8 +22,36 @@ from collections import namedtuple
 
 from .PhyDim2 import PhyDim2
 
+NODE_REGION_LIST = ['dim',
+                    'origin',
+                   ]
+
+class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
+    '''
+    A node region defined by the dimension and origin offset.
+    '''
+
+    def __new__(cls, *args, **kwargs):
+        ntp = super(NodeRegion, cls).__new__(cls, *args, **kwargs)
+
+        if not isinstance(ntp.dim, PhyDim2):
+            raise TypeError('NodeRegion: dim must be a PhyDim2 object.')
+        if not isinstance(ntp.origin, PhyDim2):
+            raise TypeError('NodeRegion: origin must be a PhyDim2 object.')
+
+        return ntp
+
+    def __contains__(self, coordinate):
+        ''' Whether the region contains the given coordinate. '''
+        min_coord = self.origin
+        max_coord = self.origin + self.dim
+        return all(cmin <= c and c < cmax for c, cmin, cmax
+                   in zip(coordinate, min_coord, max_coord))
+
+
 RESOURCE_LIST = ['dim_nodes',
                  'dim_array',
+                 'mem_regions',
                  'size_gbuf',
                  'size_regf',
                 ]
@@ -41,10 +69,31 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
         if not isinstance(ntp.dim_array, PhyDim2):
             raise TypeError('Resource: dim_array must be a PhyDim2 object.')
 
+        if not isinstance(ntp.mem_regions, tuple):
+            raise TypeError('Resource: mem_regions must be a tuple.')
+        for mr in ntp.mem_regions:
+            if not isinstance(mr, NodeRegion):
+                raise TypeError('Resource: element in mem_regions must be '
+                                'a NodeRegion instance.')
+        # Memory regions can be used as either data source or data destination.
+        # If a single region is provided, it is both the source and
+        # destination; if two regions are provided, the first is the source and
+        # the second is the destination.
+        if len(ntp.mem_regions) > 2:
+            raise ValueError('Resource: can have at most 2 mem_regions.')
+
         if hasattr(ntp.size_gbuf, '__len__'):
             raise TypeError('Cost: size_gbuf must be a scalar')
         if hasattr(ntp.size_regf, '__len__'):
             raise TypeError('Cost: size_regf must be a scalar')
 
         return ntp
+
+    def mem_region_src(self):
+        ''' Get the memory region for the data source. '''
+        return self.mem_regions[0]
+
+    def mem_region_dst(self):
+        ''' Get the memory region for the data destination. '''
+        return self.mem_regions[-1]
 

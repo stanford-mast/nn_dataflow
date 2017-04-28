@@ -163,3 +163,54 @@ def part_layer_unit_nhops(layer, batch_size, part, part_src, offset_src,
 
     return nhops
 
+
+def get_ofmap_part(part, output_mem_region):
+    '''
+    Decide the data layout partitioning for output fmaps, given the
+    PartitionScheme `part` of the computation workloads and the memory
+    NodeRegion `output_mem_region`.
+
+    The ofmap partitioning is calculated by shrinking or extending the
+    computation partitioning, while trying to maintain the same layout shape.
+    '''
+
+    dim_part = part.dim()
+    dim_omr = output_mem_region.dim
+
+    if dim_omr.size() == 0:
+        raise ValueError('Partition ofmap: empty node region.')
+
+    # Start with the same as computation partitioning.
+    ofmap_order = part.order
+    ofmap_pdims = [list(dim) for dim in part.pdims]
+    # Adjust each dimension.
+    for di in range(2):
+        pd = dim_part[di]
+        od = dim_omr[di]
+
+        if od > pd:
+            # Ofmap dimension > computation dimension. Extend.
+            ext = od // pd
+            # Apply the extension to the top level.
+            ofmap_pdims[ofmap_order[0]][di] *= ext
+        else:
+            # Computation dimension >= ofmap dimension, shrink.
+            # Go from bottom to top. Keep bottom (first) levels unchanged, and
+            # shrink top (latter) levels.
+            for pae in reversed(ofmap_order):
+                if od > ofmap_pdims[pae][di]:
+                    # Remaining size in ofmap dimension is enough for current
+                    # level. Use it to keep the current level the same size.
+                    od //= ofmap_pdims[pae][di]
+                else:
+                    # Remaining size in ofmap dimension is not enough. Shrink
+                    # current level to be whatever remains.
+                    ofmap_pdims[pae][di] = od
+                    od = 1
+    ofmap_part = PartitionScheme(order=ofmap_order, pdims=ofmap_pdims)
+    assert all(od <= omrd for od, omrd in zip(ofmap_part.dim(), dim_omr)), \
+            'Partition ofmap: ofmap partitioning {} is invalid within ' \
+            'memory region {}.'.format(ofmap_part, str(output_mem_region))
+
+    return ofmap_part
+
