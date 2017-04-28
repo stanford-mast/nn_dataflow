@@ -18,8 +18,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from collections import OrderedDict
-
+from nn_dataflow import Network
 from nn_dataflow import Layer, FCLayer
 
 '''
@@ -28,27 +27,27 @@ VGGNet-16
 Simonyan and Zisserman, 2014
 '''
 
-LAYERS = OrderedDict()
+NN = Network('VGG')
 
-LAYERS['conv1'] = Layer(3, 64, 224, 3)
-LAYERS['conv2'] = Layer(64, 64, 224, 3)
+NN.add('conv1', Layer(3, 64, 224, 3))
+NN.add('conv2', Layer(64, 64, 224, 3))
 
-LAYERS['conv3'] = Layer(64, 128, 112, 3)
-LAYERS['conv4'] = Layer(128, 128, 112, 3)
+NN.add('conv3', Layer(64, 128, 112, 3))
+NN.add('conv4', Layer(128, 128, 112, 3))
 
-LAYERS['conv5'] = Layer(128, 256, 56, 3)
-LAYERS['conv6'] = Layer(256, 256, 56, 3)
-LAYERS['conv7'] = Layer(256, 256, 56, 3)
+NN.add('conv5', Layer(128, 256, 56, 3))
+NN.add('conv6', Layer(256, 256, 56, 3))
+NN.add('conv7', Layer(256, 256, 56, 3))
 
-LAYERS['conv8'] = Layer(256, 512, 28, 3)
-LAYERS['conv9'] = Layer(512, 512, 28, 3)
-LAYERS['conv10'] = Layer(512, 512, 28, 3)
+NN.add('conv8', Layer(256, 512, 28, 3))
+NN.add('conv9', Layer(512, 512, 28, 3))
+NN.add('conv10', Layer(512, 512, 28, 3))
 
-LAYERS['conv11'] = Layer(512, 512, 14, 3)
-LAYERS['conv12'] = Layer(512, 512, 14, 3)
-LAYERS['conv13'] = Layer(512, 512, 14, 3)
+NN.add('conv11', Layer(512, 512, 14, 3))
+NN.add('conv12', Layer(512, 512, 14, 3))
+NN.add('conv13', Layer(512, 512, 14, 3))
 
-LAYERS['fc1'] = FCLayer(512, 4096, 7)
-LAYERS['fc2'] = FCLayer(4096, 4096, 1)
-LAYERS['fc3'] = FCLayer(4096, 1000, 1)
+NN.add('fc1', FCLayer(512, 4096, 7))
+NN.add('fc2', FCLayer(4096, 4096, 1))
+NN.add('fc3', FCLayer(4096, 1000, 1))
 

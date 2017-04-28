@@ -18,8 +18,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from collections import OrderedDict
-
+from nn_dataflow import Network
 from nn_dataflow import Layer, FCLayer
 
 '''
@@ -28,14 +27,14 @@ ZFNet
 Zeiler and Fergus, 2013
 '''
 
-LAYERS = OrderedDict()
+NN = Network('ZFNet')
 
-LAYERS['conv1'] = Layer(3, 96, 110, 7, 2)
-LAYERS['conv2'] = Layer(96, 256, 26, 5, 2)
-LAYERS['conv3'] = Layer(256, 512, 13, 3)
-LAYERS['conv4'] = Layer(512, 1024, 13, 3)
-LAYERS['conv5'] = Layer(1024, 512, 13, 3)
-LAYERS['fc1'] = FCLayer(512, 4096, 6)
-LAYERS['fc2'] = FCLayer(4096, 4096, 1)
-LAYERS['fc3'] = FCLayer(4096, 1000, 1)
+NN.add('conv1', Layer(3, 96, 110, 7, 2))
+NN.add('conv2', Layer(96, 256, 26, 5, 2))
+NN.add('conv3', Layer(256, 512, 13, 3))
+NN.add('conv4', Layer(512, 1024, 13, 3))
+NN.add('conv5', Layer(1024, 512, 13, 3))
+NN.add('fc1', FCLayer(512, 4096, 6))
+NN.add('fc2', FCLayer(4096, 4096, 1))
+NN.add('fc3', FCLayer(4096, 1000, 1))
 

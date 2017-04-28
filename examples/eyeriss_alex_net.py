@@ -18,8 +18,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from collections import OrderedDict
-
+from nn_dataflow import Network
 from nn_dataflow import Layer, FCLayer
 
 '''
@@ -28,14 +27,14 @@ AlexNet
 Used in Eyeriss paper.
 '''
 
-LAYERS = OrderedDict()
+NN = Network('AlexNet')
 
-LAYERS['conv1'] = Layer(3, 96, 55, 11, 4)
-LAYERS['conv2'] = Layer(48, 256, 27, 5)
-LAYERS['conv3'] = Layer(256, 384, 13, 3)
-LAYERS['conv4'] = Layer(192, 384, 13, 3)
-LAYERS['conv5'] = Layer(192, 256, 13, 3)
-LAYERS['fc1'] = FCLayer(256, 4096, 6)
-LAYERS['fc2'] = FCLayer(4096, 4096, 1)
-LAYERS['fc3'] = FCLayer(4096, 1000, 1)
+NN.add('conv1', Layer(3, 96, 55, 11, 4))
+NN.add('conv2', Layer(48, 256, 27, 5))
+NN.add('conv3', Layer(256, 384, 13, 3))
+NN.add('conv4', Layer(192, 384, 13, 3))
+NN.add('conv5', Layer(192, 256, 13, 3))
+NN.add('fc1', FCLayer(256, 4096, 6))
+NN.add('fc2', FCLayer(4096, 4096, 1))
+NN.add('fc3', FCLayer(4096, 1000, 1))
 

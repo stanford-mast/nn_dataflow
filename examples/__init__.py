@@ -18,7 +18,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-def import_network_layers(name):
+def import_network(name):
     '''
     Import an example network.
     '''
@@ -30,6 +30,6 @@ def import_network_layers(name):
     if not os.path.isfile(os.path.join(example_dir, '__init__.py')):
         raise ImportError
     nets = importlib.import_module('examples.' + name, top_dir)
-    layers = nets.LAYERS
-    return layers
+    network = nets.NN
+    return network
 

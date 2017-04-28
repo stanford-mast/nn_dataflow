@@ -31,6 +31,7 @@ from .Layer import Layer, FCLayer
 from .LoopBlockingScheme import LoopBlockingScheme
 from .MapStrategy import MapStrategyEyeriss
 from .NestedLoopDesc import NestedLoopDesc
+from .Network import Network
 from .Option import Option
 from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2

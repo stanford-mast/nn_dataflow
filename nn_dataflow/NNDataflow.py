@@ -30,7 +30,7 @@ from .Scheduling import SchedulingCondition, Scheduling
 Top-level scheduling interface.
 '''
 
-def schedule_search(layers, batch_size, resource, cost, map_strategy_class,
+def schedule_search(network, batch_size, resource, cost, map_strategy_class,
                     options):
     '''
     Search the best schedule results for the given network and batch size.
@@ -49,7 +49,7 @@ def schedule_search(layers, batch_size, resource, cost, map_strategy_class,
     # partition scheme.
     aggr_top_indexes_list = [range(options.ntops)]
 
-    for name, layer in layers.items():
+    for name, layer in network.layers():
 
         layer_sched = Scheduling(layer, batch_size, cost, map_strategy_class)
 

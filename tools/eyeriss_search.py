@@ -33,14 +33,14 @@ from nn_dataflow import PhyDim2
 from nn_dataflow import Resource
 from nn_dataflow import schedule_search
 
-from examples import import_network_layers
+from examples import import_network
 
 def do_scheduling(args):
     '''
     Get optimal scheduling for given problem. Return a result schedule.
     '''
 
-    layers = import_network_layers(args.net)
+    network = import_network(args.net)
 
     batch_size = args.batch
     word = (args.word + 7) / 8
@@ -72,7 +72,7 @@ def do_scheduling(args):
                      nprocesses=args.processes)
 
     # Search schedules.
-    tops = schedule_search(layers, batch_size, resource, cost,
+    tops = schedule_search(network, batch_size, resource, cost,
                            MapStrategyEyeriss, options)
 
     top_mapping = tops[0]
@@ -87,7 +87,7 @@ def do_scheduling(args):
     stats['max_dram_bw_per_node'] = 0
     stats['max_dram_bw_layer'] = None
     stats['total_accesses_per_node'] = [0] * me.NUM
-    for name in layers.keys():
+    for name, _ in network.layers():
         layer_top_mapping = top_mapping[1][name]
         layer_dict_loop = layer_top_mapping[1]
         layer_dict_part = layer_top_mapping[2]
