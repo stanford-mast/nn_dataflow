@@ -24,6 +24,7 @@ import multiprocessing
 import sys
 from collections import OrderedDict
 
+from nn_dataflow import NNDataflow
 from nn_dataflow import Cost
 from nn_dataflow import DataCategoryEnum as de
 from nn_dataflow import MapStrategyEyeriss
@@ -32,7 +33,6 @@ from nn_dataflow import NodeRegion
 from nn_dataflow import Option
 from nn_dataflow import PhyDim2
 from nn_dataflow import Resource
-from nn_dataflow import schedule_search
 
 from examples import import_network
 
@@ -86,14 +86,14 @@ def do_scheduling(args):
                      nprocesses=args.processes)
 
     # Search schedules.
-    tops = schedule_search(network, batch_size, resource, cost,
-                           MapStrategyEyeriss, options)
+    nnd = NNDataflow(network, batch_size, resource, cost)
+    tops = nnd.schedule_search(MapStrategyEyeriss, options)
 
     top_mapping = tops[0]
 
     # Get stats.
     stats = {}
-    stats['total_cost'] = top_mapping[0]
+    stats['total_cost'] = top_mapping.scheduling_total_cost()
 
     stats['total_time'] = 0
     stats['total_noc_cost'] = 0
@@ -101,8 +101,8 @@ def do_scheduling(args):
     stats['max_dram_bw_per_node'] = 0
     stats['max_dram_bw_layer'] = None
     stats['total_accesses_per_node'] = [0] * me.NUM
-    for name, _ in network.layers():
-        layer_top_mapping = top_mapping[1][name]
+    for name in network:
+        layer_top_mapping = top_mapping[name]
         layer_dict_loop = layer_top_mapping[1]
         layer_dict_part = layer_top_mapping[2]
 
@@ -146,7 +146,7 @@ def do_scheduling(args):
                      'max_dram_bw_per_node', 'max_dram_bw_layer',
                      'total_ops_per_node', 'total_accesses_per_node']:
         res_map[statname] = stats[statname]
-    res_map['mappings'] = top_mapping[1]
+    res_map['mappings'] = top_mapping.scheduling_result_dict()
 
     return res_map
 

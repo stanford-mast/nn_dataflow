@@ -64,13 +64,6 @@ class Network(object):
         self.layer_dict[layer_name] = layer
         self.prevs_dict[layer_name] = prevs
 
-    def layers(self):
-        '''
-        Generator to iterate through layers. Return layer name and layer.
-        '''
-        for layer_name, layer in self.layer_dict.items():
-            yield layer_name, layer
-
     def prev_layers(self, layer_name):
         '''
         Get the previous layers of the given layer name, and the merge approach.
@@ -78,6 +71,15 @@ class Network(object):
         Return a tuple of all the previous layer names, and the merge symbol.
         '''
         return self.prevs_dict[layer_name], self._merge_symbol(layer_name)
+
+    def first_layer_name(self):
+        '''
+        Return the name of the first layer in the network.
+        '''
+        try:
+            return list(self.layer_dict.keys())[0]
+        except IndexError:
+            return None
 
     def _merge_symbol(self, layer_name):
         '''
@@ -88,7 +90,7 @@ class Network(object):
 
         prev_layer_names = self.prevs_dict[layer_name]
 
-        if len(prev_layer_names) == 1:
+        if len(prev_layer_names) <= 1:
             return ''
 
         sum_nfmaps = 0
@@ -120,6 +122,15 @@ class Network(object):
     def __contains__(self, layer_name):
         ''' Whether the network contains a layer. '''
         return layer_name in self.layer_dict
+
+    def __iter__(self):
+        ''' Iterate through layer names. '''
+        for layer_name in self.layer_dict.keys():
+            yield layer_name
+
+    def __getitem__(self, layer_name):
+        ''' Get the layer by name. '''
+        return self.layer_dict[layer_name]
 
     def __str__(self):
         str_ = 'Network: {}\n'.format(self.net_name)
