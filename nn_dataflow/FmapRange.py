@@ -22,6 +22,8 @@ from collections import namedtuple, Counter
 import itertools
 import numpy as np
 
+from .Util import StringifyClass
+
 _FMAP_POSITION_ATTRS = ['b', 'n', 'h', 'w']
 
 '''
@@ -30,7 +32,7 @@ A position in a batched fmap.
 FmapPosition = namedtuple('FmapPosition', _FMAP_POSITION_ATTRS)
 
 
-class FmapRange(object):
+class FmapRange(StringifyClass):
     '''
     A range of a batched fmap.
     '''
@@ -158,9 +160,6 @@ class FmapRange(object):
 
         return 0
 
-    def __str__(self):
-        return 'beg: {}, end: {}'.format(self.fp_beg, self.fp_end)
-
 
 class FmapRangeMap(object):
     '''
@@ -224,4 +223,10 @@ class FmapRangeMap(object):
                 return key
         raise ValueError('FmapRange: given fmap range does not correspond to '
                          'a single value.')
+
+    def __str__(self):
+        str_ = '{}:\n'.format(self.__class__.__name__)
+        for k, v in self.items():
+            str_ += '  {} -> {}\n'.format(str(k), str(v))
+        return str_
 

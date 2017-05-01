@@ -25,8 +25,9 @@ from . import Util
 from .FmapRange import FmapPosition, FmapRange
 from .Layer import Layer
 from .PhyDim2 import PhyDim2
+from .Util import StringifyClass
 
-class PartitionScheme(object):
+class PartitionScheme(StringifyClass):
     '''
     A parallel processing partitioning scheme.
     '''
@@ -143,7 +144,4 @@ class PartitionScheme(object):
 
         return FmapRange(FmapPosition(b=b_beg, n=n_beg, h=h_beg, w=w_beg),
                          FmapPosition(b=b_end, n=n_end, h=h_end, w=w_end))
-
-    def __str__(self):
-        return str(self.__dict__)
 
