@@ -169,6 +169,8 @@ class FmapRangeMap(object):
 
     def __init__(self):
         self.keyvals = []
+        self.min_fpos = [float('inf')] * len(_FMAP_POSITION_ATTRS)
+        self.max_fpos = [-float('inf')] * len(_FMAP_POSITION_ATTRS)
 
     def add(self, frng, val):
         '''
@@ -188,9 +190,35 @@ class FmapRangeMap(object):
                              .format(str(frng), str(prev),
                                      str(self.keyvals[idx][0])))
         self.keyvals.insert(idx, (frng, val))
+
+        self.min_fpos = [min(a, b) for a, b in zip(self.min_fpos, frng.fp_beg)]
+        self.max_fpos = [max(a, b) for a, b in zip(self.max_fpos, frng.fp_end)]
+
         # Ensure sorted.
         assert all(self.keyvals[idx][0] < self.keyvals[idx+1][0]
                    for idx in range(len(self.keyvals) - 1))
+
+    def complete_fmap_range(self):
+        '''
+        Get the complete FmapRange. If the map is not complete, raise a
+        ValueError. Complete map means the map covers a perfect hyper cube
+        starting from origin point (0, ..., 0) with no holes.
+        '''
+        cfrng = FmapRange(fp_beg=self.min_fpos, fp_end=self.max_fpos)
+        if cfrng.fp_beg != FmapPosition(0, 0, 0, 0) \
+                or cfrng.size() != sum(self.rget_counter(cfrng).values()):
+            raise ValueError('FmapRangeMap: not a complete map.')
+        return cfrng
+
+    def is_complete(self):
+        '''
+        Whether the map is a complete map.
+        '''
+        try:
+            self.complete_fmap_range()
+        except ValueError:
+            return False
+        return True
 
     def get(self, fpos):
         '''
@@ -200,6 +228,23 @@ class FmapRangeMap(object):
             if fpos in kv[0]:
                 return kv[1]
         raise KeyError('FmapRangeMap: key {} is not found.'.format(fpos))
+
+    def items(self):
+        '''
+        A generator to iterate over all FmapRanges and their values. Yield the
+        FmapRange and its value as a pair at a time.
+        '''
+        for kv in self.keyvals:
+            yield kv[0], kv[1]
+
+    def copy(self):
+        '''
+        Get a copy of the map.
+        '''
+        new = FmapRangeMap()
+        for frng, val in self.items():
+            new.add(frng, val)
+        return new
 
     def rget_counter(self, frng):
         '''

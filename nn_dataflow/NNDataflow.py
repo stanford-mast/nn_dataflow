@@ -22,10 +22,12 @@ import sys
 from collections import OrderedDict
 
 from . import Partition
+from . import Util
 from .Cost import Cost
+from .DataLayout import DataLayout
+from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
 from .Layer import Layer
 from .Network import Network
-from .PartitionScheme import PartitionScheme
 from .Resource import Resource
 from .Scheduling import SchedulingCondition, SchedulingResult, Scheduling
 
@@ -126,37 +128,33 @@ class NNDataflow(object):
         Search the optimized dataflows.
         '''
 
-        aggr_tops = [SchedulingResultDict()]
-        part_lprev_list = list(self._gen_input_part(options))
-        aggr_top_indexes_list = [[0] for _ in range(len(part_lprev_list))]
+        sched_res_dict_list = [SchedulingResultDict()]
 
         for layer_name in self.network:
-            aggr_tops = self._layer_schedule_search(
-                layer_name, aggr_tops, part_lprev_list, aggr_top_indexes_list,
-                map_strategy_class, options)
+            sched_res_dict_list = self._layer_schedule_search(
+                layer_name, sched_res_dict_list, map_strategy_class, options)
 
-        return aggr_tops
+        return sched_res_dict_list
 
-    def _layer_schedule_search(self, layer_name, aggr_tops, part_lprev_list,
-                               aggr_top_indexes_list, map_strategy_class,
-                               options):
+    def _layer_schedule_search(self, layer_name, sched_res_dict_list,
+                               map_strategy_class, options):
         '''
         Schedule the given layer under the previous layer scheduling results.
+        `sched_res_dict_list` contains up to top n SchedulingResultDict for the
+        previous layers.
         '''
 
         layer = self.network[layer_name]
         layer_sched = Scheduling(layer, self.batch_size, self.cost,
                                  map_strategy_class)
 
-        new_aggr_tops = []
+        new_sched_res_dict_list = []
 
-        # For each previous layer partition scheme, search top schedules for
-        # the current layer.
-        for part_lprev, aggr_top_indexes in zip(part_lprev_list,
-                                                aggr_top_indexes_list):
+        for ifmap_layout, srd_idx in self._gen_layer_ifmap_layout(
+                layer_name, sched_res_dict_list, options):
 
             condition = SchedulingCondition(resource=self.resource,
-                                            part_src=part_lprev)
+                                            ifmap_layout=ifmap_layout)
 
             try:
                 tops = layer_sched.schedule_search(condition, options)
@@ -170,44 +168,89 @@ class NNDataflow(object):
                                  .format(layer_name))
 
             # Append all the current layer top schedules to all the previous top
-            # schedules with the matching partition scheme.
-            for t_idx in range(options.ntops):
-                if t_idx >= len(tops):
-                    break
-                assert tops[t_idx].dict_part['part_src'] == part_lprev.__dict__
-                for at_idx in aggr_top_indexes:
-                    atop = aggr_tops[at_idx].copy()
-                    atop[layer_name] = tops[t_idx]
-                    new_aggr_tops.append(atop)
+            # schedules with the matching fmap layout.
+            for t in tops:
+                srd = sched_res_dict_list[srd_idx].copy()
+                srd[layer_name] = t
+                new_sched_res_dict_list.append(srd)
 
         # Always pick and keep top n at each layer.
-        aggr_tops = sorted(new_aggr_tops)[:options.ntops]
+        return sorted(new_sched_res_dict_list)[:options.ntops]
 
-        # Record all layer partition schemes for next layer.
-        part_lprev_list = []
-        aggr_top_indexes_list = []
-        for at_idx in range(options.ntops):
-            if at_idx >= len(aggr_tops):
-                break
-            # Translate back to PartitionScheme.
-            part_lprev_dict = aggr_tops[at_idx][layer_name].dict_part['part_dst']
-            part_lprev = PartitionScheme(part_lprev_dict['order'],
-                                         part_lprev_dict['pdims'])
-            try:
-                i = part_lprev_list.index(part_lprev)
-            except ValueError:
-                assert part_lprev_list.count(part_lprev) == 0
-                part_lprev_list.append(part_lprev)
-                aggr_top_indexes_list.append([])
-                assert len(part_lprev_list) == len(aggr_top_indexes_list)
-                i = -1
-            aggr_top_indexes_list[i].append(at_idx)
-
-        return aggr_tops
-
-    def _gen_input_part(self, options):
+    def _gen_layer_ifmap_layout(self, layer_name, sched_res_dict_list, options):
         '''
-        Get the input layer partitioning schemes.
+        Generator to get all the choices of ifmap layout for the layer.
+
+        Return the ifmap layout, and the corresponding SchedulingResultDict
+        index in the list.
+        '''
+
+        layer = self.network[layer_name]
+        prev_layer_names, merge_symbol = self.network.prev_layers(layer_name)
+
+        if not prev_layer_names:
+            # No previous layer, the first layer.
+            assert len(sched_res_dict_list) == 1 \
+                    and sched_res_dict_list[0].total_cost == 0, \
+                    'NNDataflow: initial sched_res_dict_list should only ' \
+                    'contain one 0 cost result.'
+
+            for input_layout in self._gen_input_layout(options):
+                yield input_layout, 0
+            return
+
+        for idx, srd in enumerate(sched_res_dict_list):
+            # Merge all previous layer ofmap layouts to get the ifmap layout.
+            ifmap_layout = srd[prev_layer_names[0]].ofmap_layout
+            for pl_name in prev_layer_names[1:]:
+                ifmap_layout = ifmap_layout.merge(merge_symbol,
+                                                  srd[pl_name].ofmap_layout)
+
+            # Remap dst memory to src memory.
+            origin_diff = self.resource.mem_region_src().origin \
+                    - self.resource.mem_region_dst().origin
+            ifmap_layout = ifmap_layout.view(origin_diff=origin_diff)
+
+            # Layout dimension check.
+            icfrng = ifmap_layout.frmap.complete_fmap_range()
+            assert icfrng.size('b') == self.batch_size \
+                    and icfrng.size('n') == layer.nifm
+
+            ## FIXME: Hack to deal with fmap size shrink due to pooling.
+            icfrng = ifmap_layout.frmap.complete_fmap_range()
+            h_shk_flt = 1. * icfrng.size('h') / layer.hifm
+            h_shk = int(round(h_shk_flt) + 1e-4)
+            if abs(h_shk / h_shk_flt - 1) > 0.3 \
+                    or not (h_shk == 1 or h_shk == 2 or h_shk == 4):
+                raise ValueError('NNDataflow: fmap shrink by {}?'
+                                 .format(h_shk_flt))
+            w_shk_flt = 1. * icfrng.size('w') / layer.wifm
+            w_shk = int(round(w_shk_flt) + 1e-4)
+            if abs(w_shk / w_shk_flt - 1) > 0.3 \
+                    or not (w_shk == 1 or w_shk == 2 or w_shk == 4):
+                raise ValueError('NNDataflow: fmap shrink by {}?'
+                                 .format(w_shk_flt))
+            # Make the new layout after shrinking.
+            new_frmap = FmapRangeMap()
+            for frng, coords in ifmap_layout.frmap.items():
+                fpb = frng.fp_beg
+                fpe = frng.fp_end
+                new_frng = FmapRange(FmapPosition(b=fpb.b, n=fpb.n,
+                                                  h=Util.idivc(fpb.h, h_shk),
+                                                  w=Util.idivc(fpb.w, w_shk)),
+                                     FmapPosition(b=fpe.b, n=fpe.n,
+                                                  h=Util.idivc(fpe.h, h_shk),
+                                                  w=Util.idivc(fpe.w, w_shk)))
+                new_frmap.add(new_frng, coords)
+
+            ifmap_layout = DataLayout(frmap=new_frmap,
+                                      origin=ifmap_layout.origin)
+
+            yield ifmap_layout, idx
+
+    def _gen_input_layout(self, options):
+        '''
+        Get the input layer layout choices.
         '''
 
         first_layer = self.network[self.network.first_layer_name()]
@@ -218,5 +261,8 @@ class NNDataflow(object):
 
         for part in Partition.gen_partition(input_layer, self.batch_size,
                                             mem_region.dim, options):
-            yield part
+            input_layout = Partition.get_ofmap_layout(
+                input_layer, self.batch_size, part, mem_region)
+
+            yield input_layout
 

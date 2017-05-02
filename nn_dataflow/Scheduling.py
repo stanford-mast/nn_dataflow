@@ -26,9 +26,9 @@ from multiprocessing import Pool
 from . import LoopBlocking
 from . import Partition
 from .Cost import Cost
+from .DataLayout import DataLayout
 from .Layer import Layer
 from .MapStrategy import MapStrategy
-from .PartitionScheme import PartitionScheme
 from .Resource import Resource
 
 def _apply_loopblocking_search(scheduling, *args):
@@ -40,7 +40,7 @@ def _apply_loopblocking_search(scheduling, *args):
 
 class SchedulingCondition(namedtuple('SchedulingCondition',
                                      ['resource',
-                                      'part_src',
+                                      'ifmap_layout',
                                      ])):
     '''
     Layer scheduling condition (constraints).
@@ -52,9 +52,9 @@ class SchedulingCondition(namedtuple('SchedulingCondition',
         if not isinstance(ntp.resource, Resource):
             raise TypeError('SchedulingCondition: resource must be '
                             'a Resource instance.')
-        if not isinstance(ntp.part_src, PartitionScheme):
-            raise TypeError('SchedulingCondition: part_src must be '
-                            'a PartitionScheme instance.')
+        if not isinstance(ntp.ifmap_layout, DataLayout):
+            raise TypeError('SchedulingCondition: ifmap_layout must be '
+                            'a DataLayout instance.')
 
         return ntp
 
@@ -63,6 +63,7 @@ class SchedulingResult(namedtuple('SchedulingResult',
                                   ['total_cost',
                                    'dict_loop',
                                    'dict_part',
+                                   'ofmap_layout',
                                   ])):
     '''
     Layer scheduling result.
@@ -75,6 +76,9 @@ class SchedulingResult(namedtuple('SchedulingResult',
                 or not isinstance(ntp.dict_part, OrderedDict):
             raise TypeError('SchedulingResult: dict_loop and dict_part '
                             'must be OrderedDict instances.')
+        if not isinstance(ntp.ofmap_layout, DataLayout):
+            raise TypeError('SchedulingCondition: ofmap_layout must be '
+                            'a DataLayout instance.')
 
         return ntp
 
@@ -131,27 +135,29 @@ class Scheduling(object):
         mem_region_src = condition.resource.mem_region_src()
         mem_region_dst = condition.resource.mem_region_dst()
 
+        # Ifmap layout.
+        ifmap_layout = condition.ifmap_layout
+        if not ifmap_layout.is_in_region(mem_region_src):
+            raise ValueError('Scheduling: ifmap layout contains invalid '
+                             'source memory nodes.')
+
+        # Filter nodes. All memory nodes can store filters. Deduplicate.
+        filter_node_coord_list = [c for c in mem_region_src.node_iter()] \
+                               + [c for c in mem_region_dst.node_iter()]
+        filter_node_coord_list = list(set(filter_node_coord_list))
+
         # Explore parallel partitioning schemes.
         for part in Partition.gen_partition(self.layer, self.batch_size,
                                             condition.resource.dim_nodes,
                                             options):
-            # Ifmap partitioning.
-            part_src = condition.part_src
-            if not all(sd <= mrsd for sd, mrsd
-                       in zip(part_src.dim(), mem_region_src.dim)):
-                raise ValueError('Scheduling: ifmap partitioning {} is '
-                                 'invalid within memory region {}.'
-                                 .format(part_src, str(mem_region_src)))
-
-            # Ofmap partitioning.
-            part_dst = Partition.get_ofmap_part(part, mem_region_dst)
+            # Ofmap layout.
+            ofmap_layout = Partition.get_ofmap_layout(
+                self.layer, self.batch_size, part, mem_region_dst)
 
             # Partition NoC hop cost.
             unit_nhops = Partition.part_layer_unit_nhops(
-                self.layer, self.batch_size, part,
-                part_src, mem_region_src.origin,
-                part_dst, mem_region_dst.origin,
-                options)
+                self.layer, self.batch_size, part, filter_node_coord_list,
+                ifmap_layout, ofmap_layout, options)
             if math.isinf(sum(unit_nhops)):
                 continue
 
@@ -169,7 +175,7 @@ class Scheduling(object):
                 # Explore loop blocking schemes.
                 r = apply_func(_apply_loopblocking_search,
                                (self, nested_loop_desc, part, unit_nhops,
-                                p_occ, part_dst, condition, options))
+                                p_occ, ofmap_layout, condition, options))
                 results.append(r)
 
         tops = heapq.nsmallest(options.ntops, retrieve_func, key=lambda x: x[0])
@@ -189,7 +195,7 @@ class Scheduling(object):
         return list(tops)
 
     def loopblocking_search(self, nested_loop_desc, part, unit_nhops, part_occ,
-                            part_dst, condition, options):
+                            ofmap_layout, condition, options):
         '''
         Search the loop blocking schemes. Return the best schedule results.
         '''
@@ -198,12 +204,12 @@ class Scheduling(object):
                                                      condition.resource,
                                                      options):
                 yield self._get_result(lbs, part, unit_nhops, part_occ,
-                                       part_dst, condition, options)
+                                       ofmap_layout, condition, options)
 
         return heapq.nsmallest(options.ntops, _sweep(), key=lambda x: x[0])
 
-    def _get_result(self, lbs, part, unit_nhops, part_occ, part_dst, condition,
-                    options):
+    def _get_result(self, lbs, part, unit_nhops, part_occ, ofmap_layout,
+                    condition, options):
         '''
         Make the schedule result from loop blocking and partitioning.
         '''
@@ -227,8 +233,6 @@ class Scheduling(object):
         dict_part = OrderedDict([('cost', cost_part),
                                  ('total_nhops', total_nhops),
                                  ('part', part.__dict__),
-                                 ('part_src', condition.part_src.__dict__),
-                                 ('part_dst', part_dst.__dict__),
                                  ('unit_nhops', unit_nhops),
                                  ('part_occ', part_occ)])
 
@@ -237,5 +241,6 @@ class Scheduling(object):
 
         return SchedulingResult(total_cost=total_cost,
                                 dict_loop=dict_loop,
-                                dict_part=dict_part)
+                                dict_part=dict_part,
+                                ofmap_layout=ofmap_layout)
 

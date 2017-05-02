@@ -153,7 +153,8 @@ def do_scheduling(args):
 
 def main(args):
     ''' Main function. '''
-    json.dump(do_scheduling(args), sys.stdout, indent=2)
+    json.dump(do_scheduling(args), sys.stdout, indent=2,
+              default=lambda o: o.__dict__)
     sys.stdout.write('\n')
     return 0
 
