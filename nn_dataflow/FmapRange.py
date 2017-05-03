@@ -253,7 +253,8 @@ class FmapRangeMap(object):
         '''
         counts = Counter()
         for kv in self.keyvals:
-            counts[kv[1]] = frng.overlap(kv[0]).size()
+            counts[kv[1]] = counts.setdefault(kv[1], 0) \
+                    + frng.overlap(kv[0]).size()
         return counts
 
     def rget_single(self, frng):
