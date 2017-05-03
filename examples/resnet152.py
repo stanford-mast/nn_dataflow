@@ -19,7 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from nn_dataflow import Network
-from nn_dataflow import Layer
+from nn_dataflow import InputLayer, ConvLayer, PoolingLayer
 
 '''
 ResNet-152
@@ -29,60 +29,69 @@ He, Zhang, Ren, and Sun, 2015
 
 NN = Network('ResNet')
 
+NN.set_input(InputLayer(3, 224))
+
 _PREVS = None
 
-NN.add('conv1', Layer(3, 64, 112, 7, 2))
+NN.add('conv1', ConvLayer(3, 64, 112, 7, 2))
+NN.add('pool1', PoolingLayer(64, 56, 2))
 
 for i in range(1, 4):
     NN.add('conv2_{}_a'.format(i),
-           Layer(64, 64, 56, 1, 2) if i == 1 else Layer(256, 64, 56, 1),
+           ConvLayer(64, 64, 56, 1) if i == 1 else ConvLayer(256, 64, 56, 1),
            prevs=_PREVS)
-    NN.add('conv2_{}_b'.format(i), Layer(64, 64, 56, 3))
-    NN.add('conv2_{}_c'.format(i), Layer(64, 256, 56, 1))
+    NN.add('conv2_{}_b'.format(i), ConvLayer(64, 64, 56, 3))
+    NN.add('conv2_{}_c'.format(i), ConvLayer(64, 256, 56, 1))
 
-    if i > 1:
-        # With residual shortcut.
+    # With residual shortcut.
+    if i == 1:
+        # Residual does not cross module.
+        _PREVS = None
+    else:
         _PREVS = ('conv2_{}_c'.format(i), 'conv2_{}_c'.format(i - 1))
 
 for i in range(1, 9):
     NN.add('conv3_{}_a'.format(i),
-           Layer(256, 128, 28, 1, 2) if i == 1 else Layer(512, 128, 28, 1),
+           ConvLayer(256, 128, 28, 1, 2) if i == 1
+           else ConvLayer(512, 128, 28, 1),
            prevs=_PREVS)
-    NN.add('conv3_{}_b'.format(i), Layer(128, 128, 28, 3))
-    NN.add('conv3_{}_c'.format(i), Layer(128, 512, 28, 1))
+    NN.add('conv3_{}_b'.format(i), ConvLayer(128, 128, 28, 3))
+    NN.add('conv3_{}_c'.format(i), ConvLayer(128, 512, 28, 1))
 
+    # With residual shortcut.
     if i == 1:
         # Residual does not cross module.
         _PREVS = None
     else:
-        # With residual shortcut.
         _PREVS = ('conv3_{}_c'.format(i), 'conv3_{}_c'.format(i - 1))
 
 for i in range(1, 37):
     NN.add('conv4_{}_a'.format(i),
-           Layer(512, 256, 14, 1, 2) if i == 1 else Layer(1024, 256, 14, 1),
+           ConvLayer(512, 256, 14, 1, 2) if i == 1
+           else ConvLayer(1024, 256, 14, 1),
            prevs=_PREVS)
-    NN.add('conv4_{}_b'.format(i), Layer(256, 256, 14, 3))
-    NN.add('conv4_{}_c'.format(i), Layer(256, 1024, 14, 1))
+    NN.add('conv4_{}_b'.format(i), ConvLayer(256, 256, 14, 3))
+    NN.add('conv4_{}_c'.format(i), ConvLayer(256, 1024, 14, 1))
 
+    # With residual shortcut.
     if i == 1:
         # Residual does not cross module.
         _PREVS = None
     else:
-        # With residual shortcut.
         _PREVS = ('conv4_{}_c'.format(i), 'conv4_{}_c'.format(i - 1))
 
 for i in range(1, 4):
     NN.add('conv5_{}_a'.format(i),
-           Layer(1024, 512, 7, 1, 2) if i == 1 else Layer(2048, 512, 7, 1),
+           ConvLayer(1024, 512, 7, 1, 2) if i == 1
+           else ConvLayer(2048, 512, 7, 1),
            prevs=_PREVS)
-    NN.add('conv5_{}_b'.format(i), Layer(512, 512, 7, 3))
-    NN.add('conv5_{}_c'.format(i), Layer(512, 2048, 7, 1))
+    NN.add('conv5_{}_b'.format(i), ConvLayer(512, 512, 7, 3))
+    NN.add('conv5_{}_c'.format(i), ConvLayer(512, 2048, 7, 1))
 
+    # With residual shortcut.
     if i == 1:
         # Residual does not cross module.
         _PREVS = None
     else:
-        # With residual shortcut.
         _PREVS = ('conv5_{}_c'.format(i), 'conv5_{}_c'.format(i - 1))
 

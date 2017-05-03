@@ -27,7 +27,8 @@ from . import Partition
 from .Cost import Cost
 from .DataLayout import DataLayout
 from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
-from .Layer import Layer, FCLayer
+from .Layer import Layer, InputLayer, ConvLayer, FCLayer, \
+        LocalRegionLayer, PoolingLayer
 from .LoopBlockingScheme import LoopBlockingScheme
 from .MapStrategy import MapStrategyEyeriss
 from .NestedLoopDesc import NestedLoopDesc

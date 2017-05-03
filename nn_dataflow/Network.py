@@ -20,17 +20,32 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import OrderedDict
 
-from .Layer import Layer
+from .Layer import Layer, InputLayer
 
 class Network(object):
     '''
     NN topology. Support DAG structure of layers.
     '''
 
+    INPUT_LAYER_KEY = '__INPUT__'
+
     def __init__(self, net_name):
         self.net_name = net_name
         self.layer_dict = OrderedDict()
         self.prevs_dict = {}
+
+    def set_input(self, input_layer):
+        '''
+        Set the input layer.
+        '''
+        if self.INPUT_LAYER_KEY in self.layer_dict:
+            raise KeyError('Network: only one input layer is allowed.')
+
+        if not isinstance(input_layer, InputLayer):
+            raise TypeError('Network: input_layer must be an InputLayer '
+                            'instance.')
+
+        self.layer_dict[self.INPUT_LAYER_KEY] = input_layer
 
     def add(self, layer_name, layer, prevs=None):
         '''
@@ -39,6 +54,13 @@ class Network(object):
         If previous layer(s) is not given, assume it follows the last added
         layer.
         '''
+        if self.INPUT_LAYER_KEY not in self.layer_dict:
+            raise RuntimeError('Network: must first set input layer.')
+
+        if layer_name in self.layer_dict:
+            raise KeyError('Network: layer {} already exists.'
+                           .format(layer_name))
+
         if not isinstance(layer, Layer):
             raise TypeError('Network: layer must be a Layer instance.')
 
@@ -55,14 +77,19 @@ class Network(object):
                     raise ValueError('Network: given previous layer {} '
                                      'has not been added to the network'.
                                      format(pl))
-        elif self.layer_dict:
-            # Has previously added layers.
-            prevs = (self.layer_dict.keys()[-1],)
         else:
-            prevs = tuple()
+            prevs = (self.layer_dict.keys()[-1],)
 
         self.layer_dict[layer_name] = layer
         self.prevs_dict[layer_name] = prevs
+
+        # Ensure dimension matching between layers.
+        try:
+            self._merge_symbol(layer_name)
+        except ValueError:
+            del self.layer_dict[layer_name]
+            del self.prevs_dict[layer_name]
+            raise
 
     def prev_layers(self, layer_name):
         '''
@@ -72,14 +99,11 @@ class Network(object):
         '''
         return self.prevs_dict[layer_name], self._merge_symbol(layer_name)
 
-    def first_layer_name(self):
+    def input_layer(self):
         '''
-        Return the name of the first layer in the network.
+        Get the input layer.
         '''
-        try:
-            return list(self.layer_dict.keys())[0]
-        except IndexError:
-            return None
+        return self.layer_dict[self.INPUT_LAYER_KEY]
 
     def _merge_symbol(self, layer_name):
         '''
@@ -89,27 +113,31 @@ class Network(object):
         layer = self.layer_dict[layer_name]
 
         prev_layer_names = self.prevs_dict[layer_name]
+        assert prev_layer_names
 
-        if len(prev_layer_names) <= 1:
-            return ''
-
+        # Compare the ifmap dimensions of this layer, with all the ofmaps of
+        # the previous layers.
         sum_nfmaps = 0
         same_nfmaps = True
+
         for pln in prev_layer_names:
             pl = self.layer_dict[pln]
-            if pl.ofmap_size() != layer.ofmap_size() * layer.strd * layer.strd \
-                    and pl.ofmap_size() != layer.ifmap_size():
-                # With or without padding.
+
+            # Ensure fmap sizes match. Allow padding.
+            try:
+                self.check_padded_fmap(pl, layer)
+            except ValueError as e:
                 raise ValueError('Network: {}, a previous layer of {}, '
-                                 'has mismatch fmap size.'
-                                 .format(pln, layer_name))
+                                 'has mismatch fmap size: {}'
+                                 .format(pln, layer_name, str(e)))
+
             sum_nfmaps += pl.nofm
-            if pl.nofm != layer.nifm:
-                same_nfmaps = False
+            same_nfmaps = same_nfmaps and pl.nofm == layer.nifm
 
         if sum_nfmaps == layer.nifm:
+            if same_nfmaps:
+                assert len(prev_layer_names) == 1
             # Fmaps are concatenated.
-            assert not same_nfmaps
             return '|'
         elif same_nfmaps:
             # Fmaps are summed up.
@@ -119,13 +147,34 @@ class Network(object):
                              'which are the previous layers of {}'
                              .format(' '.join(prev_layer_names), layer_name))
 
+    @staticmethod
+    def check_padded_fmap(layer1, layer2):
+        '''
+        Check whether the fmap heights and widths match between the two layers
+        when considering padding. If not, raise ValueError.
+        '''
+        h_padding_rng = sorted((layer2.hofm * layer2.htrd, layer2.hifm))
+        w_padding_rng = sorted((layer2.wofm * layer2.wtrd, layer2.wifm))
+        if (not h_padding_rng[0] <= layer1.hofm <= h_padding_rng[1]
+                or not w_padding_rng[0] <= layer1.wofm <= w_padding_rng[1]):
+            raise ValueError('({}, {}) vs. ({}, {}).'
+                             .format(layer2.hofm, layer2.wofm,
+                                     h_padding_rng, w_padding_rng))
+
     def __contains__(self, layer_name):
         ''' Whether the network contains a layer. '''
         return layer_name in self.layer_dict
 
+    def __len__(self):
+        ''' Number of layers in the network. '''
+        assert self.INPUT_LAYER_KEY in self.layer_dict
+        return len(self.layer_dict) - 1
+
     def __iter__(self):
         ''' Iterate through layer names. '''
         for layer_name in self.layer_dict.keys():
+            if layer_name == self.INPUT_LAYER_KEY:
+                continue
             yield layer_name
 
     def __getitem__(self, layer_name):
@@ -134,7 +183,7 @@ class Network(object):
 
     def __str__(self):
         str_ = 'Network: {}\n'.format(self.net_name)
-        for layer_name in self.layer_dict.keys():
+        for layer_name in self:
             prev_layer_names, merge_symbol = self.prev_layers(layer_name)
             str_ += '  Layer {} <- {}\n'.format(
                 layer_name, ' {} '.format(merge_symbol).join(prev_layer_names))

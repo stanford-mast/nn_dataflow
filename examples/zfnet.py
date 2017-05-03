@@ -19,7 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from nn_dataflow import Network
-from nn_dataflow import Layer, FCLayer
+from nn_dataflow import InputLayer, ConvLayer, FCLayer, PoolingLayer
 
 '''
 ZFNet
@@ -29,11 +29,18 @@ Zeiler and Fergus, 2013
 
 NN = Network('ZFNet')
 
-NN.add('conv1', Layer(3, 96, 110, 7, 2))
-NN.add('conv2', Layer(96, 256, 26, 5, 2))
-NN.add('conv3', Layer(256, 512, 13, 3))
-NN.add('conv4', Layer(512, 1024, 13, 3))
-NN.add('conv5', Layer(1024, 512, 13, 3))
+NN.set_input(InputLayer(3, 224))
+
+NN.add('conv1', ConvLayer(3, 96, 110, 7, 2))
+NN.add('pool1', PoolingLayer(96, 55, 3, strd=2))
+# Norm layer is ignored.
+NN.add('conv2', ConvLayer(96, 256, 26, 5, 2))
+NN.add('pool2', PoolingLayer(256, 13, 3, strd=2))
+# Norm layer is ignored.
+NN.add('conv3', ConvLayer(256, 512, 13, 3))
+NN.add('conv4', ConvLayer(512, 1024, 13, 3))
+NN.add('conv5', ConvLayer(1024, 512, 13, 3))
+NN.add('pool3', PoolingLayer(512, 6, 3, strd=2))
 NN.add('fc1', FCLayer(512, 4096, 6))
 NN.add('fc2', FCLayer(4096, 4096, 1))
 NN.add('fc3', FCLayer(4096, 1000, 1))

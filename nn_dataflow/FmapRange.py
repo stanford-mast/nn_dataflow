@@ -22,6 +22,7 @@ from collections import namedtuple, Counter
 import itertools
 import numpy as np
 
+from .Layer import ConvLayer, LocalRegionLayer
 from .Util import StringifyClass
 
 _FMAP_POSITION_ATTRS = ['b', 'n', 'h', 'w']
@@ -115,22 +116,38 @@ class FmapRange(StringifyClass):
         '''
         Get the corresponding input FmapRange.
         '''
-        b_rng, h_rng, w_rng = self.beg_end('b', 'h', 'w')
+        b_rng, n_rng, h_rng, w_rng = self.beg_end('b', 'n', 'h', 'w')
 
         # Batch. Same as ofmap.
         b_src_beg, b_src_end = b_rng
-        # Channel. All.
-        n_src_beg = 0
-        n_src_end = layer.nifm
-        # Height tiling.
-        # xy_i = xy_o * stride + (0 ... sfil-1)
-        h_src_beg = h_rng[0] * layer.strd
-        h_src_end = (h_rng[1] - 1) * layer.strd + layer.sfil
-        assert h_src_end <= layer.hifm
-        # Width tiling.
-        w_src_beg = w_rng[0] * layer.strd
-        w_src_end = (w_rng[1] - 1) * layer.strd + layer.sfil
-        assert w_src_end <= layer.wifm
+
+        if isinstance(layer, ConvLayer):
+            # Channel. All.
+            n_src_beg = 0
+            n_src_end = layer.nifm
+            # Height tiling.
+            # xy_i = xy_o * stride + (0 ... sfil-1)
+            h_src_beg = h_rng[0] * layer.htrd
+            h_src_end = (h_rng[1] - 1) * layer.htrd + layer.sfil
+            # Width tiling.
+            w_src_beg = w_rng[0] * layer.wtrd
+            w_src_end = (w_rng[1] - 1) * layer.wtrd + layer.sfil
+        elif isinstance(layer, LocalRegionLayer):
+            # Channel. Same as ofmap.
+            n_src_beg = max(0, n_rng[0] - layer.nreg//2)
+            n_src_end = min(layer.nifm,
+                            n_rng[1] + layer.nreg - layer.nreg//2)
+            # Height tiling.
+            h_src_beg = max(0, h_rng[0] * layer.htrd - layer.hreg//2)
+            h_src_end = min(layer.hifm,
+                            h_rng[1] * layer.htrd + layer.hreg - layer.hreg//2)
+            # Width tiling.
+            w_src_beg = max(0, w_rng[0] * layer.wtrd - layer.wreg//2)
+            w_src_end = min(layer.wifm,
+                            w_rng[1] * layer.wtrd + layer.wreg - layer.wreg//2)
+
+        assert n_src_end <= layer.nifm and h_src_end <= layer.hifm \
+                and w_src_end <= layer.wifm
 
         return FmapRange(FmapPosition(b=b_src_beg, n=n_src_beg,
                                       h=h_src_beg, w=w_src_beg),

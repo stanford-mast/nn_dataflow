@@ -188,6 +188,15 @@ class Scheduling(object):
                     * condition.resource.dim_nodes.size()
             assert abs(float(total_layer_ops) / sum_part_layer_ops - 1) < 1e-4
 
+        # Check ofmap layout matches the layer.
+        for t in tops:
+            cofrng = t.ofmap_layout.frmap.complete_fmap_range()
+            b_rng, n_rng, h_rng, w_rng = cofrng.beg_end()
+            assert b_rng[1] - b_rng[0] == self.batch_size \
+                    and n_rng[1] - n_rng[0] == self.layer.nofm \
+                    and h_rng[1] - h_rng[0] == self.layer.hofm \
+                    and w_rng[1] - w_rng[0] == self.layer.wofm
+
         if pool is not None:
             pool.close()
             pool.join()

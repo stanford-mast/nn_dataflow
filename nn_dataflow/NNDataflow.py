@@ -22,11 +22,7 @@ import sys
 from collections import OrderedDict
 
 from . import Partition
-from . import Util
 from .Cost import Cost
-from .DataLayout import DataLayout
-from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
-from .Layer import Layer
 from .Network import Network
 from .Resource import Resource
 from .Scheduling import SchedulingCondition, SchedulingResult, Scheduling
@@ -128,7 +124,13 @@ class NNDataflow(object):
         Search the optimized dataflows.
         '''
 
-        sched_res_dict_list = [SchedulingResultDict()]
+        sched_res_dict_list = []
+        for input_layout in self._gen_input_layout(options):
+            srd = SchedulingResultDict()
+            srd[self.network.INPUT_LAYER_KEY] = SchedulingResult(
+                total_cost=0, dict_loop=OrderedDict(), dict_part=OrderedDict(),
+                ofmap_layout=input_layout)
+            sched_res_dict_list.append(srd)
 
         for layer_name in self.network:
             sched_res_dict_list = self._layer_schedule_search(
@@ -185,19 +187,10 @@ class NNDataflow(object):
         index in the list.
         '''
 
-        layer = self.network[layer_name]
+        del options
+
         prev_layer_names, merge_symbol = self.network.prev_layers(layer_name)
-
-        if not prev_layer_names:
-            # No previous layer, the first layer.
-            assert len(sched_res_dict_list) == 1 \
-                    and sched_res_dict_list[0].total_cost == 0, \
-                    'NNDataflow: initial sched_res_dict_list should only ' \
-                    'contain one 0 cost result.'
-
-            for input_layout in self._gen_input_layout(options):
-                yield input_layout, 0
-            return
+        assert prev_layer_names
 
         for idx, srd in enumerate(sched_res_dict_list):
             # Merge all previous layer ofmap layouts to get the ifmap layout.
@@ -211,40 +204,9 @@ class NNDataflow(object):
                     - self.resource.mem_region_dst().origin
             ifmap_layout = ifmap_layout.view(origin_diff=origin_diff)
 
-            # Layout dimension check.
-            icfrng = ifmap_layout.frmap.complete_fmap_range()
-            assert icfrng.size('b') == self.batch_size \
-                    and icfrng.size('n') == layer.nifm
-
-            ## FIXME: Hack to deal with fmap size shrink due to pooling.
-            icfrng = ifmap_layout.frmap.complete_fmap_range()
-            h_shk_flt = 1. * icfrng.size('h') / layer.hifm
-            h_shk = int(round(h_shk_flt) + 1e-4)
-            if abs(h_shk / h_shk_flt - 1) > 0.3 \
-                    or not (h_shk == 1 or h_shk == 2 or h_shk == 4):
-                raise ValueError('NNDataflow: fmap shrink by {}?'
-                                 .format(h_shk_flt))
-            w_shk_flt = 1. * icfrng.size('w') / layer.wifm
-            w_shk = int(round(w_shk_flt) + 1e-4)
-            if abs(w_shk / w_shk_flt - 1) > 0.3 \
-                    or not (w_shk == 1 or w_shk == 2 or w_shk == 4):
-                raise ValueError('NNDataflow: fmap shrink by {}?'
-                                 .format(w_shk_flt))
-            # Make the new layout after shrinking.
-            new_frmap = FmapRangeMap()
-            for frng, coords in ifmap_layout.frmap.items():
-                fpb = frng.fp_beg
-                fpe = frng.fp_end
-                new_frng = FmapRange(FmapPosition(b=fpb.b, n=fpb.n,
-                                                  h=Util.idivc(fpb.h, h_shk),
-                                                  w=Util.idivc(fpb.w, w_shk)),
-                                     FmapPosition(b=fpe.b, n=fpe.n,
-                                                  h=Util.idivc(fpe.h, h_shk),
-                                                  w=Util.idivc(fpe.w, w_shk)))
-                new_frmap.add(new_frng, coords)
-
-            ifmap_layout = DataLayout(frmap=new_frmap,
-                                      origin=ifmap_layout.origin)
+            # We already checked the ofmap layout dimension in Scheduling, and
+            # the prev/next layer dimensions in Network, so ifmap_layout ==
+            # layer == prev_layers == ofmap_layout.
 
             yield ifmap_layout, idx
 
@@ -253,11 +215,9 @@ class NNDataflow(object):
         Get the input layer layout choices.
         '''
 
-        first_layer = self.network[self.network.first_layer_name()]
-        input_layer = Layer(nifm=1, nofm=first_layer.nifm,
-                            sofm=(first_layer.hifm, first_layer.wifm), sfil=1)
+        input_layer = self.network.input_layer()
 
-        mem_region = self.resource.mem_region_src()
+        mem_region = self.resource.mem_region_dst()
 
         for part in Partition.gen_partition(input_layer, self.batch_size,
                                             mem_region.dim, options):

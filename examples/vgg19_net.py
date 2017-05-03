@@ -19,7 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from nn_dataflow import Network
-from nn_dataflow import Layer, FCLayer
+from nn_dataflow import InputLayer, ConvLayer, FCLayer, PoolingLayer
 
 '''
 VGGNet-19
@@ -29,26 +29,33 @@ Simonyan and Zisserman, 2014
 
 NN = Network('VGG19')
 
-NN.add('conv1', Layer(3, 64, 224, 3))
-NN.add('conv2', Layer(64, 64, 224, 3))
+NN.set_input(InputLayer(3, 224))
 
-NN.add('conv3', Layer(64, 128, 112, 3))
-NN.add('conv4', Layer(128, 128, 112, 3))
+NN.add('conv1', ConvLayer(3, 64, 224, 3))
+NN.add('conv2', ConvLayer(64, 64, 224, 3))
+NN.add('pool1', PoolingLayer(64, 112, 2))
 
-NN.add('conv5', Layer(128, 256, 56, 3))
-NN.add('conv6', Layer(256, 256, 56, 3))
-NN.add('conv7', Layer(256, 256, 56, 3))
-NN.add('conv8', Layer(256, 256, 56, 3))
+NN.add('conv3', ConvLayer(64, 128, 112, 3))
+NN.add('conv4', ConvLayer(128, 128, 112, 3))
+NN.add('pool2', PoolingLayer(128, 56, 2))
 
-NN.add('conv9', Layer(256, 512, 28, 3))
-NN.add('conv10', Layer(512, 512, 28, 3))
-NN.add('conv11', Layer(512, 512, 28, 3))
-NN.add('conv12', Layer(512, 512, 28, 3))
+NN.add('conv5', ConvLayer(128, 256, 56, 3))
+NN.add('conv6', ConvLayer(256, 256, 56, 3))
+NN.add('conv7', ConvLayer(256, 256, 56, 3))
+NN.add('conv8', ConvLayer(256, 256, 56, 3))
+NN.add('pool3', PoolingLayer(256, 28, 2))
 
-NN.add('conv13', Layer(512, 512, 14, 3))
-NN.add('conv14', Layer(512, 512, 14, 3))
-NN.add('conv15', Layer(512, 512, 14, 3))
-NN.add('conv16', Layer(512, 512, 14, 3))
+NN.add('conv9', ConvLayer(256, 512, 28, 3))
+NN.add('conv10', ConvLayer(512, 512, 28, 3))
+NN.add('conv11', ConvLayer(512, 512, 28, 3))
+NN.add('conv12', ConvLayer(512, 512, 28, 3))
+NN.add('pool4', PoolingLayer(512, 14, 2))
+
+NN.add('conv13', ConvLayer(512, 512, 14, 3))
+NN.add('conv14', ConvLayer(512, 512, 14, 3))
+NN.add('conv15', ConvLayer(512, 512, 14, 3))
+NN.add('conv16', ConvLayer(512, 512, 14, 3))
+NN.add('pool5', PoolingLayer(512, 7, 2))
 
 NN.add('fc1', FCLayer(512, 4096, 7))
 NN.add('fc2', FCLayer(4096, 4096, 1))

@@ -25,6 +25,7 @@ from . import ParallelEnum as pe
 from . import Util
 from .DataLayout import DataLayout
 from .FmapRange import FmapRangeMap
+from .Layer import ConvLayer
 from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
 
@@ -132,9 +133,10 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
             nhops[de.OFM] += ofmap_layout.total_transfer_nhops(frng, coord)
 
         # filter access.
-        fil_size = frng.size('n') * frng_src.size('n') * layer.filter_size()
-        min_hops = min(coord.hop_dist(cfil) for cfil in filter_node_coord_list)
-        nhops[de.FIL] += fil_size * min_hops
+        if isinstance(layer, ConvLayer):
+            fil_size = frng.size('n') * frng_src.size('n') * layer.filter_size()
+            min_hops = min(coord.hop_dist(c) for c in filter_node_coord_list)
+            nhops[de.FIL] += fil_size * min_hops
 
     return nhops
 

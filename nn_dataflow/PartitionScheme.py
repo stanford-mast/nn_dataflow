@@ -23,7 +23,7 @@ import itertools
 from . import ParallelEnum as pe
 from . import Util
 from .FmapRange import FmapPosition, FmapRange
-from .Layer import Layer
+from .Layer import ConvLayer, LocalRegionLayer
 from .PhyDim2 import PhyDim2
 from .Util import StringifyClass
 
@@ -100,12 +100,21 @@ class PartitionScheme(StringifyClass):
         Get the partitioned layer structure and batch size. Return partitioned
         layer, partitioned batch size, and partitioning op occupation.
         '''
-        p_layer = Layer(layer.nifm,
-                        Util.idivc(layer.nofm, self.pdims[pe.OUTP].size()),
-                        (Util.idivc(layer.hofm, self.pdims[pe.OFMP].h),
-                         Util.idivc(layer.wofm, self.pdims[pe.OFMP].w)),
-                        layer.sfil,
-                        layer.strd)
+
+        p_nofm = Util.idivc(layer.nofm, self.pdims[pe.OUTP].size())
+        p_hofm = Util.idivc(layer.hofm, self.pdims[pe.OFMP].h)
+        p_wofm = Util.idivc(layer.wofm, self.pdims[pe.OFMP].w)
+
+        if isinstance(layer, ConvLayer):
+            p_layer = ConvLayer(layer.nifm, p_nofm, (p_hofm, p_wofm),
+                                layer.sfil,
+                                strd=(layer.htrd, layer.wtrd))
+        elif isinstance(layer, LocalRegionLayer):
+            p_layer = LocalRegionLayer(p_nofm, (p_hofm, p_wofm),
+                                       layer.nreg, (layer.hreg, layer.wreg),
+                                       strd=(layer.htrd, layer.wtrd))
+        else:
+            raise TypeError('PartitionScheme: unrecognized layer type.')
 
         p_batch_size = batch_size / self.pdims[pe.BATP].size()
 

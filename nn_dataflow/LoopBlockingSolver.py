@@ -100,13 +100,13 @@ def _solve_lpbl_iofmap_gbuf_reside(nested_loop_desc, resource, reside_dce):
 
     usize_gbuf_x = nested_loop_desc.usize_gbuf_of(dce_x)
     usize_gbuf_y = nested_loop_desc.usize_gbuf_of(dce_y)
-    usize_gbuf_fil = nested_loop_desc.usize_gbuf_of(de.FIL)
+    usize_gbuf_fil = nested_loop_desc.usize_gbuf_of(de.FIL) + 1e-6
 
     max_size_gbuf = resource.size_gbuf
 
     usize_regf_x = nested_loop_desc.usize_regf_of(dce_x)
     usize_regf_y = nested_loop_desc.usize_regf_of(dce_y)
-    usize_regf_fil = nested_loop_desc.usize_regf_of(de.FIL)
+    usize_regf_fil = nested_loop_desc.usize_regf_of(de.FIL) + 1e-6
 
     max_size_regf = resource.size_regf
 
@@ -254,13 +254,13 @@ def _solve_lpbl_filter_gbuf_reside(nested_loop_desc, resource):
 
         usize_gbuf_x = nested_loop_desc.usize_gbuf_of(dce_x)
         usize_gbuf_y = nested_loop_desc.usize_gbuf_of(dce_y)
-        usize_gbuf_fil = nested_loop_desc.usize_gbuf_of(de.FIL)
+        usize_gbuf_fil = nested_loop_desc.usize_gbuf_of(de.FIL) + 1e-6
 
         max_size_gbuf = resource.size_gbuf
 
         usize_regf_x = nested_loop_desc.usize_regf_of(dce_x)
         usize_regf_y = nested_loop_desc.usize_regf_of(dce_y)
-        usize_regf_fil = nested_loop_desc.usize_regf_of(de.FIL)
+        usize_regf_fil = nested_loop_desc.usize_regf_of(de.FIL) + 1e-6
 
         max_size_regf = resource.size_regf
 

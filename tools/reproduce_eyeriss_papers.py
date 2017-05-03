@@ -36,7 +36,7 @@ def main(args):
 
     if args.paper == 'isscc16':
         mapping_args = _Namespace(
-            net='eyeriss_alex_net',
+            net='alex_net',
             batch=4,
             word=16,
             nodes=[1, 1],
@@ -56,16 +56,26 @@ def main(args):
 
         results = do_scheduling(mapping_args)
         mappings = results['mappings']
-        for name, mapping in mappings.items():
-            ops = mapping[1]['ops']
-            access = [sum(a) for a in mapping[1]['access']]
-            assert len(access) == 4
-            print '{},{},{}'.format(name, ops,
+
+        for layer in ['conv{}'.format(i) for i in range(1, 6)] \
+                + ['fc{}'.format(i) for i in range(1, 4)]:
+            ops = 0
+            access = [0] * 4
+
+            for layer_part in mappings:
+                if not layer_part.startswith(layer):
+                    continue
+                ops += mappings[layer_part].dict_loop['ops']
+                access = [a1 + sum(a2) for a1, a2
+                          in zip(access,
+                                 mappings[layer_part].dict_loop['access'])]
+
+            print '{},{},{}'.format(layer, ops,
                                     ','.join([str(a) for a in access]))
 
     elif args.paper == 'isca16':
         mapping_args = _Namespace(
-            net='eyeriss_alex_net',
+            net='alex_net',
             batch=16,
             word=16,
             nodes=[1, 1],
@@ -85,13 +95,24 @@ def main(args):
 
         results = do_scheduling(mapping_args)
         mappings = results['mappings']
-        for name, mapping in mappings.items():
-            ops = mapping[1]['ops']
-            access = [sum(a) for a in mapping[1]['access']]
-            assert len(access) == 4
+
+        for layer in ['conv{}'.format(i) for i in range(1, 6)] \
+                + ['fc{}'.format(i) for i in range(1, 4)]:
+            ops = 0
+            access = [0] * 4
+
+            for layer_part in mappings:
+                if not layer_part.startswith(layer):
+                    continue
+                ops += mappings[layer_part].dict_loop['ops']
+                access = [a1 + sum(a2) for a1, a2
+                          in zip(access,
+                                 mappings[layer_part].dict_loop['access'])]
+
             cost_breakdown = [ops * 1] + [a * c for a, c
                                           in zip(access, hier_cost)]
-            print '{},{}'.format(name,
+
+            print '{},{}'.format(layer,
                                  ','.join([str(c) for c in cost_breakdown]))
 
     else:
