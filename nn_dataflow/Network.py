@@ -158,7 +158,7 @@ class Network(object):
         if (not h_padding_rng[0] <= layer1.hofm <= h_padding_rng[1]
                 or not w_padding_rng[0] <= layer1.wofm <= w_padding_rng[1]):
             raise ValueError('({}, {}) vs. ({}, {}).'
-                             .format(layer2.hofm, layer2.wofm,
+                             .format(layer1.hofm, layer1.wofm,
                                      h_padding_rng, w_padding_rng))
 
     def __contains__(self, layer_name):
