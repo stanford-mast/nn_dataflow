@@ -20,8 +20,8 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import namedtuple, Counter
 import itertools
-import numpy as np
 
+from . import Util
 from .Layer import ConvLayer, LocalRegionLayer
 from .Util import StringifyClass
 
@@ -89,7 +89,7 @@ class FmapRange(StringifyClass):
 
         lens = [e - b for b, e in zip(begs, ends)]
 
-        return np.prod(lens)
+        return Util.prod(lens)
 
     def overlap(self, other):
         '''

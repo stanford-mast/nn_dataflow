@@ -19,10 +19,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from collections import OrderedDict
-import numpy as np
 
 from . import DataCategoryEnum as de
 from . import MemHierEnum as me
+from . import Util
 
 class LoopBlockingScheme(object):
     '''
@@ -59,26 +59,25 @@ class LoopBlockingScheme(object):
         # pylint: disable=invalid-name
         BL = self.BL
 
-        # Translate tx to np.ndarray, for better perf.
-        self.ti = np.array(tifm)
-        self.to = np.array(tofm)
-        self.tb = np.array(tbat)
+        self.ti = tuple(tifm)
+        self.to = tuple(tofm)
+        self.tb = tuple(tbat)
         self.orders = orders
 
-        tip = np.prod(self.ti)
-        top = np.prod(self.to)
-        tbp = np.prod(self.tb)
+        self.tip = Util.prod(self.ti)
+        self.top = Util.prod(self.to)
+        self.tbp = Util.prod(self.tb)
 
         # Check lengths and values.
-        assert self.ti.size == BL.NUM + 1, 'LoopBlocking: wrong length for ti.'
-        assert self.to.size == BL.NUM + 1, 'LoopBlocking: wrong length for to.'
-        assert self.tb.size == BL.NUM + 1, 'LoopBlocking: wrong length for tb.'
+        assert len(self.ti) == BL.NUM + 1, 'LoopBlocking: wrong length for ti.'
+        assert len(self.to) == BL.NUM + 1, 'LoopBlocking: wrong length for to.'
+        assert len(self.tb) == BL.NUM + 1, 'LoopBlocking: wrong length for tb.'
 
-        assert tip >= nested_loop_desc.loopcnt_ifm, \
+        assert self.tip >= nested_loop_desc.loopcnt_ifm, \
                 'LoopBlocking: invalid blocking for ifm: {}'.format(self.ti)
-        assert top >= nested_loop_desc.loopcnt_ofm, \
+        assert self.top >= nested_loop_desc.loopcnt_ofm, \
                 'LoopBlocking: invalid blocking for ofm: {}'.format(self.to)
-        assert tbp >= nested_loop_desc.loopcnt_bat, \
+        assert self.tbp >= nested_loop_desc.loopcnt_bat, \
                 'LoopBlocking: invalid blocking for bat: {}'.format(self.tb)
 
         # Buffer data size for one unit.
@@ -90,11 +89,11 @@ class LoopBlockingScheme(object):
         self.unit_cnt = [[0] * de.NUM for _ in range(BL.NUM)]
         for bl in range(BL.NUM):
             self.unit_cnt[bl][de.FIL] = \
-                    np.prod(self.ti[bl+1:]) * np.prod(self.to[bl+1:])
+                    Util.prod(self.ti[bl+1:]) * Util.prod(self.to[bl+1:])
             self.unit_cnt[bl][de.IFM] = \
-                    np.prod(self.ti[bl+1:]) * np.prod(self.tb[bl+1:])
+                    Util.prod(self.ti[bl+1:]) * Util.prod(self.tb[bl+1:])
             self.unit_cnt[bl][de.OFM] = \
-                    np.prod(self.to[bl+1:]) * np.prod(self.tb[bl+1:])
+                    Util.prod(self.to[bl+1:]) * Util.prod(self.tb[bl+1:])
 
         # Whether reside in gbuf.
         self.stored_in_gbuf = [not options.sw_gbuf_bypass[dce]
@@ -116,9 +115,9 @@ class LoopBlockingScheme(object):
         # Base reuse.
         self.reuse = [[0] * de.NUM for _ in range(BL.NUM)]
         for bl in range(BL.NUM):
-            self.reuse[bl][de.FIL] = np.prod(self.tb[bl+1:])
-            self.reuse[bl][de.IFM] = np.prod(self.to[bl+1:])
-            self.reuse[bl][de.OFM] = np.prod(self.ti[bl+1:])
+            self.reuse[bl][de.FIL] = Util.prod(self.tb[bl+1:])
+            self.reuse[bl][de.IFM] = Util.prod(self.to[bl+1:])
+            self.reuse[bl][de.OFM] = Util.prod(self.ti[bl+1:])
 
         # Adjusted reuse based on loop orders, bypass, etc..
         self._adjust_reuse(self.reuse[BL.REGF], BL.REGF, self.orders[me.REGF],
@@ -148,7 +147,7 @@ class LoopBlockingScheme(object):
         self.unit_access = nested_loop_desc.unit_access
 
         # Misc.
-        self.lcnt = tip * top * tbp
+        self.lcnt = self.tip * self.top * self.tbp
         self.ops = nested_loop_desc.unit_ops * self.lcnt
         self.time = nested_loop_desc.unit_time * self.lcnt
 
@@ -210,7 +209,7 @@ class LoopBlockingScheme(object):
         c += self.ops * cost.mac_op
 
         access_total = [sum(acc) for acc in self.access]
-        c += np.dot(cost.mem_hier, access_total)
+        c += sum(mc * ma for mc, ma in zip(cost.mem_hier, access_total))
 
         c += self.time * cost.unit_static
 
@@ -278,9 +277,6 @@ class LoopBlockingScheme(object):
         '''
         # pylint: disable=invalid-name
         BL = self.BL
-        tip = np.prod(self.ti)
-        top = np.prod(self.to)
-        tbp = np.prod(self.tb)
 
         # Accesses to each hierarchy.
         self.access = [[0] * de.NUM for _ in range(me.NUM)]
@@ -304,17 +300,17 @@ class LoopBlockingScheme(object):
         # Number of top-level (DRAM) fetches.
         self.fetches = [1] * de.NUM
 
-        self.fetches[de.FIL] = tbp / self.reuse[BL.GBUF][de.FIL]
+        self.fetches[de.FIL] = self.tbp / self.reuse[BL.GBUF][de.FIL]
 
         if self.ti[BL.GBUF] != 1 \
                 and self.orders[me.GBUF].index(de.IFM) \
                     < self.orders[me.GBUF].index(de.OFM):
             self.fetches[de.IFM] = self.to[BL.GBUF]
-        assert self.fetches[de.IFM] * self.reuse[BL.GBUF][de.IFM] == top
+        assert self.fetches[de.IFM] * self.reuse[BL.GBUF][de.IFM] == self.top
 
         if self.to[BL.GBUF] != 1 \
                 and self.orders[me.GBUF].index(de.OFM) \
                     < self.orders[me.GBUF].index(de.IFM):
             self.fetches[de.OFM] = self.ti[BL.GBUF]
-        assert self.fetches[de.OFM] * self.reuse[BL.GBUF][de.OFM] == tip
+        assert self.fetches[de.OFM] * self.reuse[BL.GBUF][de.OFM] == self.tip
 
