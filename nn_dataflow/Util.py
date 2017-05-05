@@ -18,11 +18,24 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+import numpy as np
+
 '''
 Utilities.
 '''
 
-import numpy as np
+class StringifyClass(object):
+    '''
+    Class with a stringify interface.
+    '''
+    # pylint: disable=too-few-public-methods
+
+    def __str__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join(['{}={}'.format(k, str(v)) for k, v
+                       in sorted(self.__dict__.items())]))
+
 
 def idivc(valx, valy):
     '''
@@ -99,4 +112,24 @@ def closest_factor(value, factor):
     res += (min(value, f), )
 
     return res
+
+
+def get_ith_range(rng, idx, num):
+    '''
+    Divide the full range `rng` into `num` parts, and get the `idx`-th range.
+    '''
+    length = rng[1] - rng[0]
+    beg = rng[0] + idx * length / num
+    end = rng[0] + (idx + 1) * length / num
+    assert end <= rng[1]
+    return beg, end
+
+
+def assert_float_eq_int(vfloat, vint, message=''):
+    '''
+    Check the given float value is equal to the given int value. Print the
+    optional message if not equal.
+    '''
+    if abs(vfloat - vint) > 1:
+        raise AssertionError(message + ' {} != {}'.format(vfloat, vint))
 

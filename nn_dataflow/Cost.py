@@ -18,51 +18,45 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Cost specification.
-'''
-
 from collections import namedtuple
 
 from . import MemHierEnum as me
 
+COST_LIST = ['mac_op',
+             'mem_hier',
+             'noc_hop',
+             'unit_static'
+            ]
 
-class Cost(namedtuple('Cost', ['cost_memhier', 'cost_nochop', 'cost_macop',
-                               'cost_unit_static'])):
+class Cost(namedtuple('Cost', COST_LIST)):
     '''
-    Cost specification, including memory hierarchy cost, NoC hop cost, MAC
-    operation cost, and unit-time static cost.
+    Cost specification, including MAC operation cost, memory hierarchy cost,
+    NoC hop cost, and unit-time static cost.
     '''
 
-    def __init__(self, cost_memhier, cost_nochop, cost_macop, cost_unit_static):
-        super(Cost, self).__init__(self, cost_memhier, cost_nochop, cost_macop,
-                                   cost_unit_static)
-        assert len(self.cost_memhier) == me.NUM
-        assert not hasattr(self.cost_nochop, '__len__')  # a scalar
+    def __new__(cls, *args, **kwargs):
+        ntp = super(Cost, cls).__new__(cls, *args, **kwargs)
 
-    def memhier(self, mhe=None):
-        '''
-        Return cost of memory hierarchy level `mhe`
+        if hasattr(ntp.mac_op, '__len__'):
+            raise TypeError('Cost: mac_op must be a scalar')
+        if not isinstance(ntp.mem_hier, tuple):
+            raise TypeError('Cost: mem_hier must be a tuple')
+        if len(ntp.mem_hier) != me.NUM:
+            raise ValueError('Cost: mem_hier must have length {}'
+                             .format(me.NUM))
+        if hasattr(ntp.noc_hop, '__len__'):
+            raise TypeError('Cost: noc_hop must be a scalar')
+        if hasattr(ntp.unit_static, '__len__'):
+            raise TypeError('Cost: unit_static must be a scalar')
 
-        If None, return the list of cost for the entire hierarchy.
-        '''
-        return self.cost_memhier[mhe] if mhe is not None else self.cost_memhier
+        return ntp
 
-    def nochop(self):
+    def mem_hier_at(self, mhe):
         '''
-        Return cost of transfer over one NoC hop.
+        Return cost of memory hierarchy level `mhe`.
         '''
-        return self.cost_nochop
-
-    def macop(self):
-        '''
-        Return cost of one MAC op.
-        '''
-        return self.cost_macop
-
-    def unit_static(self):
-        '''
-        Return static cost of unit time.
-        '''
-        return self.cost_unit_static
+        try:
+            return self.mem_hier[mhe]
+        except (IndexError, TypeError):
+            return None
 

@@ -18,46 +18,69 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-NN Layer specification.
-'''
+from .Util import StringifyClass
 
-class Layer(object):
+class Layer(StringifyClass):
     '''
-    NN layer parameters.
+    Base NN layer.
 
-    nifm (C): # ifmap channels
-    nofm (M): # ofmap channels
-    sifm (H): ifmap width/height
-    sofm (E): ofmap width/height
-    sfil (R): weight filter width/height
-    strd (U): stride size
+    Includes only the output neuron parameters.
+
+    nofm: # ofmap channels
+    hofm, wofm: ofmap height/width
+    htrd, wtrd: stride height/width
     '''
 
-    def __init__(self, nifm, nofm, sofm, sfil, strd=1):
-        self.nifm = nifm
+    def __init__(self, nofm, sofm, strd=1):
+        if isinstance(sofm, int):
+            hofm = sofm
+            wofm = sofm
+        elif len(sofm) == 2:
+            hofm = sofm[0]
+            wofm = sofm[1]
+        else:
+            raise ValueError('Layer: sofm is invalid ({}), '
+                             'needs to be either one integer or '
+                             'a pair of integers'.format(sofm))
+        assert hofm > 0 and wofm > 0
+
+        if isinstance(strd, int):
+            htrd = strd
+            wtrd = strd
+        elif len(strd) == 2:
+            htrd = strd[0]
+            wtrd = strd[1]
+        else:
+            raise ValueError('Layer: strd is invalid ({}), '
+                             'needs to be either one integer or '
+                             'a pair of integers'.format(strd))
+        assert htrd > 0 and wtrd > 0
+
         self.nofm = nofm
-        self.sofm = sofm
-        self.sifm = sfil + (sofm - 1) * strd
-        self.sfil = sfil
-        self.strd = strd
-        assert self.sofm > 0
+        self.hofm = hofm
+        self.wofm = wofm
 
-    def ifmap_size(self, word_size=1):
-        '''
-        Get size of one input fmap.
+        self.htrd = htrd
+        self.wtrd = wtrd
 
-        If `word_size` is set to word byte size, return size in bytes.
-        '''
-        return self.sifm * self.sifm * word_size
+    def input_layer(self):
+        ''' Get the input layer parameters. '''
+        raise NotImplementedError(self.__class__.__name__)
 
-    def total_ifmap_size(self, word_size=1):
-        '''
-        Get total size of all input fmaps.
+    @property
+    def nifm(self):
+        ''' Number of fmap channels of input layer. '''
+        return self.input_layer().nofm
 
-        If `word_size` is set to word byte size, return size in bytes.
-        '''
-        return self.nifm * self.ifmap_size(word_size)
+    @property
+    def hifm(self):
+        ''' Fmap height of input layer. '''
+        return self.input_layer().hofm
+
+    @property
+    def wifm(self):
+        ''' Fmap width of input layer. '''
+        return self.input_layer().wofm
 
     def ofmap_size(self, word_size=1):
         '''
@@ -65,7 +88,7 @@ class Layer(object):
 
         If `word_size` is set to word byte size, return size in bytes.
         '''
-        return self.sofm * self.sofm * word_size
+        return self.hofm * self.wofm * word_size
 
     def total_ofmap_size(self, word_size=1):
         '''
@@ -74,6 +97,71 @@ class Layer(object):
         If `word_size` is set to word byte size, return size in bytes.
         '''
         return self.nofm * self.ofmap_size(word_size)
+
+    def ifmap_size(self, word_size=1):
+        '''
+        Get size of one input fmap.
+
+        If `word_size` is set to word byte size, return size in bytes.
+        '''
+        return self.input_layer().ofmap_size(word_size)
+
+    def total_ifmap_size(self, word_size=1):
+        '''
+        Get total size of all input fmaps.
+
+        If `word_size` is set to word byte size, return size in bytes.
+        '''
+        return self.input_layer().total_ofmap_size(word_size)
+
+    def ops_per_neuron(self):
+        ''' Number of operations per neuron. '''
+        raise NotImplementedError(self.__class__.__name__)
+
+    def total_ops(self, batch_size=1):
+        ''' Get total number of operations. '''
+        return self.total_ofmap_size() * self.ops_per_neuron() * batch_size
+
+
+class InputLayer(Layer):
+    '''
+    NN input layer parameters.
+    '''
+
+    def input_layer(self):
+        return None
+
+    def ops_per_neuron(self):
+        return 0
+
+
+class ConvLayer(Layer):
+    '''
+    NN convolutional layer parameters.
+
+    nifm (C): # ifmap channels
+    nofm (M): # ofmap channels
+    hifm, wifm (H): ifmap height/width
+    hofm, wofm (E): ofmap height/width
+    sfil (R): weight filter width/height
+    htrd, wtrd (U): stride height/width
+    '''
+
+    def __init__(self, nifm, nofm, sofm, sfil, strd=1):
+        super(ConvLayer, self).__init__(nofm, sofm, strd=strd)
+
+        self.sfil = sfil
+
+        hifm = self.sfil + (self.hofm - 1) * self.htrd
+        wifm = self.sfil + (self.wofm - 1) * self.wtrd
+        self.inlayer = Layer(nifm, (hifm, wifm))
+
+    def input_layer(self):
+        return self.inlayer
+
+    def ops_per_neuron(self):
+        # 2D convolution across all ifmap channels.
+        return self.sfil * self.sfil * self.nifm
 
     def filter_size(self, word_size=1):
         '''
@@ -91,23 +179,81 @@ class Layer(object):
         '''
         return self.nifm * self.nofm * self.filter_size(word_size)
 
-    def total_ops(self, batch_size=1):
-        '''
-        Get total number of MAC ops.
-        '''
-        return self.sofm * self.sofm * self.sfil * self.sfil \
-                * self.nofm * self.nifm * batch_size
 
-
-class FCLayer(Layer):
+class FCLayer(ConvLayer):
     '''
     NN fully-connected layer parameters.
 
-    sifm = sfil, strd = 1, sofm = 1
+    As a special case of CONVLayer.
+
+    hifm = wifm = sfil, strd = 1, hofm = wofm = 1
     '''
 
     def __init__(self, nifm, nofm, sfil):
-        Layer.__init__(self, nifm, nofm, 1, sfil)
-        assert self.sofm == 1
+        super(FCLayer, self).__init__(nifm, nofm, 1, sfil)
+        assert self.hofm == 1 and self.wofm == 1
 
+
+class LocalRegionLayer(Layer):
+    '''
+    NN layer which computes on a local region. The layer has no or limited
+    shared weights, whose impact can be ignored during scheduling.
+
+    Includes pooling layer and normalization layer.
+
+    nifm = nofm, sfil = 0
+    '''
+
+    def __init__(self, nofm, sofm, nreg, sreg, strd=1):
+        super(LocalRegionLayer, self).__init__(nofm, sofm, strd=strd)
+
+        if isinstance(sreg, int):
+            hreg = sreg
+            wreg = sreg
+        elif len(sreg) == 2:
+            hreg = sreg[0]
+            wreg = sreg[1]
+        else:
+            raise ValueError('LocalRegionLayer: sreg is invalid ({}), '
+                             'needs to be either one integer or '
+                             'a pair of integers'.format(sreg))
+        if nreg > 1 and (hreg * wreg) > 1:
+            raise ValueError('LocalRegionLayer: local region cannot be a mix '
+                             'of both n ({}) and h & w ({}, {})'
+                             .format(nreg, hreg, wreg))
+        self.nreg = nreg
+        self.hreg = hreg
+        self.wreg = wreg
+
+        nifm = self.nofm
+        hifm = self.hreg + (self.hofm - 1) * self.htrd
+        wifm = self.wreg + (self.wofm - 1) * self.wtrd
+        self.inlayer = Layer(nifm, (hifm, wifm))
+
+    def input_layer(self):
+        return self.inlayer
+
+    def ops_per_neuron(self):
+        # Each output point corresponds to merging a local region.
+        return self.region_size()
+
+    def region_size(self):
+        ''' The size of the local region corresponding to one output point. '''
+        return self.nreg * self.hreg * self.wreg
+
+
+class PoolingLayer(LocalRegionLayer):
+    '''
+    NN pooling layer parameters.
+
+    As a special case of LocalRegionLayer.
+
+    nreg = 1
+    '''
+
+    def __init__(self, nofm, sofm, sreg, strd=None):
+        if strd is None:
+            strd = sreg
+        super(PoolingLayer, self).__init__(nofm, sofm, 1, sreg, strd=strd)
+        assert self.nreg == 1
 

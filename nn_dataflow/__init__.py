@@ -18,25 +18,29 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-nn_dataflow module.
-'''
-
 from . import DataCategoryEnum
 from . import LoopBlocking
+from . import LoopBlockingSolver
 from . import MemHierEnum
 from . import ParallelEnum
 from . import Partition
-from . import Solver
 from .Cost import Cost
-from .Layer import Layer, FCLayer
-from .LoopBlocking import NestedLoopDesc
+from .DataLayout import DataLayout
+from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
+from .Layer import Layer, InputLayer, ConvLayer, FCLayer, \
+        LocalRegionLayer, PoolingLayer
+from .LoopBlockingScheme import LoopBlockingScheme
+from .MapStrategy import MapStrategyEyeriss
+from .NestedLoopDesc import NestedLoopDesc
+from .Network import Network
+from .NNDataflow import SchedulingResultDict
 from .Option import Option
-from .Partition import Partition2dScheme
+from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
-from .Resource import Resource
+from .Resource import NodeRegion, Resource
+from .Scheduling import SchedulingCondition, SchedulingResult, Scheduling
 
-from . import MapEyeriss
+from .NNDataflow import NNDataflow
 
-from .Schedule import schedule_search
+__version__ = '1.1.0'
 

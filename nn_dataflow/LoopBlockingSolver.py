@@ -18,19 +18,17 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Analytical models and solvers.
-'''
-
 import math
 import itertools
 
 from . import DataCategoryEnum as de
-from . import LoopBlocking
 from . import Util
 
+'''
+Analytical solvers for loop blocking.
+'''
 
-def _solve_lpbl_iofmap_gbuf_reside(resource, nested_loop_desc, reside_dce):
+def _solve_lpbl_iofmap_gbuf_reside(nested_loop_desc, resource, reside_dce):
     '''
     Given data category (ifm or ofm, according to `reside_dce` which is a
     DataCategortyEnum) is the only one in gbuf; the other data category and
@@ -84,30 +82,31 @@ def _solve_lpbl_iofmap_gbuf_reside(resource, nested_loop_desc, reside_dce):
     dce_y = reside_dce
     if dce_y == de.OFM:
         dce_x = de.IFM
-        nfmaps_x = nested_loop_desc.loopcnt_ifm()
-        nfmaps_y = nested_loop_desc.loopcnt_ofm()
+        nfmaps_x = nested_loop_desc.loopcnt_ifm
+        nfmaps_y = nested_loop_desc.loopcnt_ofm
         facc_x = 1
         facc_y = 2
     elif dce_y == de.IFM:
         dce_x = de.OFM
-        nfmaps_x = nested_loop_desc.loopcnt_ofm()
-        nfmaps_y = nested_loop_desc.loopcnt_ifm()
+        nfmaps_x = nested_loop_desc.loopcnt_ofm
+        nfmaps_y = nested_loop_desc.loopcnt_ifm
         facc_x = 2
         facc_y = 1
     else:
-        raise RuntimeError('Solver: only allow ifmap or ofmap to bypass.')
+        raise RuntimeError('LoopBlockingSolver: only allow ifmap or ofmap '
+                           'to bypass.')
 
-    nbats = nested_loop_desc.loopcnt_bat()
+    nbats = nested_loop_desc.loopcnt_bat
 
-    usize_gbuf_x = nested_loop_desc.usize_gbuf(dce_x)
-    usize_gbuf_y = nested_loop_desc.usize_gbuf(dce_y)
-    usize_gbuf_fil = nested_loop_desc.usize_gbuf(de.FIL)
+    usize_gbuf_x = nested_loop_desc.usize_gbuf_of(dce_x)
+    usize_gbuf_y = nested_loop_desc.usize_gbuf_of(dce_y)
+    usize_gbuf_fil = nested_loop_desc.usize_gbuf_of(de.FIL) + 1e-6
 
     max_size_gbuf = resource.size_gbuf
 
-    usize_regf_x = nested_loop_desc.usize_regf(dce_x)
-    usize_regf_y = nested_loop_desc.usize_regf(dce_y)
-    usize_regf_fil = nested_loop_desc.usize_regf(de.FIL)
+    usize_regf_x = nested_loop_desc.usize_regf_of(dce_x)
+    usize_regf_y = nested_loop_desc.usize_regf_of(dce_y)
+    usize_regf_fil = nested_loop_desc.usize_regf_of(de.FIL) + 1e-6
 
     max_size_regf = resource.size_regf
 
@@ -204,7 +203,7 @@ def _solve_lpbl_iofmap_gbuf_reside(resource, nested_loop_desc, reside_dce):
     return ti, to, tb, orders
 
 
-def _solve_lpbl_filter_gbuf_reside(resource, nested_loop_desc):
+def _solve_lpbl_filter_gbuf_reside(nested_loop_desc, resource):
     '''
     The fil is the only one in gbuf; both ifm and ofm bypass gbuf. Solve the
     analytical optimal loop blocking. Return ti, to, tb, and orders, same
@@ -237,30 +236,31 @@ def _solve_lpbl_filter_gbuf_reside(resource, nested_loop_desc):
     for dce_y in [de.IFM, de.OFM]:
         if dce_y == de.OFM:
             dce_x = de.IFM
-            nfmaps_x = nested_loop_desc.loopcnt_ifm()
-            nfmaps_y = nested_loop_desc.loopcnt_ofm()
+            nfmaps_x = nested_loop_desc.loopcnt_ifm
+            nfmaps_y = nested_loop_desc.loopcnt_ofm
             facc_x = 1
             facc_y = 2
         elif dce_y == de.IFM:
             dce_x = de.OFM
-            nfmaps_x = nested_loop_desc.loopcnt_ofm()
-            nfmaps_y = nested_loop_desc.loopcnt_ifm()
+            nfmaps_x = nested_loop_desc.loopcnt_ofm
+            nfmaps_y = nested_loop_desc.loopcnt_ifm
             facc_x = 2
             facc_y = 1
         else:
-            raise RuntimeError('Solver: only allow ifmap or ofmap to bypass.')
+            raise RuntimeError('LoopBlockingSolver: only allow ifmap or ofmap '
+                               'to bypass.')
 
-        nbats = nested_loop_desc.loopcnt_bat()
+        nbats = nested_loop_desc.loopcnt_bat
 
-        usize_gbuf_x = nested_loop_desc.usize_gbuf(dce_x)
-        usize_gbuf_y = nested_loop_desc.usize_gbuf(dce_y)
-        usize_gbuf_fil = nested_loop_desc.usize_gbuf(de.FIL)
+        usize_gbuf_x = nested_loop_desc.usize_gbuf_of(dce_x)
+        usize_gbuf_y = nested_loop_desc.usize_gbuf_of(dce_y)
+        usize_gbuf_fil = nested_loop_desc.usize_gbuf_of(de.FIL) + 1e-6
 
         max_size_gbuf = resource.size_gbuf
 
-        usize_regf_x = nested_loop_desc.usize_regf(dce_x)
-        usize_regf_y = nested_loop_desc.usize_regf(dce_y)
-        usize_regf_fil = nested_loop_desc.usize_regf(de.FIL)
+        usize_regf_x = nested_loop_desc.usize_regf_of(dce_x)
+        usize_regf_y = nested_loop_desc.usize_regf_of(dce_y)
+        usize_regf_fil = nested_loop_desc.usize_regf_of(de.FIL) + 1e-6
 
         max_size_regf = resource.size_regf
 
@@ -313,7 +313,7 @@ def _solve_lpbl_filter_gbuf_reside(resource, nested_loop_desc):
     return ti, to, tb, orders
 
 
-def gen_loopblocking_gbuf_regf(resource, cost, nested_loop_desc, options):
+def gen_loopblocking_gbuf_regf(nested_loop_desc, resource, options):
     '''
     Generator for loop blocking schemes that are solved from iofmap gbuf bypass
     analytical models.
@@ -322,20 +322,17 @@ def gen_loopblocking_gbuf_regf(resource, cost, nested_loop_desc, options):
     # reside_dce_list is a list of DataCategoryEnum, each element is a config
     # with only that data category in gbuf, i.e., the others are all bypassed.
     for reside_dce in range(de.NUM):
-        if all([denum == reside_dce or options.allow_gbuf_bypass[denum]
+        if all([denum == reside_dce or options.sw_gbuf_bypass[denum]
                 for denum in range(de.NUM)]):
             reside_dce_list.append(reside_dce)
 
     for reside_dce in reside_dce_list:
         if reside_dce == de.FIL:
             ti, to, tb, orders = _solve_lpbl_filter_gbuf_reside(
-                resource, nested_loop_desc)
+                nested_loop_desc, resource)
         else:
             assert reside_dce == de.IFM or reside_dce == de.OFM
             ti, to, tb, orders = _solve_lpbl_iofmap_gbuf_reside(
-                resource, nested_loop_desc, reside_dce)
-        yield LoopBlocking.cost_loopblocking_gbuf_regf(
-            ti, to, tb, orders, resource=resource, cost=cost,
-            nested_loop_desc=nested_loop_desc, options=options)
-
+                nested_loop_desc, resource, reside_dce)
+        yield ti, to, tb, orders
 

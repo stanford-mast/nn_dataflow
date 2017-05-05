@@ -18,10 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Physical 2D dimension.
-'''
-
 from collections import namedtuple
 from operator import add, sub, mul
 
@@ -33,6 +29,13 @@ class PhyDim2(namedtuple('PhyDim2', ['h', 'w'])):
     def size(self):
         ''' Total size. '''
         return int(reduce(mul, self, 1))
+
+    def hop_dist(self, other):
+        ''' Hop distance between twn coordinate. '''
+        if not isinstance(other, PhyDim2):
+            raise TypeError('PhyDim2: hop_dist only applies on two PhyDim2 '
+                            'instances.')
+        return abs(self.h - other.h) + abs(self.w - other.w)
 
     def __add__(self, other):
         ''' Return element-wise `self + other`. '''
@@ -53,5 +56,4 @@ class PhyDim2(namedtuple('PhyDim2', ['h', 'w'])):
         return PhyDim2(*map(mul, self, other))
 
     __rmul__ = __mul__
-
 

@@ -18,18 +18,36 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Schedule options for nn_dataflow.
-'''
-
 from collections import namedtuple
 
+from . import DataCategoryEnum as de
 
-OPTION_LIST = ['allow_gbuf_bypass',
-               'solve_loopblocking',
-               'hybrid_partition2d',
+OPTION_LIST = ['sw_gbuf_bypass',
+               'sw_solve_loopblocking',
+               'partition_hybrid',
+               'partition_batch',
                'ntops',
                'nprocesses',
               ]
-Option = namedtuple('Option', OPTION_LIST)
+
+class Option(namedtuple('Option', OPTION_LIST)):
+    '''
+    Schedule options.
+    '''
+
+    def __new__(cls, *args, **kwargs):
+        ntp = super(Option, cls).__new__(cls, *args, **kwargs)
+
+        if not isinstance(ntp.sw_gbuf_bypass, tuple):
+            raise TypeError('Option: sw_gbuf_bypass must be a tuple')
+        if len(ntp.sw_gbuf_bypass) != de.NUM:
+            raise ValueError('Option: sw_gbuf_bypass must have length {}'
+                             .format(de.NUM))
+
+        return ntp
+
+    @staticmethod
+    def option_list():
+        ''' List of options. '''
+        return OPTION_LIST
 

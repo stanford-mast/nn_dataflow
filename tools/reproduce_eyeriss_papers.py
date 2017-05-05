@@ -18,16 +18,11 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Reproduce optimal schedule for Eyeriss paper.
-'''
-
 import argparse
 import multiprocessing
 import sys
 
 from eyeriss_search import do_scheduling
-
 
 class _Namespace(object):  # pylint: disable=too-few-public-methods
     def __init__(self, **kwargs):
@@ -35,13 +30,13 @@ class _Namespace(object):  # pylint: disable=too-few-public-methods
 
 
 def main(args):
-    ''' Main function. '''
+    ''' Reproduce optimal schedule for Eyeriss paper. '''
 
     hier_cost = [200, 6, 2, 1]
 
     if args.paper == 'isscc16':
         mapping_args = _Namespace(
-            net='eyeriss_alex_net',
+            net='alex_net',
             batch=4,
             word=16,
             nodes=[1, 1],
@@ -52,23 +47,35 @@ def main(args):
             hier_cost=hier_cost,
             hop_cost=0,
             unit_static_cost=0,
+            mem_type='2D',
             disable_bypass='i o f'.split(),
             solve_loopblocking=False,
-            hybrid_partition2d=False,
+            hybrid_partition=False,
+            batch_partition=False,
             processes=args.processes)
 
         results = do_scheduling(mapping_args)
         mappings = results['mappings']
-        for name, mapping in mappings.items():
-            ops = mapping[1]['ops']
-            access = [sum(a) for a in mapping[1]['access']]
-            assert len(access) == 4
-            print '{},{},{}'.format(name, ops,
+
+        for layer in ['conv{}'.format(i) for i in range(1, 6)] \
+                + ['fc{}'.format(i) for i in range(1, 4)]:
+            ops = 0
+            access = [0] * 4
+
+            for layer_part in mappings:
+                if not layer_part.startswith(layer):
+                    continue
+                ops += mappings[layer_part].dict_loop['ops']
+                access = [a1 + sum(a2) for a1, a2
+                          in zip(access,
+                                 mappings[layer_part].dict_loop['access'])]
+
+            print '{},{},{}'.format(layer, ops,
                                     ','.join([str(a) for a in access]))
 
     elif args.paper == 'isca16':
         mapping_args = _Namespace(
-            net='eyeriss_alex_net',
+            net='alex_net',
             batch=16,
             word=16,
             nodes=[1, 1],
@@ -79,20 +86,33 @@ def main(args):
             hier_cost=hier_cost,
             hop_cost=0,
             unit_static_cost=0,
+            mem_type='2D',
             disable_bypass='i o f'.split(),
             solve_loopblocking=False,
-            hybrid_partition2d=False,
+            hybrid_partition=False,
+            batch_partition=False,
             processes=args.processes)
 
         results = do_scheduling(mapping_args)
         mappings = results['mappings']
-        for name, mapping in mappings.items():
-            ops = mapping[1]['ops']
-            access = [sum(a) for a in mapping[1]['access']]
-            assert len(access) == 4
+
+        for layer in ['conv{}'.format(i) for i in range(1, 6)] \
+                + ['fc{}'.format(i) for i in range(1, 4)]:
+            ops = 0
+            access = [0] * 4
+
+            for layer_part in mappings:
+                if not layer_part.startswith(layer):
+                    continue
+                ops += mappings[layer_part].dict_loop['ops']
+                access = [a1 + sum(a2) for a1, a2
+                          in zip(access,
+                                 mappings[layer_part].dict_loop['access'])]
+
             cost_breakdown = [ops * 1] + [a * c for a, c
                                           in zip(access, hier_cost)]
-            print '{},{}'.format(name,
+
+            print '{},{}'.format(layer,
                                  ','.join([str(c) for c in cost_breakdown]))
 
     else:

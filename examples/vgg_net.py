@@ -18,37 +18,43 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from nn_dataflow import Network
+from nn_dataflow import InputLayer, ConvLayer, FCLayer, PoolingLayer
+
 '''
 VGGNet-16
 
 Simonyan and Zisserman, 2014
 '''
 
-from collections import OrderedDict
+NN = Network('VGG')
 
-from nn_dataflow import Layer, FCLayer
+NN.set_input(InputLayer(3, 224))
 
-LAYERS = OrderedDict()
+NN.add('conv1', ConvLayer(3, 64, 224, 3))
+NN.add('conv2', ConvLayer(64, 64, 224, 3))
+NN.add('pool1', PoolingLayer(64, 112, 2))
 
-LAYERS['conv1'] = Layer(3, 64, 224, 3)
-LAYERS['conv2'] = Layer(64, 64, 224, 3)
+NN.add('conv3', ConvLayer(64, 128, 112, 3))
+NN.add('conv4', ConvLayer(128, 128, 112, 3))
+NN.add('pool2', PoolingLayer(128, 56, 2))
 
-LAYERS['conv3'] = Layer(64, 128, 112, 3)
-LAYERS['conv4'] = Layer(128, 128, 112, 3)
+NN.add('conv5', ConvLayer(128, 256, 56, 3))
+NN.add('conv6', ConvLayer(256, 256, 56, 3))
+NN.add('conv7', ConvLayer(256, 256, 56, 3))
+NN.add('pool3', PoolingLayer(256, 28, 2))
 
-LAYERS['conv5'] = Layer(128, 256, 56, 3)
-LAYERS['conv6'] = Layer(256, 256, 56, 3)
-LAYERS['conv7'] = Layer(256, 256, 56, 3)
+NN.add('conv8', ConvLayer(256, 512, 28, 3))
+NN.add('conv9', ConvLayer(512, 512, 28, 3))
+NN.add('conv10', ConvLayer(512, 512, 28, 3))
+NN.add('pool4', PoolingLayer(512, 14, 2))
 
-LAYERS['conv8'] = Layer(256, 512, 28, 3)
-LAYERS['conv9'] = Layer(512, 512, 28, 3)
-LAYERS['conv10'] = Layer(512, 512, 28, 3)
+NN.add('conv11', ConvLayer(512, 512, 14, 3))
+NN.add('conv12', ConvLayer(512, 512, 14, 3))
+NN.add('conv13', ConvLayer(512, 512, 14, 3))
+NN.add('pool5', PoolingLayer(512, 7, 2))
 
-LAYERS['conv11'] = Layer(512, 512, 14, 3)
-LAYERS['conv12'] = Layer(512, 512, 14, 3)
-LAYERS['conv13'] = Layer(512, 512, 14, 3)
-
-LAYERS['fc1'] = FCLayer(512, 4096, 7)
-LAYERS['fc2'] = FCLayer(4096, 4096, 1)
-LAYERS['fc3'] = FCLayer(4096, 1000, 1)
+NN.add('fc1', FCLayer(512, 4096, 7))
+NN.add('fc2', FCLayer(4096, 4096, 1))
+NN.add('fc3', FCLayer(4096, 1000, 1))
 
