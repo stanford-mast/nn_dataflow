@@ -35,7 +35,8 @@ def _apply_loopblocking_search(scheduling, *args):
     '''
     Make function pickle-able for multiprocessing.Pool.
     '''
-    return scheduling.loopblocking_search(*args)
+    # pylint: disable=protected-access
+    return scheduling._loopblocking_search(*args)
 
 
 class SchedulingCondition(namedtuple('SchedulingCondition',
@@ -108,29 +109,7 @@ class Scheduling(object):
         '''
         Search the best schedule results under the given condition and options.
         '''
-        results = []
-
-        def retrieve_result():
-            ''' Retrieve results from multiprocessing.Pool. '''
-            for r in results:
-                ntops = r.get(timeout=3600)
-                for t in ntops:
-                    yield t
-
-        def retrieve_result_st():
-            ''' Retrieve results from single-process processing. '''
-            for r in results:
-                for t in r:
-                    yield t
-
-        if options.nprocesses > 1:
-            pool = Pool(processes=options.nprocesses)
-            apply_func = pool.apply_async
-            retrieve_func = retrieve_result()
-        else:
-            pool = None
-            apply_func = apply
-            retrieve_func = retrieve_result_st()
+        tops = []
 
         mem_region_src = condition.resource.mem_region_src()
         mem_region_dst = condition.resource.mem_region_dst()
@@ -161,24 +140,17 @@ class Scheduling(object):
             if math.isinf(sum(unit_nhops)):
                 continue
 
-            # Partitioned layer.
-            p_layer, p_batch_size, p_occ = part.part_layer(self.layer,
-                                                           self.batch_size)
+            # Explore single-node schedules.
+            for lbs in self.schedule_search_per_node(
+                    part, condition.resource, options):
 
-            # Mapping strategy.
-            map_strategy = self.map_strategy_class(p_layer, p_batch_size,
-                                                   condition.resource.dim_array)
+                # Make scheduling result.
+                r = self._get_result(lbs, part, unit_nhops, ofmap_layout,
+                                     condition, options)
+                tops.append(r)
 
-            # Explore PE array mapping schemes for partitioned layer.
-            for nested_loop_desc in map_strategy.gen_nested_loop_desc():
-
-                # Explore loop blocking schemes.
-                r = apply_func(_apply_loopblocking_search,
-                               (self, nested_loop_desc, part, unit_nhops,
-                                p_occ, ofmap_layout, condition, options))
-                results.append(r)
-
-        tops = heapq.nsmallest(options.ntops, retrieve_func, key=lambda x: x[0])
+        # Pick the top n.
+        tops = sorted(tops, key=lambda r: r.total_cost)[:options.ntops]
 
         # Check total op count.
         # Initial occupation also applies to layer.
@@ -197,36 +169,84 @@ class Scheduling(object):
                     and h_rng[1] - h_rng[0] == self.layer.hofm \
                     and w_rng[1] - w_rng[0] == self.layer.wofm
 
+        return list(tops)
+
+    def schedule_search_per_node(self, part, resource, options):
+        '''
+        Search the best mapping strategies and loop blocking schemes for a
+        single node after partitioning, given the partitioning scheme and
+        resource.
+
+        Return the top LoopBlockingScheme instances.
+        '''
+        results = []
+
+        def retrieve_result():
+            ''' Retrieve results from multiprocessing.Pool. '''
+            for r in results:
+                ntops = r.get(timeout=3600)
+                for t in ntops:
+                    yield t
+
+        def retrieve_result_st():
+            ''' Retrieve results from single-process processing. '''
+            for r in results:
+                for t in r:
+                    yield t
+
+        if options.nprocesses > 1:
+            pool = Pool(processes=options.nprocesses)
+            apply_func = pool.apply_async
+            retrieve_func = retrieve_result()
+        else:
+            pool = None
+            apply_func = apply
+            retrieve_func = retrieve_result_st()
+
+        # Partitioned layer.
+        p_layer, p_batch_size, p_occ = part.part_layer(self.layer,
+                                                       self.batch_size)
+
+        # Mapping strategy.
+        map_strategy = self.map_strategy_class(p_layer, p_batch_size,
+                                               resource.dim_array)
+
+        # Explore PE array mapping schemes for partitioned layer.
+        for nested_loop_desc in map_strategy.gen_nested_loop_desc():
+
+            # Explore loop blocking schemes.
+            r = apply_func(_apply_loopblocking_search,
+                           (self, nested_loop_desc, resource, p_occ, options))
+            results.append(r)
+
+        tops = heapq.nsmallest(options.ntops, retrieve_func,
+                               key=lambda lbs: lbs.get_cost(self.cost))
+
         if pool is not None:
             pool.close()
             pool.join()
 
         return list(tops)
 
-    def loopblocking_search(self, nested_loop_desc, part, unit_nhops, part_occ,
-                            ofmap_layout, condition, options):
-        '''
-        Search the loop blocking schemes. Return the best schedule results.
-        '''
+    def _loopblocking_search(self, nested_loop_desc, resource, part_occ,
+                             options):
         def _sweep():
             for lbs in LoopBlocking.gen_loopblocking(nested_loop_desc,
-                                                     condition.resource,
-                                                     options):
-                yield self._get_result(lbs, part, unit_nhops, part_occ,
-                                       ofmap_layout, condition, options)
+                                                     resource, options):
+                assert lbs.is_valid()
+                lbs.set_partition_occupation(part_occ)
 
-        return heapq.nsmallest(options.ntops, _sweep(), key=lambda x: x[0])
+                yield lbs
 
-    def _get_result(self, lbs, part, unit_nhops, part_occ, ofmap_layout,
-                    condition, options):
+        return heapq.nsmallest(options.ntops, _sweep(),
+                               key=lambda lbs: lbs.get_cost(self.cost))
+
+    def _get_result(self, lbs, part, unit_nhops, ofmap_layout, condition,
+                    options):
         '''
         Make the schedule result from loop blocking and partitioning.
         '''
         del options  # unused
-
-        # Scale by partition occupation.
-        assert lbs.is_valid()
-        lbs.scale_by_occupation(part_occ)
 
         # Loop blocking.
         cost_loop = lbs.get_cost(self.cost)
@@ -242,8 +262,7 @@ class Scheduling(object):
         dict_part = OrderedDict([('cost', cost_part),
                                  ('total_nhops', total_nhops),
                                  ('part', part.__dict__),
-                                 ('unit_nhops', unit_nhops),
-                                 ('part_occ', part_occ)])
+                                 ('unit_nhops', unit_nhops)])
 
         # Result.
         total_cost = cost_loop * condition.resource.dim_nodes.size() + cost_part

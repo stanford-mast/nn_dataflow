@@ -151,6 +151,8 @@ class LoopBlockingScheme(object):
         self.ops = nested_loop_desc.unit_ops * self.lcnt
         self.time = nested_loop_desc.unit_time * self.lcnt
 
+        self.part_occ = 1.  # set later.
+
         # Access.
         self._calc_access()
 
@@ -172,6 +174,11 @@ class LoopBlockingScheme(object):
             size *= 1 if self.stored_in_gbuf[dce] else 0
 
         return size
+
+    def set_partition_occupation(self, part_occ):
+        ''' Set and scale by the given partitioning occupation. '''
+        self.part_occ = part_occ
+        self.scale_by_occupation(part_occ)
 
     def scale_by_occupation(self, occupation):
         '''
@@ -232,6 +239,7 @@ class LoopBlockingScheme(object):
                             ('size', size),
                             ('unit_size', self.unit_size),
                             ('unit_cnt', self.unit_cnt),
+                            ('part_occ', self.part_occ),
                             ('ti', tuple(self.ti)),
                             ('to', tuple(self.to)),
                             ('tb', tuple(self.tb)),
