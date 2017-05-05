@@ -173,7 +173,7 @@ def do_scheduling(args):
     ## Search schedules.
 
     nnd = NNDataflow(network, batch_size, resource, cost)
-    tops = nnd.schedule_search(MapStrategyEyeriss, options)
+    tops, cache_stats = nnd.schedule_search(MapStrategyEyeriss, options)
 
     if not tops:
         sys.stderr.write('No valid dataflow found.')
@@ -193,6 +193,8 @@ def do_scheduling(args):
     res_map['resource'] = resource._asdict()
     res_map['cost'] = cost._asdict()
     res_map['options'] = options._asdict()
+
+    res_map['cache_stats'] = cache_stats
 
     for key, val in stats.items():
         res_map[key] = val
