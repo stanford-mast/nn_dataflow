@@ -42,3 +42,5 @@ from .Scheduling import SchedulingCondition, SchedulingResult, Scheduling
 
 from .NNDataflow import NNDataflow
 
+__version__ = '1.1.0'
+

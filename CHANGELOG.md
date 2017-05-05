@@ -3,6 +3,9 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+
+## [v1.0 -- v1.1] -- 2017-05-04
+
 ### Added
 
 - Workload models.
