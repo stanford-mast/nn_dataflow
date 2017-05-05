@@ -154,3 +154,14 @@ class PartitionScheme(StringifyClass):
         return FmapRange(FmapPosition(b=b_beg, n=n_beg, h=h_beg, w=w_beg),
                          FmapPosition(b=b_end, n=n_end, h=h_end, w=w_end))
 
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.__dict__ == other.__dict__
+        return NotImplemented
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(tuple(sorted(self.__dict__.items())))
+
