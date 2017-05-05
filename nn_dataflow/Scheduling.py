@@ -88,6 +88,7 @@ class Scheduling(object):
     '''
     Layer scheduling.
     '''
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, layer, batch_size, cost, map_strategy_class):
 
@@ -104,6 +105,11 @@ class Scheduling(object):
         self.batch_size = batch_size
         self.cost = cost
         self.map_strategy_class = map_strategy_class
+
+        # Per-node schedule cache.
+        self.pernode_sched_cache = {}
+        self.pernode_sched_cache_hits = 0
+        self.pernode_sched_cache_misses = 0
 
     def schedule_search(self, condition, options):
         '''
@@ -171,6 +177,12 @@ class Scheduling(object):
 
         return list(tops)
 
+    def cache_stats(self):
+        '''
+        Get the cache hits/misses stats. Return a tuple of (hits, misses).
+        '''
+        return (self.pernode_sched_cache_hits, self.pernode_sched_cache_misses)
+
     def schedule_search_per_node(self, part, resource, options):
         '''
         Search the best mapping strategies and loop blocking schemes for a
@@ -179,6 +191,21 @@ class Scheduling(object):
 
         Return the top LoopBlockingScheme instances.
         '''
+
+        # NOTE: need to ensure the key's __eq__ and __hash__ have been
+        # redefined.
+        cache_key = (part, resource, options)
+
+        cache_val = self.pernode_sched_cache.get(cache_key, None)
+
+        if cache_val is not None:
+            # Cache hit.
+            self.pernode_sched_cache_hits += 1
+            return cache_val
+
+        # Cache miss.
+        self.pernode_sched_cache_misses += 1
+
         results = []
 
         def retrieve_result():
@@ -225,6 +252,8 @@ class Scheduling(object):
         if pool is not None:
             pool.close()
             pool.join()
+
+        self.pernode_sched_cache[cache_key] = list(tops)
 
         return list(tops)
 

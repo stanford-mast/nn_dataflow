@@ -167,7 +167,7 @@ def do_scheduling(args):
                      sw_solve_loopblocking=args.solve_loopblocking,
                      partition_hybrid=args.hybrid_partition,
                      partition_batch=args.batch_partition,
-                     ntops=1,
+                     ntops=args.top,
                      nprocesses=args.processes)
 
     ## Search schedules.
@@ -263,6 +263,8 @@ if __name__ == '__main__':
                     help='Allow partitioning batch, i.e., consider data '
                          'parallelism.')
 
+    ap.add_argument('-t', '--top', type=int, default=1,
+                    help='Number of top schedules to keep during search.')
     ap.add_argument('-p', '--processes', type=int,
                     default=multiprocessing.cpu_count()/2,
                     help='Number of parallel processes to use for search.')
