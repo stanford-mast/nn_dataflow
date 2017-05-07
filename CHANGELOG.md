@@ -3,6 +3,27 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+### Added
+
+- Explorers and solvers.
+
+  - Performance improvements.
+    - Add loop blocking scheme cache in Scheduling.
+    - Use a single Scheduling instance for all same layers.
+
+- Software engineering
+
+  - Class instance used as dict key.
+    - Add value-based equality and hash to Layer.
+    - Add value-based equality and hash to PartitionScheme.
+
+
+### Changed
+
+- Software engineering
+
+  - Replace numpy for better performance.
+
 
 ## [v1.0 -- v1.1] -- 2017-05-04
 
