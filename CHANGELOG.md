@@ -22,6 +22,10 @@ List of major changes and improvements
 
 ### Changed
 
+- Explorers and solvers:
+
+  - Better formatting of verification results against Eyeriss.
+
 - Software engineering
 
   - Replace numpy for better performance.

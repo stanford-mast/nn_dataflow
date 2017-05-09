@@ -24,6 +24,9 @@ import sys
 
 from eyeriss_search import do_scheduling
 
+from nn_dataflow import DataCategoryEnum as de
+from nn_dataflow import MemHierEnum as me
+
 class _Namespace(object):  # pylint: disable=too-few-public-methods
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
@@ -58,21 +61,43 @@ def main(args):
         results = do_scheduling(mapping_args)
         mappings = results['mappings']
 
-        for layer in ['conv{}'.format(i) for i in range(1, 6)] \
-                + ['fc{}'.format(i) for i in range(1, 4)]:
+        print 'Eyeriss, ISSCC\'16, Fig. 14.5.6.'
+
+        # Title line.
+        print 'Layer,Power (mW),Latency (ms),# of MAC (MOPs),' \
+                'Active # of PEs,# of Filter Weights,' \
+                'Buffer Data Access (MB),DRAM Data Access (MB)'
+
+        for layer in ['conv{}'.format(i) for i in range(1, 6)]:
             ops = 0
+            time = 0
+            fil_size = 0
             access = [0] * 4
 
             for layer_part in mappings:
                 if not layer_part.startswith(layer):
                     continue
                 ops += mappings[layer_part].dict_loop['ops']
+                time += mappings[layer_part].dict_loop['time']
+                fil_size += mappings[layer_part].dict_loop['access'] \
+                        [me.DRAM][de.FIL] \
+                        / mappings[layer_part].dict_loop['fetches'][de.FIL]
                 access = [a1 + sum(a2) for a1, a2
                           in zip(access,
                                  mappings[layer_part].dict_loop['access'])]
 
-            print '{},{},{}'.format(layer, ops,
-                                    ','.join([str(a) for a in access]))
+            active_pes = int(ops / time)
+
+            ops /= 1e6  # to MOPs.
+            time /= 200.e3  # cycles to ms.
+            fil_size /= 1e3  # to k
+
+            dram_acc = access[me.DRAM] * 2 / 1e6  # to MB.
+            gbuf_acc = access[me.GBUF] * 2 / 1e6  # to MB.
+
+            print '{},{},{:.1f},{:.1f},{},{:.1f}k,{:.1f},{:.1f}' \
+                    .format(layer, '-', time, ops, active_pes, fil_size,
+                            dram_acc, gbuf_acc)
 
     elif args.paper == 'isca16':
         mapping_args = _Namespace(
@@ -97,6 +122,11 @@ def main(args):
 
         results = do_scheduling(mapping_args)
         mappings = results['mappings']
+
+        print 'Eyeriss, ISCA\'16, Fig. 10.'
+
+        # Title line.
+        print 'Layer,ALU,DRAM,Buffer,Array,RF'
 
         for layer in ['conv{}'.format(i) for i in range(1, 6)] \
                 + ['fc{}'.format(i) for i in range(1, 4)]:
