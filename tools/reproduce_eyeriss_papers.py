@@ -52,6 +52,7 @@ def main(args):
             solve_loopblocking=False,
             hybrid_partition=False,
             batch_partition=False,
+            top=1,
             processes=args.processes)
 
         results = do_scheduling(mapping_args)
@@ -91,6 +92,7 @@ def main(args):
             solve_loopblocking=False,
             hybrid_partition=False,
             batch_partition=False,
+            top=1,
             processes=args.processes)
 
         results = do_scheduling(mapping_args)
