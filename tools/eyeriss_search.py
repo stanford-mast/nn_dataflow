@@ -25,6 +25,7 @@ import sys
 from collections import OrderedDict
 import numpy as np
 
+from nn_dataflow import __version__ as VERSION
 from nn_dataflow import NNDataflow
 from nn_dataflow import Cost
 from nn_dataflow import DataCategoryEnum as de
@@ -186,6 +187,8 @@ def do_scheduling(args):
     ## Write results.
 
     res_map = OrderedDict()
+
+    res_map['version'] = VERSION
 
     res_map['net'] = args.net
     res_map['batch'] = args.batch

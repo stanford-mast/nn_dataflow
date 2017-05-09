@@ -17,6 +17,8 @@ List of major changes and improvements
     - Add value-based equality and hash to Layer.
     - Add value-based equality and hash to PartitionScheme.
 
+  - Add version number to output json dump.
+
 
 ### Changed
 
