@@ -3,6 +3,9 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+
+## [v1.1 -- v1.2] -- 2017-05-10
+
 ### Added
 
 - Explorers and solvers.
