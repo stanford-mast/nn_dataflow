@@ -18,7 +18,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-import numpy as np
+from operator import mul
 
 '''
 Utilities.
@@ -46,6 +46,11 @@ def idivc(valx, valy):
     return (valx + valy - 1) // valy
 
 
+def prod(lst):
+    ''' Get the product of a list. '''
+    return reduce(mul, lst, 1)
+
+
 def approx_dividable(total, num, overhead=0.2):
     ''' Whether it is reasonable to divide `total` into `num` parts.
     `overhead` is the allowed max padding overhead.  '''
@@ -54,8 +59,8 @@ def approx_dividable(total, num, overhead=0.2):
 
 def factorize(value, num, limits=None):
     '''
-    Factorize given `value` into `num` numbers. Return as a copy of num-length
-    np.array.
+    Factorize given `value` into `num` numbers. Return a tuple of length
+    `num`.
 
     Iterate over factor combinations of which the product is `value`.
 
@@ -67,19 +72,19 @@ def factorize(value, num, limits=None):
     assert len(limits) >= num - 1
     limits = limits[:num-1] + [float('inf')]
 
-    factors = np.ones(num, dtype=int)
+    factors = [1] * num
     while True:
         # Calculate the last factor.
-        factors[-1] = idivc(value, np.prod(factors[:-1]))
-        if np.prod(factors) == value \
-                and np.all(np.less(factors, limits)):
-            yield tuple(np.copy(factors))
+        factors[-1] = idivc(value, prod(factors[:-1]))
+        if prod(factors) == value \
+                and all(f <= l for f, l in zip(factors, limits)):
+            yield tuple(factors)
 
         # Update the first n - 1 factor combination, backwards.
         lvl = num - 1
         while lvl >= 0:
             factors[lvl] += 1
-            if np.prod(factors[:lvl+1]) <= value:
+            if prod(factors[:lvl+1]) <= value:
                 break
             else:
                 factors[lvl] = 1

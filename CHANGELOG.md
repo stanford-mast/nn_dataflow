@@ -4,6 +4,39 @@ List of major changes and improvements
 ## [Unreleased]
 
 
+## [v1.1 -- v1.2] -- 2017-05-10
+
+### Added
+
+- Explorers and solvers.
+
+  - Performance improvements.
+    - Add loop blocking scheme cache in Scheduling.
+    - Use a single Scheduling instance for all same layers.
+
+- Software engineering
+
+  - Class instance used as dict key.
+    - Add value-based equality and hash to Layer.
+    - Add value-based equality and hash to PartitionScheme.
+
+  - Add version number to output json dump.
+
+
+### Changed
+
+- Explorers and solvers:
+
+  - Better formatting of verification results against Eyeriss.
+
+- Software engineering
+
+  - Replace numpy for better performance.
+
+  - Move multiprocessing into loop blocking exploration for better performance
+    scaling.
+
+
 ## [v1.0 -- v1.1] -- 2017-05-04
 
 ### Added

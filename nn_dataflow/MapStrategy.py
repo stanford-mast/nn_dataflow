@@ -20,7 +20,6 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import math
 import warnings
-import numpy as np
 
 from . import DataCategoryEnum as de
 from . import MemHierEnum as me
@@ -367,7 +366,7 @@ class MapStrategyEyeriss(MapStrategy):
                     * self.layer.wtrd)
         # Due to folding, the overlapping ifmaps may need to be re-fetched,
         # resulting in amplified access for ifmaps.
-        amp_acc_ifm = 1. * np.prod(avgdims_per_flpeset[de.IFM]) \
+        amp_acc_ifm = 1. * Util.prod(avgdims_per_flpeset[de.IFM]) \
                 * self.fold.size() / self.layer.ifmap_size()
 
         # Unit regf size for one processing pass.
@@ -593,9 +592,9 @@ class MapStrategyEyeriss(MapStrategy):
         usize_gbuf = [0] * de.NUM
         # No sfil.
         usize_gbuf[de.FIL] = 0
-        usize_gbuf[de.IFM] = (np.prod(dims_per_flpeset[de.IFM])
+        usize_gbuf[de.IFM] = (Util.prod(dims_per_flpeset[de.IFM])
                               * ifms_per_procpass)
-        usize_gbuf[de.OFM] = (np.prod(dims_per_flpeset[de.OFM])
+        usize_gbuf[de.OFM] = (Util.prod(dims_per_flpeset[de.OFM])
                               * ofms_per_procpass)
         return tuple(usize_gbuf)
 

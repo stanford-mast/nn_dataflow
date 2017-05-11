@@ -25,6 +25,7 @@ import sys
 from collections import OrderedDict
 import numpy as np
 
+from nn_dataflow import __version__ as VERSION
 from nn_dataflow import NNDataflow
 from nn_dataflow import Cost
 from nn_dataflow import DataCategoryEnum as de
@@ -167,13 +168,13 @@ def do_scheduling(args):
                      sw_solve_loopblocking=args.solve_loopblocking,
                      partition_hybrid=args.hybrid_partition,
                      partition_batch=args.batch_partition,
-                     ntops=1,
+                     ntops=args.top,
                      nprocesses=args.processes)
 
     ## Search schedules.
 
     nnd = NNDataflow(network, batch_size, resource, cost)
-    tops = nnd.schedule_search(MapStrategyEyeriss, options)
+    tops, cache_stats = nnd.schedule_search(MapStrategyEyeriss, options)
 
     if not tops:
         sys.stderr.write('No valid dataflow found.')
@@ -187,12 +188,16 @@ def do_scheduling(args):
 
     res_map = OrderedDict()
 
+    res_map['version'] = VERSION
+
     res_map['net'] = args.net
     res_map['batch'] = args.batch
 
     res_map['resource'] = resource._asdict()
     res_map['cost'] = cost._asdict()
     res_map['options'] = options._asdict()
+
+    res_map['cache_stats'] = cache_stats
 
     for key, val in stats.items():
         res_map[key] = val
@@ -263,6 +268,8 @@ if __name__ == '__main__':
                     help='Allow partitioning batch, i.e., consider data '
                          'parallelism.')
 
+    ap.add_argument('-t', '--top', type=int, default=1,
+                    help='Number of top schedules to keep during search.')
     ap.add_argument('-p', '--processes', type=int,
                     default=multiprocessing.cpu_count()/2,
                     help='Number of parallel processes to use for search.')

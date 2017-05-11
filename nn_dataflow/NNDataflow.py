@@ -119,11 +119,27 @@ class NNDataflow(object):
         self.resource = resource
         self.cost = cost
 
+        # Dict of layer Scheduling instances.
+        self.layer_sched_dict = {}
+
     def schedule_search(self, map_strategy_class, options):
         '''
         Search the optimized dataflows.
         '''
 
+        # Scheduling instance dict.
+        self.layer_sched_dict = {}
+        layer2sched = {}
+        for layer_name in self.network:
+            layer = self.network[layer_name]
+            sched = layer2sched.get(layer, None)
+            if sched is None:
+                sched = Scheduling(layer, self.batch_size, self.cost,
+                                   map_strategy_class)
+                layer2sched[layer] = sched
+            self.layer_sched_dict[layer_name] = sched
+
+        # Initial input layout.
         sched_res_dict_list = []
         for input_layout in self._gen_input_layout(options):
             srd = SchedulingResultDict()
@@ -134,21 +150,26 @@ class NNDataflow(object):
 
         for layer_name in self.network:
             sched_res_dict_list = self._layer_schedule_search(
-                layer_name, sched_res_dict_list, map_strategy_class, options)
+                layer_name, sched_res_dict_list, options)
 
-        return sched_res_dict_list
+        # Cache stats.
+        cache_hits = 0
+        cache_misses = 0
+        for sched in layer2sched.values():
+            h, m = sched.cache_stats()
+            cache_hits += h
+            cache_misses += m
 
-    def _layer_schedule_search(self, layer_name, sched_res_dict_list,
-                               map_strategy_class, options):
+        return sched_res_dict_list, (cache_hits, cache_misses)
+
+    def _layer_schedule_search(self, layer_name, sched_res_dict_list, options):
         '''
         Schedule the given layer under the previous layer scheduling results.
         `sched_res_dict_list` contains up to top n SchedulingResultDict for the
         previous layers.
         '''
 
-        layer = self.network[layer_name]
-        layer_sched = Scheduling(layer, self.batch_size, self.cost,
-                                 map_strategy_class)
+        layer_sched = self.layer_sched_dict[layer_name]
 
         new_sched_res_dict_list = []
 
