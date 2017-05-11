@@ -18,10 +18,8 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-import heapq
 import math
 from collections import OrderedDict, namedtuple
-from multiprocessing import Pool
 
 from . import LoopBlocking
 from . import Partition
@@ -30,14 +28,6 @@ from .DataLayout import DataLayout
 from .Layer import Layer
 from .MapStrategy import MapStrategy
 from .Resource import Resource
-
-def _apply_loopblocking_search(scheduling, *args):
-    '''
-    Make function pickle-able for multiprocessing.Pool.
-    '''
-    # pylint: disable=protected-access
-    return scheduling._loopblocking_search(*args)
-
 
 class SchedulingCondition(namedtuple('SchedulingCondition',
                                      ['resource',
@@ -206,29 +196,7 @@ class Scheduling(object):
         # Cache miss.
         self.pernode_sched_cache_misses += 1
 
-        results = []
-
-        def retrieve_result():
-            ''' Retrieve results from multiprocessing.Pool. '''
-            for r in results:
-                ntops = r.get(timeout=3600)
-                for t in ntops:
-                    yield t
-
-        def retrieve_result_st():
-            ''' Retrieve results from single-process processing. '''
-            for r in results:
-                for t in r:
-                    yield t
-
-        if options.nprocesses > 1:
-            pool = Pool(processes=options.nprocesses)
-            apply_func = pool.apply_async
-            retrieve_func = retrieve_result()
-        else:
-            pool = None
-            apply_func = apply
-            retrieve_func = retrieve_result_st()
+        top_lbs_list = []
 
         # Partitioned layer.
         p_layer, p_batch_size, p_occ = part.part_layer(self.layer,
@@ -242,33 +210,15 @@ class Scheduling(object):
         for nested_loop_desc in map_strategy.gen_nested_loop_desc():
 
             # Explore loop blocking schemes.
-            r = apply_func(_apply_loopblocking_search,
-                           (self, nested_loop_desc, resource, p_occ, options))
-            results.append(r)
+            for lbs in LoopBlocking.gen_loopblocking(
+                    nested_loop_desc, resource, self.cost, p_occ, options):
 
-        tops = heapq.nsmallest(options.ntops, retrieve_func,
-                               key=lambda lbs: lbs.get_cost(self.cost))
+                if lbs.is_valid():
+                    top_lbs_list.append(lbs)
 
-        if pool is not None:
-            pool.close()
-            pool.join()
+        self.pernode_sched_cache[cache_key] = top_lbs_list
 
-        self.pernode_sched_cache[cache_key] = list(tops)
-
-        return list(tops)
-
-    def _loopblocking_search(self, nested_loop_desc, resource, part_occ,
-                             options):
-        def _sweep():
-            for lbs in LoopBlocking.gen_loopblocking(nested_loop_desc,
-                                                     resource, options):
-                assert lbs.is_valid()
-                lbs.set_partition_occupation(part_occ)
-
-                yield lbs
-
-        return heapq.nsmallest(options.ntops, _sweep(),
-                               key=lambda lbs: lbs.get_cost(self.cost))
+        return top_lbs_list
 
     def _get_result(self, lbs, part, unit_nhops, ofmap_layout, condition,
                     options):

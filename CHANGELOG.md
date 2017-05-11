@@ -30,6 +30,9 @@ List of major changes and improvements
 
   - Replace numpy for better performance.
 
+  - Move multiprocessing into loop blocking exploration for better performance
+    scaling.
+
 
 ## [v1.0 -- v1.1] -- 2017-05-04
 

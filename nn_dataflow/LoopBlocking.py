@@ -18,7 +18,9 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+import heapq
 import itertools
+from multiprocessing import Pool
 
 from . import DataCategoryEnum as de
 from . import LoopBlockingSolver
@@ -33,35 +35,84 @@ Include loop blocking and reordering.
 For our problem, only deal with nifm, nofm, and batch loops.
 '''
 
-def gen_loopblocking_gbuf_regf(nested_loop_desc, resource, options):
-    '''
-    Generator for loop blocking schemes.
-    '''
-    del resource, options  # unused
+def _make_loopblockingscheme(nested_loop_desc, tifm, tofm, tbat, orders,
+                             resource, part_occ, options):
+    lbs = LoopBlockingScheme(nested_loop_desc, tifm, tofm, tbat, orders,
+                             resource, options)
+    lbs.set_partition_occupation(part_occ)
+    return lbs
 
-    for ti, to, tb, orders in itertools.product( \
-            Util.factorize(nested_loop_desc.loopcnt_ifm, 3),
-            Util.factorize(nested_loop_desc.loopcnt_ofm, 3),
+
+def _loopblocking_iter_ti_to(nested_loop_desc, tbat, orders, resource, cost,
+                             part_occ, options):
+    def _sweep():
+        for ti, to in itertools.product(
+                Util.factorize(nested_loop_desc.loopcnt_ifm, 3),
+                Util.factorize(nested_loop_desc.loopcnt_ofm, 3)):
+            yield _make_loopblockingscheme(nested_loop_desc, ti, to, tbat,
+                                           orders, resource, part_occ, options)
+
+    return heapq.nsmallest(options.ntops, _sweep(),
+                           key=lambda lbs: lbs.get_cost(cost))
+
+
+def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
+    '''
+    Generator for loop blocking.
+    '''
+
+    if options.sw_solve_loopblocking:
+        gen = LoopBlockingSolver.gen_loopblocking_gbuf_regf
+
+        for ti, to, tb, orders in gen(nested_loop_desc, resource, options):
+            yield _make_loopblockingscheme(nested_loop_desc, ti, to, tb,
+                                           orders, resource, part_occ,
+                                           options)
+        return
+
+    ## Exhaustive search.
+
+    results = []
+
+    def retrieve_result():
+        ''' Retrieve results from multiprocessing.Pool. '''
+        for r in results:
+            for t in r.get(timeout=3600):
+                yield t
+
+    def retrieve_result_st():
+        ''' Retrieve results from single-process processing. '''
+        for r in results:
+            for t in r:
+                yield t
+
+    if options.nprocesses > 1:
+        pool = Pool(processes=options.nprocesses)
+        apply_func = pool.apply_async
+        retrieve_func = retrieve_result()
+    else:
+        pool = None
+        apply_func = apply
+        retrieve_func = retrieve_result_st()
+
+    # Split the design space iteration for multiprocessing: make tb and orders
+    # inter-process, and ti and to intra-process.
+    for tb, orders in itertools.product(
             Util.factorize(nested_loop_desc.loopcnt_bat, 3),
             itertools.product([None],
                               itertools.permutations((de.IFM, de.OFM)),
                               [None],
                               itertools.permutations((de.IFM, de.OFM)))):
-        yield ti, to, tb, orders
+        r = apply_func(_loopblocking_iter_ti_to,
+                       (nested_loop_desc, tb, orders, resource, cost, part_occ,
+                        options))
+        results.append(r)
 
+    for lbs in heapq.nsmallest(options.ntops, retrieve_func,
+                               key=lambda lbs: lbs.get_cost(cost)):
+        yield lbs
 
-def gen_loopblocking(nested_loop_desc, resource, options):
-    '''
-    Generator for loop blocking.
-    '''
-    if options.sw_solve_loopblocking:
-        gen = LoopBlockingSolver.gen_loopblocking_gbuf_regf
-    else:
-        gen = gen_loopblocking_gbuf_regf
-
-    for ti, to, tb, orders in gen(nested_loop_desc, resource, options):
-        lbs = LoopBlockingScheme(nested_loop_desc, ti, to, tb, orders,
-                                 resource, options)
-        if lbs.is_valid():
-            yield lbs
+    if pool is not None:
+        pool.close()
+        pool.join()
 

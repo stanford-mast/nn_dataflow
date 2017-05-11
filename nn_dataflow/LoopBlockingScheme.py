@@ -177,10 +177,12 @@ class LoopBlockingScheme(object):
 
     def set_partition_occupation(self, part_occ):
         ''' Set and scale by the given partitioning occupation. '''
+        if not self.is_valid():
+            return
         self.part_occ = part_occ
-        self.scale_by_occupation(part_occ)
+        self._scale_by_occupation(part_occ)
 
-    def scale_by_occupation(self, occupation):
+    def _scale_by_occupation(self, occupation):
         '''
         Scale the computation and regf access by the given occupation.
 
