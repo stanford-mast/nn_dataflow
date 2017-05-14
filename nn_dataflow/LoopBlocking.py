@@ -24,6 +24,7 @@ from multiprocessing import Pool
 
 from . import LoopBlockingSolver
 from . import LoopEnum as le
+from . import MemHierEnum as me
 from . import Util
 from .LoopBlockingScheme import LoopBlockingScheme
 
@@ -43,12 +44,41 @@ def _make_loopblockingscheme(nested_loop_desc, tifm, tofm, tbat, orders,
     return lbs
 
 
+def _skip_ti_to_tb_orders(tifm, tofm, tbat, orders):
+    '''
+    Skip the given loop blocking scheme if:
+
+    - trivial loops with blocking factor 1 are not all at the top.
+    - the LP values of the outer two loops in each level are not in order,
+      since the order of the outer two loops does not matter.
+    '''
+
+    for idx, mhe in enumerate([me.GBUF, me.REGF]):
+        ord_ = orders[mhe]
+
+        # Non-trivial loops.
+        nt_loop_list = tuple(lpe for lpe, t in [(le.IFM, tifm[idx]),
+                                                (le.OFM, tofm[idx]),
+                                                (le.BAT, tbat[idx])] if t > 1)
+        nt_loop_num = len(nt_loop_list)
+        if not all(ord_[lpe] < nt_loop_num for lpe in nt_loop_list):
+            return True
+
+        # Outer two loops. Only allow the larger LoopEnum at the outermost.
+        if nt_loop_num == le.NUM and (ord_[le.BAT] == 1 or ord_[le.IFM] == 2):
+            return True
+
+    return False
+
+
 def _loopblocking_iter_ti_to(nested_loop_desc, tbat, orders, resource, cost,
                              part_occ, options):
     def _sweep():
         for ti, to in itertools.product(
                 Util.factorize(nested_loop_desc.loopcnt_ifm, 3),
                 Util.factorize(nested_loop_desc.loopcnt_ofm, 3)):
+            if _skip_ti_to_tb_orders(ti, to, tbat, orders):
+                continue
             yield _make_loopblockingscheme(nested_loop_desc, ti, to, tbat,
                                            orders, resource, part_occ, options)
 
