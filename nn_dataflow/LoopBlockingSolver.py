@@ -191,14 +191,15 @@ def _solve_lpbl_iofmap_gbuf_reside(nested_loop_desc, resource, reside_dce):
     tx = (tx0, tx1, tx2)
 
     # Compose return values.
+    # For orders see docstring: at gbuf, b, y, x; at regf, b, x, y.
     if dce_x == de.IFM:
         ti = tx
         to = ty
+        orders = (None, (0, 1, 2), None, (1, 0, 2))
     elif dce_x == de.OFM:
         ti = ty
         to = tx
-    # At gbuf, y is outside x; at regf, x is outside y. See docstring.
-    orders = (None, (dce_x, dce_y), None, (dce_y, dce_x))
+        orders = (None, (1, 0, 2), None, (0, 1, 2))
 
     return ti, to, tb, orders
 
@@ -298,17 +299,17 @@ def _solve_lpbl_filter_gbuf_reside(nested_loop_desc, resource):
             ty = (ty_top, 1, nfmaps_y / ty_top)
             # tx[1] = 1 due to docstring, tx[2] = nx = 1.
             tx = (nfmaps_x, 1, 1)
-            # At outermost level, y is outside x, due to docstring;
-            # at regf, order is unimportant.
-            orders = (None, (dce_x, dce_y), None, (dce_x, dce_y))
 
             # Compose return values.
+            # For orders see docstring: at gbuf, b, y, x; at regf, b, y, x.
             if dce_x == de.IFM:
                 ti = tx
                 to = ty
+                orders = (None, (0, 1, 2), None, (0, 1, 2))
             elif dce_x == de.OFM:
                 ti = ty
                 to = tx
+                orders = (None, (1, 0, 2), None, (1, 0, 2))
 
     return ti, to, tb, orders
 

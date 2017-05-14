@@ -22,8 +22,8 @@ import heapq
 import itertools
 from multiprocessing import Pool
 
-from . import DataCategoryEnum as de
 from . import LoopBlockingSolver
+from . import LoopEnum as le
 from . import Util
 from .LoopBlockingScheme import LoopBlockingScheme
 
@@ -99,10 +99,9 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
     # inter-process, and ti and to intra-process.
     for tb, orders in itertools.product(
             Util.factorize(nested_loop_desc.loopcnt_bat, 3),
-            itertools.product([None],
-                              itertools.permutations((de.IFM, de.OFM)),
-                              [None],
-                              itertools.permutations((de.IFM, de.OFM)))):
+            itertools.product(
+                [None], itertools.permutations(range(le.NUM)),
+                [None], itertools.permutations(range(le.NUM)))):
         r = apply_func(_loopblocking_iter_ti_to,
                        (nested_loop_desc, tb, orders, resource, cost, part_occ,
                         options))
