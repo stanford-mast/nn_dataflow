@@ -22,6 +22,7 @@ import heapq
 import itertools
 from multiprocessing import Pool
 
+from . import DataCategoryEnum as de
 from . import LoopBlockingSolver
 from . import LoopEnum as le
 from . import MemHierEnum as me
@@ -35,6 +36,8 @@ Include loop blocking and reordering.
 
 For our problem, only deal with nifm, nofm, and batch loops.
 '''
+
+_DEBUG = False
 
 def loop_index_generator(ts_x, orders_x):
     '''
@@ -57,6 +60,92 @@ def loop_index_generator(ts_x, orders_x):
 
     for idx_o2i in itertools.product(*[xrange(t) for t in ts_o2i]):
         yield tuple(idx_o2i[rev_order[lpe]] for lpe in range(le.NUM))
+
+
+def _verify_loopblockingscheme_access_model(lbs):
+    '''
+    Verify the access model of LoopBlockingScheme by actually simulating and
+    generating the loops.
+    '''
+
+    if not lbs.is_valid():
+        return
+
+    tifm = lbs.ti
+    tofm = lbs.to
+    tbat = lbs.tb
+    orders = lbs.orders
+
+    tip1 = Util.prod(tifm[1:])
+    top1 = Util.prod(tofm[1:])
+    tbp1 = Util.prod(tbat[1:])
+
+    tip2 = Util.prod(tifm[2:])
+    top2 = Util.prod(tofm[2:])
+    tbp2 = Util.prod(tbat[2:])
+
+    # Buffered data ranges in the gbuf/regf.
+    # E.g., for FIL, (i0, o0) means the range [i0*tip1, i0*tip1 + tip1) x
+    # [o0*top1, o0*top1 + top1) is in gbuf. IFM uses (i0, b0), and OFM uses
+    # (o0, b0).
+    buf_ranges = {me.GBUF: [(-1, -1)] * de.NUM,
+                  me.REGF: [(-1, -1)] * de.NUM}
+    # Data accesses from gbuf/regf to upper level.
+    up_lvl_acc = {me.GBUF: [0] * de.NUM,
+                  me.REGF: [0] * de.NUM}
+
+    def _replace(mhe, dce, rng, size):
+        '''
+        Replace buffered data range for `dce` to be `rng` at level `mhe`, and
+        update data accesses.
+        '''
+        if rng != buf_ranges[mhe][dce]:
+            buf_ranges[mhe][dce] = rng
+            up_lvl_acc[mhe][dce] += size
+
+    # GBUF level.
+    for i0, o0, b0 in loop_index_generator((tifm[0], tofm[0], tbat[0]),
+                                           orders[0]):
+
+        _replace(me.GBUF, de.FIL, (i0, o0), tip1 * top1)
+        _replace(me.GBUF, de.IFM, (i0, b0), tip1 * tbp1)
+        _replace(me.GBUF, de.OFM, (o0, b0), top1 * tbp1)
+
+        # REGF level.
+        for i1, o1, b1 in loop_index_generator((tifm[1], tofm[1], tbat[1]),
+                                               orders[1]):
+
+            # Assertions, so that [i01*tip2, i01*tip2 + tip2) is contained by
+            # [i0*tip1, i0*tip1 + tip1), etc..
+            assert i1 < tifm[1] and o1 < tofm[1] and b1 < tbat[1]
+            i01 = i0 * tifm[1] + i1
+            o01 = o0 * tofm[1] + o1
+            b01 = b0 * tbat[1] + b1
+
+            _replace(me.REGF, de.FIL, (i01, o01), tip2 * top2)
+            _replace(me.REGF, de.IFM, (i01, b01), tip2 * tbp2)
+            _replace(me.REGF, de.OFM, (o01, b01), top2 * tbp2)
+
+    # Verify GBUF level to upper DRAM level accesses.
+    dram_acc = [a * ua for a, ua
+                in zip(up_lvl_acc[me.GBUF], lbs.unit_access[me.DRAM])]
+    if not all(Util.isclose(a, b, rel_tol=1e-3, abs_tol=1.5)
+               for a, b in zip(dram_acc, lbs.access[me.DRAM])):
+        raise RuntimeError('LoopBlocking: verification failed for accesses to '
+                           'DRAM for loop blocking scheme {}, {}, {}, {}: '
+                           '{} vs. {}.'.format(tifm, tofm, tbat, orders,
+                                               dram_acc, lbs.access[me.DRAM]))
+
+    # Verify REGF level to upper GBUF level accesses.
+    gbuf_acc = [a * ua * s for a, ua, s
+                in zip(up_lvl_acc[me.REGF], lbs.unit_access[me.GBUF],
+                       lbs.stored_in_gbuf)]
+    if not all(Util.isclose(a, b, rel_tol=1e-3, abs_tol=1.5)
+               for a, b in zip(gbuf_acc, lbs.access[me.GBUF])):
+        raise RuntimeError('LoopBlocking: verification failed for accesses to '
+                           'GBUF for loop blocking scheme {}, {}, {}, {}: '
+                           '{} vs. {}.'.format(tifm, tofm, tbat, orders,
+                                               gbuf_acc, lbs.access[me.GBUF]))
 
 
 def _make_loopblockingscheme(nested_loop_desc, tifm, tofm, tbat, orders,
@@ -100,10 +189,13 @@ def _loopblocking_iter_ti_to(nested_loop_desc, tbat, orders, resource, cost,
         for ti, to in itertools.product(
                 Util.factorize(nested_loop_desc.loopcnt_ifm, 3),
                 Util.factorize(nested_loop_desc.loopcnt_ofm, 3)):
-            if _skip_ti_to_tb_orders(ti, to, tbat, orders):
+            if (not _DEBUG) and _skip_ti_to_tb_orders(ti, to, tbat, orders):
                 continue
-            yield _make_loopblockingscheme(nested_loop_desc, ti, to, tbat,
+            lbs = _make_loopblockingscheme(nested_loop_desc, ti, to, tbat,
                                            orders, resource, part_occ, options)
+            if _DEBUG:
+                _verify_loopblockingscheme_access_model(lbs)
+            yield lbs
 
     return heapq.nsmallest(options.ntops, _sweep(),
                            key=lambda lbs: lbs.get_cost(cost))

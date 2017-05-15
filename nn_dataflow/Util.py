@@ -130,6 +130,15 @@ def get_ith_range(rng, idx, num):
     return beg, end
 
 
+def isclose(vala, valb, rel_tol=1e-9, abs_tol=0.0):
+    '''
+    Whether two values are close to each other.
+
+    Identical to math.isclose() in Python 3.5.
+    '''
+    return abs(vala - valb) <= max(rel_tol * max(abs(vala), abs(valb)), abs_tol)
+
+
 def assert_float_eq_int(vfloat, vint, message=''):
     '''
     Check the given float value is equal to the given int value. Print the

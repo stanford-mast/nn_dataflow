@@ -13,6 +13,9 @@ List of major changes and improvements
 
   - Loop index generator for different loop blocking schemes.
 
+  - Debug mode:
+    - Verification of the loop blocking access model.
+
 - Explorers and solvers:
 
   - Loop blocking exhaustive search skips equivalent schemes.
