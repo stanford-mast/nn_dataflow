@@ -325,16 +325,10 @@ class LoopBlockingScheme(object):
             # level is the unrelated loop, can the data reuse include the
             # current level blocking factor.
 
-            # Order of the current level, indexed by LoopEnum.
-            order = self.orders[bl]
-            # The innermost non-trivial loop has a non-one blocking factor, and
-            # the smallest order value. If not all loops are trivial, the first
-            # element in the tuple will pick them out. If all loops are
-            # trivial, we will use the outer level reuse for all data, so the
-            # loop is not used.
-            innermost_nt_lp = min((self.ti[bl] == 1, order[le.IFM], le.IFM),
-                                  (self.to[bl] == 1, order[le.OFM], le.OFM),
-                                  (self.tb[bl] == 1, order[le.BAT], le.BAT))[2]
+            # The innermost non-trivial loop.
+            # If all loops are trivial, we will use the outer level reuse for
+            # all data, so the loop is not used.
+            innermost_nt_lp = self._innermost_nontrivial_loop(bl)
 
             ru = [0] * de.NUM
 
@@ -380,4 +374,24 @@ class LoopBlockingScheme(object):
         self.access[me.DRAM] = [v * self.lcnt // r for v, r
                                 in zip(self.unit_access[me.DRAM],
                                        self.reuse[self.BL.GBUF])]
+
+    def _innermost_nontrivial_loop(self, bl_lvl):
+        '''
+        Get the innermost non-trivial loop at blocking level `bl_lvl`. Return
+        None if all loops are trivial.
+
+        The innermost non-trivial loop has a non-one blocking factor, and the
+        smallest order value.
+        '''
+        # Order of the current level, indexed by LoopEnum.
+        order = self.orders[bl_lvl]
+        # If not all loops are trivial, the first element in the tuple will
+        # pick them out (False < True). Then the second element returns the
+        # smallest order value.
+        # If all loops are trivial, the last tuple is the min one, which
+        # returns None.
+        return min((self.ti[bl_lvl] == 1, order[le.IFM], le.IFM),
+                   (self.to[bl_lvl] == 1, order[le.OFM], le.OFM),
+                   (self.tb[bl_lvl] == 1, order[le.BAT], le.BAT),
+                   (False, float('inf'), None))[2]
 
