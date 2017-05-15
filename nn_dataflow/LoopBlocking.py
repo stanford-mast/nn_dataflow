@@ -36,6 +36,29 @@ Include loop blocking and reordering.
 For our problem, only deal with nifm, nofm, and batch loops.
 '''
 
+def loop_index_generator(ts_x, orders_x):
+    '''
+    Given the loop blocking factors and the order, generate the loop indexes.
+
+    The blocking factors `ts_x` and order `orders_x` of the current hierarchy
+    are both indexed by LoopEnum.
+
+    Return the indexes in the order of LoopEnum.
+    '''
+
+    # Reversed order, i.e., values increase from outer to inner, while keys are
+    # LoopEnum.
+    rev_order = [le.NUM - 1 - o for o in orders_x]
+
+    # Blocking factors, ordered from outer to inner.
+    ts_o2i = [0] * le.NUM
+    for lpe in range(le.NUM):
+        ts_o2i[rev_order[lpe]] = ts_x[lpe]
+
+    for idx_o2i in itertools.product(*[xrange(t) for t in ts_o2i]):
+        yield tuple(idx_o2i[rev_order[lpe]] for lpe in range(le.NUM))
+
+
 def _make_loopblockingscheme(nested_loop_desc, tifm, tofm, tbat, orders,
                              resource, part_occ, options):
     lbs = LoopBlockingScheme(nested_loop_desc, tifm, tofm, tbat, orders,

@@ -9,6 +9,10 @@ List of major changes and improvements
 
   - Support loops: ifmap channel loop, ofmap channel loop, batch loop.
 
+- Software models:
+
+  - Loop index generator for different loop blocking schemes.
+
 - Explorers and solvers:
 
   - Loop blocking exhaustive search skips equivalent schemes.
