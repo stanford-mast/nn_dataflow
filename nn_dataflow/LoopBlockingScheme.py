@@ -21,6 +21,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 from collections import OrderedDict
 
 from . import DataCategoryEnum as de
+from . import LoopEnum as le
 from . import MemHierEnum as me
 from . import Util
 
@@ -47,13 +48,29 @@ class LoopBlockingScheme(object):
         and the loop `orders` of each tiling level, construct the loop blocking
         scheme.
 
-        `orders` should be indexed by MemHierEnum, and only GBUF and REGF
-        entries are valid. Each entry is a ordered tuple of IFM and OFM.
-        Smaller index corresponds to inner loop. Batching loop order should
-        never in between IFM and OFM, so we can enforce it to the outermost
-        level for all memory hierarchy (innermost can be viewed as the
-        outermost of the inner next hierarchy). So nested loop order is: tb[0],
-        ti[0]/to[0], tb[1], ti[1]/to[1], tb[2], ti[2]/to[2]
+        Nested loop order is:
+
+        for ti[0]/to[0]/tb[0]
+          // The data access order at this point (determined by the loop
+          // order above) determines the access to DRAM.
+          //
+          // ------ boundary of DRAM and GBUF levels ------
+          //
+          // Data ranges below in this loop body are buffered in GBUF.
+          for ti[1]/to[1]/tb[1]
+            // The data access order at this point (determined by the loop
+            // order above) determines the access to GBUF.
+            //
+            // ------ boundary of GBUF and REGF levels ------
+            //
+            // Data ranges below in this loop body are buffered in REGF.
+            for ti[2]/to[2]/tb[2]
+
+        `orders` indicates the order of ifm, ofm, bat loops at each level. Only
+        GBUF and REGF entries are valid. It is indexed by MemHierEnum, and each
+        entry is a 3-permutation of (0, 1, 2), which is indexed by LoopEnum and
+        gives the position of the ifm, ofm, bat loops. Smaller number means
+        inner loop.
         '''
 
         # pylint: disable=invalid-name
@@ -62,7 +79,10 @@ class LoopBlockingScheme(object):
         self.ti = tuple(tifm)
         self.to = tuple(tofm)
         self.tb = tuple(tbat)
-        self.orders = orders
+
+        self.orders = [tuple() for _ in range(BL.NUM)]
+        self.orders[BL.GBUF] = tuple(orders[me.GBUF])
+        self.orders[BL.REGF] = tuple(orders[me.REGF])
 
         self.tip = Util.prod(self.ti)
         self.top = Util.prod(self.to)
@@ -86,14 +106,7 @@ class LoopBlockingScheme(object):
         self.unit_size[BL.REGF] = nested_loop_desc.usize_regf
 
         # Buffer data unit counts.
-        self.unit_cnt = [[0] * de.NUM for _ in range(BL.NUM)]
-        for bl in range(BL.NUM):
-            self.unit_cnt[bl][de.FIL] = \
-                    Util.prod(self.ti[bl+1:]) * Util.prod(self.to[bl+1:])
-            self.unit_cnt[bl][de.IFM] = \
-                    Util.prod(self.ti[bl+1:]) * Util.prod(self.tb[bl+1:])
-            self.unit_cnt[bl][de.OFM] = \
-                    Util.prod(self.to[bl+1:]) * Util.prod(self.tb[bl+1:])
+        self._set_unit_cnt()
 
         # Whether reside in gbuf.
         self.stored_in_gbuf = [not options.sw_gbuf_bypass[dce]
@@ -112,18 +125,7 @@ class LoopBlockingScheme(object):
             self.valid = True
 
         # Data Reuse calculation.
-        # Base reuse.
-        self.reuse = [[0] * de.NUM for _ in range(BL.NUM)]
-        for bl in range(BL.NUM):
-            self.reuse[bl][de.FIL] = Util.prod(self.tb[bl+1:])
-            self.reuse[bl][de.IFM] = Util.prod(self.to[bl+1:])
-            self.reuse[bl][de.OFM] = Util.prod(self.ti[bl+1:])
-
-        # Adjusted reuse based on loop orders, bypass, etc..
-        self._adjust_reuse(self.reuse[BL.REGF], BL.REGF, self.orders[me.REGF],
-                           [BL.GBUF], [self.orders[me.GBUF]])
-        self._adjust_reuse(self.reuse[BL.GBUF], BL.GBUF, self.orders[me.GBUF],
-                           [], [])
+        self._set_reuse()
 
         # Now with the reuse, we can calculate the actual `stored_in_gbuf`
         # values.
@@ -204,7 +206,15 @@ class LoopBlockingScheme(object):
         '''
         Get number of top-level-hierarchy fetches of each data category.
         '''
-        return self.fetches if self.is_valid() else None
+        if not self.is_valid():
+            return None
+
+        raw_acc = [0] * de.NUM
+        raw_acc[de.FIL] = self.tbp
+        raw_acc[de.IFM] = self.top
+        raw_acc[de.OFM] = self.tip
+
+        return [ra / r for ra, r in zip(raw_acc, self.reuse[self.BL.GBUF])]
 
     def get_cost(self, cost):
         '''
@@ -234,10 +244,12 @@ class LoopBlockingScheme(object):
         size = [[self.data_size(bl, dce) for dce in range(de.NUM)]
                 for bl in range(self.BL.NUM)]
 
+        fetches = self.get_fetches()
+
         return OrderedDict([('ops', self.ops),
                             ('time', self.time),
                             ('access', self.access),
-                            ('fetches', self.fetches),
+                            ('fetches', fetches),
                             ('size', size),
                             ('unit_size', self.unit_size),
                             ('unit_cnt', self.unit_cnt),
@@ -247,48 +259,104 @@ class LoopBlockingScheme(object):
                             ('tb', tuple(self.tb)),
                             ('orders', self.orders)])
 
-    def _adjust_reuse(self, reuse_, bl_cur, order_cur, bls_outer, orders_outer):
+    def _set_unit_cnt(self):
         '''
-        Adjust the data reuse based on special loop structures.
+        Set the buffered unit counts for all data categories at all blocking
+        levels, based on the loop blocking factors and orders.
 
-        reuse_ is the reuse numbers for a specific level, e.g., reuse[BL.REGF].
-
-        This function is recursive as we need to look at the outer levels.
+        General rules:
+        - from the top of the current level, go down (inner) and multiply up
+          all blocking factors of loops that are related to the data (e.g.,
+          loop i and b for IFM).
+        - the product is the buffered unit count.
         '''
-        if self.ti[bl_cur] != 1 and self.to[bl_cur] != 1:
-            if order_cur.index(de.IFM) < order_cur.index(de.OFM):
-                # Loop ifm inside loop ofm.
-                # ofm also reused across current-level ifms.
-                reuse_[de.OFM] *= self.ti[bl_cur]
+
+        self.unit_cnt = []
+
+        for bl in range(self.BL.NUM):
+            # BL corresponds to the BL + 1 element in ti/to/tb.
+            blp1 = bl + 1
+            pblti = Util.prod(self.ti[blp1:])
+            pblto = Util.prod(self.to[blp1:])
+            pbltb = Util.prod(self.tb[blp1:])
+
+            uc = [1] * de.NUM
+            uc[de.FIL] = pblti * pblto
+            uc[de.IFM] = pblti * pbltb
+            uc[de.OFM] = pblto * pbltb
+
+            self.unit_cnt.append(uc)
+
+    def _set_reuse(self):
+        '''
+        Set the data reuse factors for all data categories at all blocking
+        levels, based on the loop blocking factors and orders.
+
+        Reuse is defined as the access reduction factor due to buffering. E.g.,
+        for IFM, there are `tip` * `tbp` units, which need to be accessed `top`
+        times without buffering. With reuse due to buffering, the actual access
+        time will be `tip` * `top` * `tbp` / reuse. See _calc_access().
+
+        General rules:
+        - from the top of the current level, go up (outer) until hitting a
+          non-trivial (blocking factor > 1) loop that is related to the data
+          category (e.g., loop i and b for IFM).
+        - start from that loop, go down (inner) until the innermost, and
+          multiply up all blocking factors of loops that are related to the
+          data that will reuse this data, but are unrelated to this data (e.g.,
+          loop o for IFM).
+        - the product is the reuse.
+        '''
+
+        self.reuse = []
+
+        # Have to go from outer levels to inner levels.
+        assert self.BL.GBUF < self.BL.REGF
+        for bl in range(self.BL.NUM):
+            # BL corresponds to the BL + 1 element in ti/to/tb. But the outer
+            # level is the BL element.
+
+            # If the blocking factors of a data category are all 1's in the
+            # current level, the current level does not change the data, and
+            # the reuse at this level is the same as the outer level.
+
+            # Every data category has two related loops and one unrelated
+            # loops. Only when the innermost non-trivial loop of the current
+            # level is the unrelated loop, can the data reuse include the
+            # current level blocking factor.
+
+            # The innermost non-trivial loop.
+            # If all loops are trivial, we will use the outer level reuse for
+            # all data, so the loop is not used.
+            innermost_nt_lp = self._innermost_nontrivial_loop(bl)
+
+            ru = [0] * de.NUM
+
+            if self.ti[bl] * self.to[bl] == 1:
+                ru[de.FIL] = self.reuse[bl-1][de.FIL] if bl > 0 else self.tbp
             else:
-                # Loop ifm outside loop ofm.
-                # ifm also reused across current-level ofms.
-                reuse_[de.IFM] *= self.to[bl_cur]
-        elif self.ti[bl_cur] == 1 and self.to[bl_cur] != 1:
-            # Current level does not change ifm, so ifm reuses ofms.
-            reuse_[de.IFM] *= self.to[bl_cur]
-        elif self.ti[bl_cur] != 1 and self.to[bl_cur] == 1:
-            # Current level does not change ofm, so ofm reuses ifms.
-            reuse_[de.OFM] *= self.ti[bl_cur]
-        else:
-            assert self.ti[bl_cur] == 1 and self.to[bl_cur] == 1
-            # Current level loop counts are both 1 for ifms and ofms.
-            # Effectively this level does not change the buffered data in the
-            # inner level.
-            # See the outer level.
-            assert len(bls_outer) == len(orders_outer)
-            if bls_outer:
-                self._adjust_reuse(reuse_, bls_outer[0], orders_outer[0],
-                                   bls_outer[1:], orders_outer[1:])
+                bl_start = bl + (innermost_nt_lp != le.BAT)
+                ru[de.FIL] = Util.prod(self.tb[bl_start:])
+
+            if self.ti[bl] * self.tb[bl] == 1:
+                ru[de.IFM] = self.reuse[bl-1][de.IFM] if bl > 0 else self.top
+            else:
+                bl_start = bl + (innermost_nt_lp != le.OFM)
+                ru[de.IFM] = Util.prod(self.to[bl_start:])
+
+            if self.to[bl] * self.tb[bl] == 1:
+                ru[de.OFM] = self.reuse[bl-1][de.OFM] if bl > 0 else self.tip
+            else:
+                bl_start = bl + (innermost_nt_lp != le.IFM)
+                ru[de.OFM] = Util.prod(self.ti[bl_start:])
+
+            self.reuse.append(ru)
 
     def _calc_access(self):
         '''
-        Calculate accesses to each hierarchy and the top-level fetches.
+        Calculate accesses to each hierarchy.
         '''
-        # pylint: disable=invalid-name
-        BL = self.BL
 
-        # Accesses to each hierarchy.
         self.access = [[0] * de.NUM for _ in range(me.NUM)]
 
         self.access[me.REGF] = [v * self.lcnt
@@ -296,31 +364,34 @@ class LoopBlockingScheme(object):
 
         self.access[me.ITCN] = [v * self.lcnt // r for v, r
                                 in zip(self.unit_access[me.ITCN],
-                                       self.reuse[BL.REGF])]
+                                       self.reuse[self.BL.REGF])]
 
         self.access[me.GBUF] = [v * self.lcnt // r * s for v, r, s
                                 in zip(self.unit_access[me.GBUF],
-                                       self.reuse[BL.REGF],
+                                       self.reuse[self.BL.REGF],
                                        self.stored_in_gbuf)]
 
         self.access[me.DRAM] = [v * self.lcnt // r for v, r
                                 in zip(self.unit_access[me.DRAM],
-                                       self.reuse[BL.GBUF])]
+                                       self.reuse[self.BL.GBUF])]
 
-        # Number of top-level (DRAM) fetches.
-        self.fetches = [1] * de.NUM
+    def _innermost_nontrivial_loop(self, bl_lvl):
+        '''
+        Get the innermost non-trivial loop at blocking level `bl_lvl`. Return
+        None if all loops are trivial.
 
-        self.fetches[de.FIL] = self.tbp / self.reuse[BL.GBUF][de.FIL]
-
-        if self.ti[BL.GBUF] != 1 \
-                and self.orders[me.GBUF].index(de.IFM) \
-                    < self.orders[me.GBUF].index(de.OFM):
-            self.fetches[de.IFM] = self.to[BL.GBUF]
-        assert self.fetches[de.IFM] * self.reuse[BL.GBUF][de.IFM] == self.top
-
-        if self.to[BL.GBUF] != 1 \
-                and self.orders[me.GBUF].index(de.OFM) \
-                    < self.orders[me.GBUF].index(de.IFM):
-            self.fetches[de.OFM] = self.ti[BL.GBUF]
-        assert self.fetches[de.OFM] * self.reuse[BL.GBUF][de.OFM] == self.tip
+        The innermost non-trivial loop has a non-one blocking factor, and the
+        smallest order value.
+        '''
+        # Order of the current level, indexed by LoopEnum.
+        order = self.orders[bl_lvl]
+        # If not all loops are trivial, the first element in the tuple will
+        # pick them out (False < True). Then the second element returns the
+        # smallest order value.
+        # If all loops are trivial, the last tuple is the min one, which
+        # returns None.
+        return min((self.ti[bl_lvl] == 1, order[le.IFM], le.IFM),
+                   (self.to[bl_lvl] == 1, order[le.OFM], le.OFM),
+                   (self.tb[bl_lvl] == 1, order[le.BAT], le.BAT),
+                   (False, float('inf'), None))[2]
 

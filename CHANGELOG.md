@@ -4,6 +4,35 @@ List of major changes and improvements
 ## [Unreleased]
 
 
+## [v1.2 -- v1.3] -- 2017-05-16
+
+### Added
+
+- Workload models:
+
+  - Support loops: ifmap channel loop, ofmap channel loop, batch loop.
+
+- Software models:
+
+  - Loop index generator for different loop blocking schemes.
+
+  - Debug mode:
+    - Verification of the loop blocking access model.
+
+- Explorers and solvers:
+
+  - Loop blocking exhaustive search skips equivalent schemes.
+
+
+### Changed
+
+- Software models:
+
+  - Loop blocking data buffer and reuse models.
+    - Loop orders now also consider the order of batch loop.
+    - Change the model for trivial loops (with blocking factor 1).
+
+
 ## [v1.1 -- v1.2] -- 2017-05-10
 
 ### Added
