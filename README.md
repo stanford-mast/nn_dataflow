@@ -6,7 +6,9 @@ for neural networks.
 
 We assume an Eyeriss-style NN accelerator for the hardware, i.e., a 2D array of
 processing elements, each of which has a local register file, and a global SRAM
-buffer.
+buffer. We further support partitioning and processing the NN computation
+workload in parallel using multiple nodes, where each node is an Eyeriss-style
+array as above.
 
 We decouple the scheduling problem into two subproblem, mapping and ordering.
 Mapping deals with mapping one 2D convolution computation (one 2D ifmap
@@ -14,6 +16,9 @@ convolves with one 2D filter to get one 2D ofmap) onto the hardware
 accelerator; ordering then decides the order between all 2D convolutions. We
 currently only support row stationary mapping, and support exhaustive search
 over all loop blocking and reordering schemes.
+
+For parallel processing and partitioning, we support batch partitioning, fmap
+partitioning, output partitioning, and the combination between them (hybrid).
 
 See the details in our ASPLOS'17 paper.
 
@@ -37,7 +42,7 @@ for detailed options. You can specify PE array size, number of parallel arrays,
 NN batch size and word size, register file and global buffer capacity, and the
 energy cost of all components.
 
-Finally, the two options, `--solve-loopblocking` and `--hybrid-partition2d`,
+Finally, the two options, `--solve-loopblocking` and `--hybrid-partition`,
 correspond to the analytical bypass schedule solution, and the hybrid
 partitioning scheme, in our ASPLOS'17 paper. See the paper for details.
 
