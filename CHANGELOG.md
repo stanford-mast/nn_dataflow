@@ -3,6 +3,13 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+### Added
+
+- Software models.
+
+  - Partition schemes.
+    - Input partitioning: partition different input fmaps (channels).
+
 
 ## [v1.2 -- v1.3] -- 2017-05-16
 

@@ -22,7 +22,6 @@ import itertools
 
 from . import ParallelEnum as pe
 from . import Util
-from .FmapRange import FmapPosition, FmapRange
 from .Layer import ConvLayer, LocalRegionLayer
 from .PhyDim2 import PhyDim2
 from .Util import StringifyClass
@@ -101,13 +100,13 @@ class PartitionScheme(StringifyClass):
         layer, partitioned batch size, and partitioning op occupation.
         '''
 
+        p_nifm = Util.idivc(layer.nifm, self.pdims[pe.INPP].size())
         p_nofm = Util.idivc(layer.nofm, self.pdims[pe.OUTP].size())
         p_hofm = Util.idivc(layer.hofm, self.pdims[pe.OFMP].h)
         p_wofm = Util.idivc(layer.wofm, self.pdims[pe.OFMP].w)
 
         if isinstance(layer, ConvLayer):
-            p_layer = ConvLayer(layer.nifm, p_nofm, (p_hofm, p_wofm),
-                                layer.sfil,
+            p_layer = ConvLayer(p_nifm, p_nofm, (p_hofm, p_wofm), layer.sfil,
                                 strd=(layer.htrd, layer.wtrd))
         elif isinstance(layer, LocalRegionLayer):
             p_layer = LocalRegionLayer(p_nofm, (p_hofm, p_wofm),
@@ -123,36 +122,6 @@ class PartitionScheme(StringifyClass):
         assert p_occ <= 1 + 1e-6
 
         return p_layer, p_batch_size, p_occ
-
-    def part_fmap_range(self, batch_size, nfmap, hfmap, wfmap, pidx):
-        '''
-        Get the partitioned fmap range including batch, for the given partition
-        index.
-        '''
-        # Batch partition.
-        idx_bat = pidx[pe.BATP].h * self.pdims[pe.BATP].w + pidx[pe.BATP].w
-        b_beg, b_end = Util.get_ith_range((0, batch_size),
-                                          idx_bat,
-                                          self.pdims[pe.BATP].size())
-
-        # Fmap channel partition.
-        idx_chn = pidx[pe.OUTP].h * self.pdims[pe.OUTP].w + pidx[pe.OUTP].w
-        n_beg, n_end = Util.get_ith_range((0, nfmap),
-                                          idx_chn,
-                                          self.pdims[pe.OUTP].size())
-
-        # Fmap height tiling.
-        h_beg, h_end = Util.get_ith_range((0, hfmap),
-                                          pidx[pe.OFMP].h,
-                                          self.pdims[pe.OFMP].h)
-
-        # Fmap width tiling.
-        w_beg, w_end = Util.get_ith_range((0, wfmap),
-                                          pidx[pe.OFMP].w,
-                                          self.pdims[pe.OFMP].w)
-
-        return FmapRange(FmapPosition(b=b_beg, n=n_beg, h=h_beg, w=w_beg),
-                         FmapPosition(b=b_end, n=n_end, h=h_end, w=w_end))
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):

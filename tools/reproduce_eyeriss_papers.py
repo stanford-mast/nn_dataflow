@@ -55,6 +55,7 @@ def main(args):
             solve_loopblocking=False,
             hybrid_partition=False,
             batch_partition=False,
+            ifmaps_partition=False,
             top=1,
             processes=args.processes)
 
@@ -117,6 +118,7 @@ def main(args):
             solve_loopblocking=False,
             hybrid_partition=False,
             batch_partition=False,
+            ifmaps_partition=False,
             top=1,
             processes=args.processes)
 

@@ -26,6 +26,7 @@ OPTION_LIST = ['sw_gbuf_bypass',
                'sw_solve_loopblocking',
                'partition_hybrid',
                'partition_batch',
+               'partition_ifmaps',
                'ntops',
                'nprocesses',
               ]
@@ -43,6 +44,10 @@ class Option(namedtuple('Option', OPTION_LIST)):
         if len(ntp.sw_gbuf_bypass) != de.NUM:
             raise ValueError('Option: sw_gbuf_bypass must have length {}'
                              .format(de.NUM))
+
+        if ntp.partition_ifmaps and not ntp.partition_hybrid:
+            raise ValueError('Option: partition_ifmaps requires '
+                             'partition_hybrid to be set.')
 
         return ntp
 

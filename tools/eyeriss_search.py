@@ -168,6 +168,7 @@ def do_scheduling(args):
                      sw_solve_loopblocking=args.solve_loopblocking,
                      partition_hybrid=args.hybrid_partition,
                      partition_batch=args.batch_partition,
+                     partition_ifmaps=args.ifmaps_partition,
                      ntops=args.top,
                      nprocesses=args.processes)
 
@@ -267,6 +268,10 @@ if __name__ == '__main__':
     ap.add_argument('--batch-partition', action='store_true',
                     help='Allow partitioning batch, i.e., consider data '
                          'parallelism.')
+    ap.add_argument('--ifmaps-partition', '--ifmap-partition',
+                    action='store_true',
+                    help='Allow partitioning ifmap channel dimension, which '
+                         'requires extra data synchronization.')
 
     ap.add_argument('-t', '--top', type=int, default=1,
                     help='Number of top schedules to keep during search.')

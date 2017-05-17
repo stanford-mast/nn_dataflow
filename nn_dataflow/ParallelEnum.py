@@ -24,9 +24,6 @@ Enum for parallel partition taxonomy.
 OUTP = 0
 OFMP = 1
 BATP = 2
-NUM = 3
-
-# We do not support input partitioning (partitioning input fmaps in channel
-# dimension) as it is symmetric to OUTP, but would require to R/W share ofmaps,
-# which add additional cost for synchronization.
+INPP = 3
+NUM = 4
 
