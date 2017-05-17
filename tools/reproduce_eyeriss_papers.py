@@ -22,7 +22,7 @@ import argparse
 import multiprocessing
 import sys
 
-from eyeriss_search import do_scheduling
+from eyeriss_search import do_scheduling, argparser
 
 from nn_dataflow import DataCategoryEnum as de
 from nn_dataflow import MemHierEnum as me
@@ -37,29 +37,19 @@ def main(args):
 
     hier_cost = [200, 6, 2, 1]
 
-    if args.paper == 'isscc16':
-        mapping_args = _Namespace(
-            net='alex_net',
-            batch=4,
-            word=16,
-            nodes=[1, 1],
-            array=[12, 14],
-            regf=530,  # (225 + 12 + 24) * 16b
-            gbuf=108 * 1024,  # 108 kB
-            op_cost=1,
-            hier_cost=hier_cost,
-            hop_cost=0,
-            unit_static_cost=0,
-            mem_type='2D',
-            disable_bypass='i o f'.split(),
-            solve_loopblocking=False,
-            hybrid_partition=False,
-            batch_partition=False,
-            ifmaps_partition=False,
-            top=1,
-            processes=args.processes)
+    aparser = argparser()
 
-        results = do_scheduling(mapping_args)
+    if args.paper == 'isscc16':
+        regf = 530  # (225 + 12 + 24) * 16b
+        gbuf = 108 * 1024  # 108 kB
+        cmd = 'alex_net --batch 4 --word 16 --nodes 1 1 --array 12 14 ' \
+              '--regf {} --gbuf {} ' \
+              '--hier-cost {} --hop-cost 0 ' \
+              '--disable-bypass i o f -p {}' \
+              .format(regf, gbuf, ' '.join(str(x) for x in hier_cost),
+                      args.processes)
+
+        results = do_scheduling(aparser.parse_args(cmd.split()))
         mappings = results['mappings']
 
         print 'Eyeriss, ISSCC\'16, Fig. 14.5.6.'
@@ -101,28 +91,16 @@ def main(args):
                             dram_acc, gbuf_acc)
 
     elif args.paper == 'isca16':
-        mapping_args = _Namespace(
-            net='alex_net',
-            batch=16,
-            word=16,
-            nodes=[1, 1],
-            array=[16, 16],
-            regf=512,
-            gbuf=128 * 1024,
-            op_cost=1,
-            hier_cost=hier_cost,
-            hop_cost=0,
-            unit_static_cost=0,
-            mem_type='2D',
-            disable_bypass='i o f'.split(),
-            solve_loopblocking=False,
-            hybrid_partition=False,
-            batch_partition=False,
-            ifmaps_partition=False,
-            top=1,
-            processes=args.processes)
+        regf = 512
+        gbuf = 128 * 1024
+        cmd = 'alex_net --batch 16 --word 16 --nodes 1 1 --array 16 16 ' \
+              '--regf {} --gbuf {} ' \
+              '--hier-cost {} --hop-cost 0 ' \
+              '--disable-bypass i o f -p {}' \
+              .format(regf, gbuf, ' '.join(str(x) for x in hier_cost),
+                      args.processes)
 
-        results = do_scheduling(mapping_args)
+        results = do_scheduling(aparser.parse_args(cmd.split()))
         mappings = results['mappings']
 
         print 'Eyeriss, ISCA\'16, Fig. 10.'

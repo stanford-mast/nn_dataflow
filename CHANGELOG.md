@@ -11,6 +11,13 @@ List of major changes and improvements
     - Input partitioning: partition different input fmaps (channels).
 
 
+### Changed
+
+- Software engineering.
+
+  - Use a single global argument parser.
+
+
 ## [v1.2 -- v1.3] -- 2017-05-16
 
 ### Added

@@ -214,8 +214,10 @@ def main(args):
     return 0
 
 
-if __name__ == '__main__':
-    ap = argparse.ArgumentParser()  # pylint: disable=invalid-name
+def argparser():
+    ''' Argument parser. '''
+
+    ap = argparse.ArgumentParser()
 
     ap.add_argument('net',
                     help='network name, should be a .py file under examples')
@@ -279,5 +281,9 @@ if __name__ == '__main__':
                     default=multiprocessing.cpu_count()/2,
                     help='Number of parallel processes to use for search.')
 
-    sys.exit(main(ap.parse_args()))
+    return ap
+
+
+if __name__ == '__main__':
+    sys.exit(main(argparser().parse_args()))
 
