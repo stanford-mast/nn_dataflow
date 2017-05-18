@@ -3,6 +3,12 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+### Changed
+
+- Software engineering.
+
+  - Lazily evaluate loop blocking stats.
+
 
 ## [v1.3 -- v1.4] -- 2017-05-18
 

@@ -145,18 +145,20 @@ class LoopBlockingScheme(object):
             self.valid = False
             return
 
-        # Record unit access.
+        # Record unit stats.
+        self.unit_ops = nested_loop_desc.unit_ops
+        self.unit_time = nested_loop_desc.unit_time
         self.unit_access = nested_loop_desc.unit_access
 
-        # Misc.
-        self.lcnt = self.tip * self.top * self.tbp
-        self.ops = nested_loop_desc.unit_ops * self.lcnt
-        self.time = nested_loop_desc.unit_time * self.lcnt
-
+        # Occupation.
+        # Occupation only affects op counts and REGF accesses.
         self.part_occ = 1.  # set later.
 
-        # Access.
-        self._calc_access()
+        # Stats: lazy evaluation.
+        self.finalized_stats = False
+        self.ops = float('nan')
+        self.time = float('nan')
+        self.access = [[float('nan')] * de.NUM for _ in range(me.NUM)]
 
     def is_valid(self):
         '''
@@ -181,17 +183,8 @@ class LoopBlockingScheme(object):
         ''' Set and scale by the given partitioning occupation. '''
         if not self.is_valid():
             return
+        assert not self.finalized_stats
         self.part_occ = part_occ
-        self._scale_by_occupation(part_occ)
-
-    def _scale_by_occupation(self, occupation):
-        '''
-        Scale the computation and regf access by the given occupation.
-
-        Other accesses are not affected.
-        '''
-        self.ops *= occupation
-        self.access[me.REGF] = [a * occupation for a in self.access[me.REGF]]
 
     def get_access(self):
         '''
@@ -200,13 +193,25 @@ class LoopBlockingScheme(object):
         Access is a two-dimensional list, first indexed by MemHierEnum, then
         indexed by DataCategoryEnum.
         '''
-        return self.access if self.is_valid() else None
+        if not self.is_valid():
+            return None
+
+        if not self.finalized_stats:
+            self._calc_stats()
+
+        return self.access
 
     def get_top_level_fetch(self):
         '''
         Get number of top-level-hierarchy fetches of each data category.
         '''
-        return self.fetch[self.BL.GBUF] if self.is_valid() else None
+        if not self.is_valid():
+            return None
+
+        if not self.finalized_stats:
+            self._calc_stats()
+
+        return self.fetch[self.BL.GBUF]
 
     def get_cost(self, cost):
         '''
@@ -214,6 +219,9 @@ class LoopBlockingScheme(object):
         '''
         if not self.is_valid():
             return float('inf')
+
+        if not self.finalized_stats:
+            self._calc_stats()
 
         c = 0
 
@@ -232,6 +240,9 @@ class LoopBlockingScheme(object):
         '''
         if not self.is_valid():
             return None
+
+        if not self.finalized_stats:
+            self._calc_stats()
 
         size = [[self.data_size(bl, dce) for dce in range(de.NUM)]
                 for bl in range(self.BL.NUM)]
@@ -348,19 +359,22 @@ class LoopBlockingScheme(object):
 
             self.fetch.append(fe)
 
-    def _calc_access(self):
+    def _calc_stats(self):
         '''
-        Calculate accesses to each hierarchy.
+        Lazily calculate stats.
         '''
-
-        self.access = [[0] * de.NUM for _ in range(me.NUM)]
 
         total_units = [0] * de.NUM
         total_units[de.FIL] = self.tip * self.top
         total_units[de.IFM] = self.tip * self.tbp
         total_units[de.OFM] = self.top * self.tbp
 
-        self.access[me.REGF] = [v * self.lcnt * t for v, t
+        lcnt = self.tip * self.top * self.tbp
+
+        self.ops = self.unit_ops * lcnt * self.part_occ
+        self.time = self.unit_time * lcnt
+
+        self.access[me.REGF] = [v * lcnt * t * self.part_occ for v, t
                                 in zip(self.unit_access[me.REGF],
                                        [1, 1, 2])]
 
@@ -379,6 +393,8 @@ class LoopBlockingScheme(object):
                                 in zip(self.unit_access[me.DRAM],
                                        total_units,
                                        self.fetch[self.BL.GBUF])]
+
+        self.finalized_stats = True
 
     def _innermost_nontrivial_loop(self, bl_lvl):
         '''
