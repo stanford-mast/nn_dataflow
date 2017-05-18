@@ -29,6 +29,7 @@ OPTION_LIST = ['sw_gbuf_bypass',
                'partition_ifmaps',
                'ntops',
                'nprocesses',
+               'verbose',
               ]
 
 class Option(namedtuple('Option', OPTION_LIST)):

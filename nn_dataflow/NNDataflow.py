@@ -149,6 +149,9 @@ class NNDataflow(object):
             sched_res_dict_list.append(srd)
 
         for layer_name in self.network:
+            if options.verbose:
+                sys.stderr.write('-> {}\n'.format(layer_name))
+                sys.stderr.flush()
             sched_res_dict_list = self._layer_schedule_search(
                 layer_name, sched_res_dict_list, options)
 

@@ -170,7 +170,8 @@ def do_scheduling(args):
                      partition_batch=args.batch_partition,
                      partition_ifmaps=args.ifmaps_partition,
                      ntops=args.top,
-                     nprocesses=args.processes)
+                     nprocesses=args.processes,
+                     verbose=args.verbose)
 
     ## Search schedules.
 
@@ -280,6 +281,8 @@ def argparser():
     ap.add_argument('-p', '--processes', type=int,
                     default=multiprocessing.cpu_count()/2,
                     help='Number of parallel processes to use for search.')
+    ap.add_argument('-v', '--verbose', action='store_true',
+                    help='Show progress and details.')
 
     return ap
 

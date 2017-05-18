@@ -10,6 +10,10 @@ List of major changes and improvements
   - Partition schemes.
     - Input partitioning: partition different input fmaps (channels).
 
+- Software engineering
+
+  - Verbose mode.
+
 
 ### Changed
 
