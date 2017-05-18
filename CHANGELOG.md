@@ -31,6 +31,8 @@ List of major changes and improvements
 
   - Use a single global argument parser.
 
+  - Introduce ContentHashClass.
+
 
 ### Fixed
 
