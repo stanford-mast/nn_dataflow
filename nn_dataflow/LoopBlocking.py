@@ -163,7 +163,11 @@ def _skip_ti_to_tb_orders(tifm, tofm, tbat, orders):
     - trivial loops with blocking factor 1 are not all at the top.
     - the LP values of the outer two loops in each level are not in order,
       since the order of the outer two loops does not matter.
+    - the innermost and outermost non-trivial loops of adjacent levels are the
+      same, which is equal to merge into one loop at the outer level.
     '''
+
+    outer_level_innermost_nt_loop = None
 
     for idx, mhe in enumerate([me.GBUF, me.REGF]):
         ord_ = orders[mhe]
@@ -179,6 +183,14 @@ def _skip_ti_to_tb_orders(tifm, tofm, tbat, orders):
         # Outer two loops. Only allow the larger LoopEnum at the outermost.
         if nt_loop_num == le.NUM and (ord_[le.BAT] == 1 or ord_[le.IFM] == 2):
             return True
+
+        # Outermost loop should not equal to the innermost loop of the outer
+        # level.
+        if nt_loop_num > 1:
+            outermost_nt_loop = ord_.index(nt_loop_num - 1)
+            if outermost_nt_loop == outer_level_innermost_nt_loop:
+                return True
+            outer_level_innermost_nt_loop = ord_.index(0)
 
     return False
 

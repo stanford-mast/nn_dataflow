@@ -4,6 +4,46 @@ List of major changes and improvements
 ## [Unreleased]
 
 
+## [v1.3 -- v1.4] -- 2017-05-18
+
+### Added
+
+- Software models.
+
+  - Partition schemes.
+    - Input partitioning: partition different input fmaps (channels).
+
+- Explorers and solvers:
+
+  - Loop blocking exhaustive search skips more equivalent schemes.
+    - Adjacent same loops in different hierarchy levels.
+
+- Software engineering
+
+  - Verbose mode.
+
+
+### Changed
+
+- Software models:
+
+  - Loop blocking.
+    - Avoid initial zero-value fetch for output data.
+
+- Software engineering.
+
+  - Use a single global argument parser.
+
+  - Introduce ContentHashClass.
+
+
+### Fixed
+
+- FmapRange comparison.
+
+- Map strategy bug when filters are folded.
+
+
 ## [v1.2 -- v1.3] -- 2017-05-16
 
 ### Added

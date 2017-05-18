@@ -18,9 +18,9 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from .Util import StringifyClass
+from .Util import StringifyClass, ContentHashClass
 
-class Layer(StringifyClass):
+class Layer(StringifyClass, ContentHashClass):
     '''
     Base NN layer.
 
@@ -121,17 +121,6 @@ class Layer(StringifyClass):
     def total_ops(self, batch_size=1):
         ''' Get total number of operations. '''
         return self.total_ofmap_size() * self.ops_per_neuron() * batch_size
-
-    def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            return self.__dict__ == other.__dict__
-        return NotImplemented
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def __hash__(self):
-        return hash(tuple(sorted(self.__dict__.items())))
 
 
 class InputLayer(Layer):

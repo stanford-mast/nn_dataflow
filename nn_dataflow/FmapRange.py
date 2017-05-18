@@ -22,7 +22,6 @@ from collections import namedtuple, Counter
 import itertools
 
 from . import Util
-from .Layer import ConvLayer, LocalRegionLayer
 from .Util import StringifyClass
 
 _FMAP_POSITION_ATTRS = ['b', 'n', 'h', 'w']
@@ -112,48 +111,6 @@ class FmapRange(StringifyClass):
             ends.append(e)
         return FmapRange(begs, ends)
 
-    def corresponding_input_fmap_range(self, layer):
-        '''
-        Get the corresponding input FmapRange.
-        '''
-        b_rng, n_rng, h_rng, w_rng = self.beg_end('b', 'n', 'h', 'w')
-
-        # Batch. Same as ofmap.
-        b_src_beg, b_src_end = b_rng
-
-        if isinstance(layer, ConvLayer):
-            # Channel. All.
-            n_src_beg = 0
-            n_src_end = layer.nifm
-            # Height tiling.
-            # xy_i = xy_o * stride + (0 ... sfil-1)
-            h_src_beg = h_rng[0] * layer.htrd
-            h_src_end = (h_rng[1] - 1) * layer.htrd + layer.sfil
-            # Width tiling.
-            w_src_beg = w_rng[0] * layer.wtrd
-            w_src_end = (w_rng[1] - 1) * layer.wtrd + layer.sfil
-        elif isinstance(layer, LocalRegionLayer):
-            # Channel. Same as ofmap.
-            n_src_beg = max(0, n_rng[0] - layer.nreg//2)
-            n_src_end = min(layer.nifm,
-                            n_rng[1] + layer.nreg - layer.nreg//2)
-            # Height tiling.
-            h_src_beg = max(0, h_rng[0] * layer.htrd - layer.hreg//2)
-            h_src_end = min(layer.hifm,
-                            h_rng[1] * layer.htrd + layer.hreg - layer.hreg//2)
-            # Width tiling.
-            w_src_beg = max(0, w_rng[0] * layer.wtrd - layer.wreg//2)
-            w_src_end = min(layer.wifm,
-                            w_rng[1] * layer.wtrd + layer.wreg - layer.wreg//2)
-
-        assert n_src_end <= layer.nifm and h_src_end <= layer.hifm \
-                and w_src_end <= layer.wifm
-
-        return FmapRange(FmapPosition(b=b_src_beg, n=n_src_beg,
-                                      h=h_src_beg, w=w_src_beg),
-                         FmapPosition(b=b_src_end, n=n_src_end,
-                                      h=h_src_end, w=w_src_end))
-
     def __contains__(self, fpos):
         '''
         Whether the given FmapPosition is in the FmapRange.
@@ -165,17 +122,20 @@ class FmapRange(StringifyClass):
         if not isinstance(other, FmapRange):
             raise TypeError('FmapRange: an FmapRange object is required.')
 
-        for srng, orng in zip(zip(self.fp_beg, self.fp_end),
-                              zip(other.fp_beg, other.fp_end)):
-            if srng[0] >= orng[1]:
-                return 1
-            elif srng[1] <= orng[0]:
-                return -1
-            elif srng != orng:
-                raise ValueError('FmapRange: comparing two overlap ranges. '
-                                 '{} vs. {}'.format(self, other))
+        # We compare the two range using their begin points.
+        if self.fp_beg > other.fp_beg:
+            return 1
+        elif self.fp_beg < other.fp_beg:
+            return -1
 
-        return 0
+        # If the begin points are identical, either the same range or overlap.
+        if self.fp_end == other.fp_end \
+                or (self.size() == 0 and other.size() == 0):
+            return 0
+
+        assert self.overlap(other).size() > 0
+        raise ValueError('FmapRange: comparing two overlap ranges. '
+                         '{} vs. {}'.format(self, other))
 
 
 class FmapRangeMap(object):

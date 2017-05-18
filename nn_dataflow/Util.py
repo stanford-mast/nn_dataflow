@@ -37,6 +37,26 @@ class StringifyClass(object):
                        in sorted(self.__dict__.items())]))
 
 
+class ContentHashClass(object):
+    '''
+    Class using the content instead of the object ID for hash.
+
+    Such class instance can be used as key in dictionary.
+    '''
+    # pylint: disable=too-few-public-methods
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.__dict__ == other.__dict__
+        return NotImplemented
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash(tuple(sorted(self.__dict__.items())))
+
+
 def idivc(valx, valy):
     '''
     Integer division and ceiling.

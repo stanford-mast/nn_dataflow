@@ -185,8 +185,10 @@ class MapStrategyEyeriss(MapStrategy):
         # Due to folding, the overlapping ifmaps may need to be re-fetched,
         # resulting in amplified access for ifmaps. On the other hand, if
         # the stride results in gaps in ifmaps, some ifmaps are not accessed.
+        # Consider one flpeset, hifm rows are folded by fold.size(), but each
+        # is accessed accrnds_per_procpass times.
         amp_acc_ifm = 1. * avgrows_per_flpeset[de.IFM] * self.fold.size() \
-                / self.layer.hifm
+                / (self.layer.hifm * accrnds_per_procpass[de.IFM])
 
         # Unit regf size for one processing pass.
         usz_regf = [0] * de.NUM
@@ -272,23 +274,22 @@ class MapStrategyEyeriss(MapStrategy):
                                                        ifms_per_procpass,
                                                        ofms_per_procpass,
                                                        ppesets_per_procpass)
-            uaccess[me.DRAM] = tuple(ua * t * o for ua, t, o
-                                     in zip(uacc_gbuf, [1, 1, 2], occ_acc))
+            uaccess[me.DRAM] = tuple(ua * o for ua, o
+                                     in zip(uacc_gbuf, occ_acc))
             # gbuf access.
             # Load each element once from gbuf then use itcn.
             uaccess[me.GBUF] = tuple(ua * ar for ua, ar
                                      in zip(uaccess[me.DRAM],
                                             accrnds_per_procpass))
             # itcn access is total accessed regf size - gbuf access.
-            uaccess[me.ITCN] = tuple(asar * t - ua for asar, t, ua
-                                     in zip(avgsize_all_regfs, [1, 1, 2],
+            uaccess[me.ITCN] = tuple(asar - ua for asar, ua
+                                     in zip(avgsize_all_regfs,
                                             uaccess[me.GBUF]))
             assert all(ua >= 0 for ua in uaccess[me.ITCN]), \
                     'MapEyeriss: encounter negative access count to itcn {}' \
                     .format(uaccess[me.ITCN])
             # regf access is based on num ops.
-            uaccess[me.REGF] = tuple(avgops_per_procpass * t for t
-                                     in [1, 1, 2])
+            uaccess[me.REGF] = (avgops_per_procpass,) * de.NUM
 
             # Check unit access.
             Util.assert_float_eq_int(
@@ -304,7 +305,7 @@ class MapStrategyEyeriss(MapStrategy):
                 .format(uaccess[me.DRAM][de.IFM]))
             Util.assert_float_eq_int(
                 uaccess[me.DRAM][de.OFM] * lcnt_ofm * lcnt_bat,
-                2 * self.layer.total_ofmap_size() * self.batch_size,
+                self.layer.total_ofmap_size() * self.batch_size,
                 'MapEyeriss: unit access at DRAM for OFM {} is incorrect.'
                 .format(uaccess[me.DRAM][de.OFM]))
 
@@ -438,21 +439,19 @@ class MapStrategyEyeriss(MapStrategy):
         # DRAM access is based on gbuf, need to buffer all data in gbuf.
         uacc_gbuf = self._calc_unit_size_gbuf_localregion(
             avgdims_per_flpeset, ofms_per_procpass, is_access=True)
-        uaccess[me.DRAM] = tuple(ua * t * o for ua, t, o
-                                 in zip(uacc_gbuf, [1, 1, 2], occ_acc))
+        uaccess[me.DRAM] = tuple(ua * o for ua, o
+                                 in zip(uacc_gbuf, occ_acc))
         # gbuf access.
         # Load each element once from gbuf then use itcn.
         uaccess[me.GBUF] = tuple(ua for ua in uaccess[me.DRAM])
         # itcn access is total accessed regf size - gbuf access.
-        uaccess[me.ITCN] = tuple(asar * t - ua for asar, t, ua
-                                 in zip(avgsize_all_regfs, [1, 1, 2],
-                                        uaccess[me.GBUF]))
+        uaccess[me.ITCN] = tuple(asar - ua for asar, ua
+                                 in zip(avgsize_all_regfs, uaccess[me.GBUF]))
         assert all(ua >= 0 for ua in uaccess[me.ITCN]), \
                 'MapEyeriss: encounter negative access count to itcn {}' \
                 .format(uaccess[me.ITCN])
         # regf access is based on num ops.
-        uaccess[me.REGF] = tuple(avgops_per_procpass * t for t
-                                 in [1, 1, 2])
+        uaccess[me.REGF] = (avgops_per_procpass,) * de.NUM
 
         # Check unit access.
         Util.assert_float_eq_int(
@@ -468,7 +467,7 @@ class MapStrategyEyeriss(MapStrategy):
             .format(uaccess[me.DRAM][de.IFM]))
         Util.assert_float_eq_int(
             uaccess[me.DRAM][de.OFM] * lcnt_ofm * lcnt_bat,
-            2 * self.layer.total_ofmap_size() * self.batch_size,
+            self.layer.total_ofmap_size() * self.batch_size,
             'MapEyeriss: unit access at DRAM for OFM {} is incorrect.'
             .format(uaccess[me.DRAM][de.OFM]))
 

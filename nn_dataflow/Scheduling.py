@@ -236,7 +236,7 @@ class Scheduling(object):
         total_nhops = [unh * f
                        for unh, f
                        in zip(unit_nhops,
-                              lbs.get_fetches())]
+                              lbs.get_top_level_fetch())]
         cost_part = self.cost.noc_hop * sum(total_nhops)
         dict_part = OrderedDict([('cost', cost_part),
                                  ('total_nhops', total_nhops),
