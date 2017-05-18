@@ -10,6 +10,11 @@ List of major changes and improvements
   - Partition schemes.
     - Input partitioning: partition different input fmaps (channels).
 
+- Explorers and solvers:
+
+  - Loop blocking exhaustive search skips more equivalent schemes.
+    - Adjacent same loops in different hierarchy levels.
+
 - Software engineering
 
   - Verbose mode.
