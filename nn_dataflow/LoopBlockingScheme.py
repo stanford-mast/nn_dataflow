@@ -124,11 +124,11 @@ class LoopBlockingScheme(object):
         else:
             self.valid = True
 
-        # Data Reuse calculation.
-        self._set_reuse()
+        # Data fetch calculation.
+        self._set_fetch()
 
-        # Now with the reuse, we can calculate the actual `stored_in_gbuf`
-        # values.
+        # Now with the fetch times, we can calculate the actual
+        # `stored_in_gbuf` values.
         # Only store in gbuf if having reuse.
         for dce in range(de.NUM):
             # Skip enforced stored in gbuf.
@@ -136,7 +136,7 @@ class LoopBlockingScheme(object):
                 continue
             assert options.sw_gbuf_bypass[dce]
 
-            if self.reuse[BL.GBUF][dce] > self.reuse[BL.REGF][dce]:
+            if self.fetch[BL.GBUF][dce] < self.fetch[BL.REGF][dce]:
                 self.stored_in_gbuf[dce] = True
 
         # Recheck size.
@@ -202,19 +202,11 @@ class LoopBlockingScheme(object):
         '''
         return self.access if self.is_valid() else None
 
-    def get_fetches(self):
+    def get_top_level_fetch(self):
         '''
         Get number of top-level-hierarchy fetches of each data category.
         '''
-        if not self.is_valid():
-            return None
-
-        raw_acc = [0] * de.NUM
-        raw_acc[de.FIL] = self.tbp
-        raw_acc[de.IFM] = self.top
-        raw_acc[de.OFM] = self.tip
-
-        return [ra / r for ra, r in zip(raw_acc, self.reuse[self.BL.GBUF])]
+        return self.fetch[self.BL.GBUF] if self.is_valid() else None
 
     def get_cost(self, cost):
         '''
@@ -244,12 +236,10 @@ class LoopBlockingScheme(object):
         size = [[self.data_size(bl, dce) for dce in range(de.NUM)]
                 for bl in range(self.BL.NUM)]
 
-        fetches = self.get_fetches()
-
         return OrderedDict([('ops', self.ops),
                             ('time', self.time),
                             ('access', self.access),
-                            ('fetches', fetches),
+                            ('fetch', self.fetch),
                             ('size', size),
                             ('unit_size', self.unit_size),
                             ('unit_cnt', self.unit_cnt),
@@ -287,28 +277,32 @@ class LoopBlockingScheme(object):
 
             self.unit_cnt.append(uc)
 
-    def _set_reuse(self):
+    def _set_fetch(self):
         '''
-        Set the data reuse factors for all data categories at all blocking
+        Set the data fetch times for all data categories at all blocking
         levels, based on the loop blocking factors and orders.
 
-        Reuse is defined as the access reduction factor due to buffering. E.g.,
-        for IFM, there are `tip` * `tbp` units, which need to be accessed `top`
-        times without buffering. With reuse due to buffering, the actual access
-        time will be `tip` * `top` * `tbp` / reuse. See _calc_access().
+        Fetch times considers the buffering. E.g., for IFM, there are `tip` *
+        `tbp` units, which need to be fetched `top` times without buffering.
+        With reuse due to buffering, the actual fetch times will be `top` /
+        reuse.
+
+        Fetch times at a level means the fetch to the upper level. E.g.,
+        fetches at GBUF level access DRAM, and fetches at REGF level accesses
+        GBUF.
 
         General rules:
         - from the top of the current level, go up (outer) until hitting a
           non-trivial (blocking factor > 1) loop that is related to the data
           category (e.g., loop i and b for IFM).
-        - start from that loop, go down (inner) until the innermost, and
-          multiply up all blocking factors of loops that are related to the
-          data that will reuse this data, but are unrelated to this data (e.g.,
-          loop o for IFM).
-        - the product is the reuse.
+        - start from that loop, go up (outer) until the outermost, and multiply
+          up all blocking factors of loops that are related to the data that
+          will reuse this data, but are unrelated to this data (e.g., loop o
+          for IFM).
+        - the product is the fetch times.
         '''
 
-        self.reuse = []
+        self.fetch = []
 
         # Have to go from outer levels to inner levels.
         assert self.BL.GBUF < self.BL.REGF
@@ -318,7 +312,7 @@ class LoopBlockingScheme(object):
 
             # If the blocking factors of a data category are all 1's in the
             # current level, the current level does not change the data, and
-            # the reuse at this level is the same as the outer level.
+            # the fetch times at this level is the same as the outer level.
 
             # Every data category has two related loops and one unrelated
             # loops. Only when the innermost non-trivial loop of the current
@@ -330,27 +324,29 @@ class LoopBlockingScheme(object):
             # all data, so the loop is not used.
             innermost_nt_lp = self._innermost_nontrivial_loop(bl)
 
-            ru = [0] * de.NUM
+            fe = [0] * de.NUM
 
             if self.ti[bl] * self.to[bl] == 1:
-                ru[de.FIL] = self.reuse[bl-1][de.FIL] if bl > 0 else self.tbp
+                fe[de.FIL] = self.fetch[bl-1][de.FIL] if bl > 0 else 1
             else:
                 bl_start = bl + (innermost_nt_lp != le.BAT)
-                ru[de.FIL] = Util.prod(self.tb[bl_start:])
+                fe[de.FIL] = Util.prod(self.tb[:bl_start])
 
             if self.ti[bl] * self.tb[bl] == 1:
-                ru[de.IFM] = self.reuse[bl-1][de.IFM] if bl > 0 else self.top
+                fe[de.IFM] = self.fetch[bl-1][de.IFM] if bl > 0 else 1
             else:
                 bl_start = bl + (innermost_nt_lp != le.OFM)
-                ru[de.IFM] = Util.prod(self.to[bl_start:])
+                fe[de.IFM] = Util.prod(self.to[:bl_start])
 
             if self.to[bl] * self.tb[bl] == 1:
-                ru[de.OFM] = self.reuse[bl-1][de.OFM] if bl > 0 else self.tip
+                fe[de.OFM] = self.fetch[bl-1][de.OFM] if bl > 0 else 1
             else:
                 bl_start = bl + (innermost_nt_lp != le.IFM)
-                ru[de.OFM] = Util.prod(self.ti[bl_start:])
+                # See equation (4) in Chen, et al., ISCA'16.
+                fe[de.OFM] = 2 * Util.prod(self.ti[:bl_start]) \
+                        - Util.prod(self.ti[:max(0, bl_start-1)])
 
-            self.reuse.append(ru)
+            self.fetch.append(fe)
 
     def _calc_access(self):
         '''
@@ -359,21 +355,30 @@ class LoopBlockingScheme(object):
 
         self.access = [[0] * de.NUM for _ in range(me.NUM)]
 
-        self.access[me.REGF] = [v * self.lcnt
-                                for v in self.unit_access[me.REGF]]
+        total_units = [0] * de.NUM
+        total_units[de.FIL] = self.tip * self.top
+        total_units[de.IFM] = self.tip * self.tbp
+        total_units[de.OFM] = self.top * self.tbp
 
-        self.access[me.ITCN] = [v * self.lcnt // r for v, r
+        self.access[me.REGF] = [v * self.lcnt * t for v, t
+                                in zip(self.unit_access[me.REGF],
+                                       [1, 1, 2])]
+
+        self.access[me.ITCN] = [v * u * f for v, u, f
                                 in zip(self.unit_access[me.ITCN],
-                                       self.reuse[self.BL.REGF])]
+                                       total_units,
+                                       self.fetch[self.BL.REGF])]
 
-        self.access[me.GBUF] = [v * self.lcnt // r * s for v, r, s
+        self.access[me.GBUF] = [v * u * f * s for v, u, f, s
                                 in zip(self.unit_access[me.GBUF],
-                                       self.reuse[self.BL.REGF],
+                                       total_units,
+                                       self.fetch[self.BL.REGF],
                                        self.stored_in_gbuf)]
 
-        self.access[me.DRAM] = [v * self.lcnt // r for v, r
+        self.access[me.DRAM] = [v * u * f for v, u, f
                                 in zip(self.unit_access[me.DRAM],
-                                       self.reuse[self.BL.GBUF])]
+                                       total_units,
+                                       self.fetch[self.BL.GBUF])]
 
     def _innermost_nontrivial_loop(self, bl_lvl):
         '''

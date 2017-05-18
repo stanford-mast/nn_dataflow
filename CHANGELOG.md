@@ -13,6 +13,11 @@ List of major changes and improvements
 
 ### Changed
 
+- Software models:
+
+  - Loop blocking.
+    - Avoid initial zero-value fetch for output data.
+
 - Software engineering.
 
   - Use a single global argument parser.
