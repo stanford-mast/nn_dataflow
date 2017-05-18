@@ -122,17 +122,20 @@ class FmapRange(StringifyClass):
         if not isinstance(other, FmapRange):
             raise TypeError('FmapRange: an FmapRange object is required.')
 
-        for srng, orng in zip(zip(self.fp_beg, self.fp_end),
-                              zip(other.fp_beg, other.fp_end)):
-            if srng[0] >= orng[1]:
-                return 1
-            elif srng[1] <= orng[0]:
-                return -1
-            elif srng != orng:
-                raise ValueError('FmapRange: comparing two overlap ranges. '
-                                 '{} vs. {}'.format(self, other))
+        # We compare the two range using their begin points.
+        if self.fp_beg > other.fp_beg:
+            return 1
+        elif self.fp_beg < other.fp_beg:
+            return -1
 
-        return 0
+        # If the begin points are identical, either the same range or overlap.
+        if self.fp_end == other.fp_end \
+                or (self.size() == 0 and other.size() == 0):
+            return 0
+
+        assert self.overlap(other).size() > 0
+        raise ValueError('FmapRange: comparing two overlap ranges. '
+                         '{} vs. {}'.format(self, other))
 
 
 class FmapRangeMap(object):

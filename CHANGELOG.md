@@ -23,6 +23,11 @@ List of major changes and improvements
   - Use a single global argument parser.
 
 
+### Fixed
+
+- FmapRange comparison.
+
+
 ## [v1.2 -- v1.3] -- 2017-05-16
 
 ### Added
