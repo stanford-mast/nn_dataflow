@@ -3,6 +3,9 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+
+## [v1.3 -- v1.4] -- 2017-05-18
+
 ### Added
 
 - Software models.
