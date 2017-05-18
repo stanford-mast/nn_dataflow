@@ -38,6 +38,8 @@ List of major changes and improvements
 
 - FmapRange comparison.
 
+- Map strategy bug when filters are folded.
+
 
 ## [v1.2 -- v1.3] -- 2017-05-16
 

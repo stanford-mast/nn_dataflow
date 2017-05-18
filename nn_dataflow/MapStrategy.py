@@ -185,8 +185,10 @@ class MapStrategyEyeriss(MapStrategy):
         # Due to folding, the overlapping ifmaps may need to be re-fetched,
         # resulting in amplified access for ifmaps. On the other hand, if
         # the stride results in gaps in ifmaps, some ifmaps are not accessed.
+        # Consider one flpeset, hifm rows are folded by fold.size(), but each
+        # is accessed accrnds_per_procpass times.
         amp_acc_ifm = 1. * avgrows_per_flpeset[de.IFM] * self.fold.size() \
-                / self.layer.hifm
+                / (self.layer.hifm * accrnds_per_procpass[de.IFM])
 
         # Unit regf size for one processing pass.
         usz_regf = [0] * de.NUM
