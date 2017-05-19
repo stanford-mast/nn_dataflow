@@ -211,7 +211,8 @@ class Scheduling(object):
 
             # Explore loop blocking schemes.
             for lbs in LoopBlocking.gen_loopblocking(
-                    nested_loop_desc, resource, self.cost, p_occ, options):
+                    nested_loop_desc, resource, part, self.cost, p_occ,
+                    options):
 
                 if lbs.is_valid():
                     top_lbs_list.append(lbs)

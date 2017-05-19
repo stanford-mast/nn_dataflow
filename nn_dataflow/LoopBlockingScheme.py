@@ -42,7 +42,7 @@ class LoopBlockingScheme(object):
         NUM = 2
 
     def __init__(self, nested_loop_desc, tifm, tofm, tbat, orders,
-                 resource, options):
+                 resource, bufshr, options):
         '''
         Given tiling factors `ti`, `to`, and `tb` for ifm, ofm and batching,
         and the loop `orders` of each tiling level, construct the loop blocking
@@ -71,6 +71,9 @@ class LoopBlockingScheme(object):
         entry is a 3-permutation of (0, 1, 2), which is indexed by LoopEnum and
         gives the position of the ifm, ofm, bat loops. Smaller number means
         inner loop.
+
+        `bufshr` is a BufShrScheme instance, indicating the buffer sharing
+        scheme.
         '''
 
         # pylint: disable=invalid-name

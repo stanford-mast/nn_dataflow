@@ -166,6 +166,7 @@ def do_scheduling(args):
     bypass[de.FIL] = 'f' not in args.disable_bypass
     options = Option(sw_gbuf_bypass=tuple(bypass),
                      sw_solve_loopblocking=args.solve_loopblocking,
+                     hw_gbuf_sharing=args.enable_gbuf_sharing,
                      partition_hybrid=args.hybrid_partition,
                      partition_batch=args.batch_partition,
                      partition_ifmaps=args.ifmaps_partition,
@@ -262,6 +263,8 @@ def argparser():
     ap.add_argument('--solve-loopblocking', action='store_true',
                     help='Use analytical solver to choose loop blocking. '
                          'Otherwise use exhaustive search.')
+    ap.add_argument('--enable-gbuf-sharing', action='store_true',
+                    help='Share gbuf capacity across nodes through NoC.')
 
     ap.add_argument('--hybrid-partition',
                     '--hybrid-partition2d',  # deprecated old name

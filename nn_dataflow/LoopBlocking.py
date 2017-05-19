@@ -27,6 +27,7 @@ from . import LoopBlockingSolver
 from . import LoopEnum as le
 from . import MemHierEnum as me
 from . import Util
+from .BufShrScheme import BufShrScheme
 from .LoopBlockingScheme import LoopBlockingScheme
 
 '''
@@ -149,9 +150,9 @@ def _verify_loopblockingscheme_access_model(lbs):
 
 
 def _make_loopblockingscheme(nested_loop_desc, tifm, tofm, tbat, orders,
-                             resource, part_occ, options):
+                             resource, bufshr, part_occ, options):
     lbs = LoopBlockingScheme(nested_loop_desc, tifm, tofm, tbat, orders,
-                             resource, options)
+                             resource, bufshr, options)
     lbs.set_partition_occupation(part_occ)
     return lbs
 
@@ -195,8 +196,8 @@ def _skip_ti_to_tb_orders(tifm, tofm, tbat, orders):
     return False
 
 
-def _loopblocking_iter_ti_to(nested_loop_desc, tbat, orders, resource, cost,
-                             part_occ, options):
+def _loopblocking_iter_ti_to(nested_loop_desc, tbat, orders, resource, bufshr,
+                             cost, part_occ, options):
     def _sweep():
         for ti, to in itertools.product(
                 Util.factorize(nested_loop_desc.loopcnt_ifm, 3),
@@ -204,7 +205,8 @@ def _loopblocking_iter_ti_to(nested_loop_desc, tbat, orders, resource, cost,
             if (not _DEBUG) and _skip_ti_to_tb_orders(ti, to, tbat, orders):
                 continue
             lbs = _make_loopblockingscheme(nested_loop_desc, ti, to, tbat,
-                                           orders, resource, part_occ, options)
+                                           orders, resource, bufshr, part_occ,
+                                           options)
             if _DEBUG:
                 _verify_loopblockingscheme_access_model(lbs)
             yield lbs
@@ -213,17 +215,20 @@ def _loopblocking_iter_ti_to(nested_loop_desc, tbat, orders, resource, cost,
                            key=lambda lbs: lbs.get_cost(cost))
 
 
-def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
+def gen_loopblocking(nested_loop_desc, resource, part, cost, part_occ, options):
     '''
     Generator for loop blocking.
     '''
+
+    # Buffer sharing scheme.
+    bufshr = BufShrScheme(part)
 
     if options.sw_solve_loopblocking:
         gen = LoopBlockingSolver.gen_loopblocking_gbuf_regf
 
         for ti, to, tb, orders in gen(nested_loop_desc, resource, options):
             yield _make_loopblockingscheme(nested_loop_desc, ti, to, tb,
-                                           orders, resource, part_occ,
+                                           orders, resource, bufshr, part_occ,
                                            options)
         return
 
@@ -260,8 +265,8 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
                 [None], itertools.permutations(range(le.NUM)),
                 [None], itertools.permutations(range(le.NUM)))):
         r = apply_func(_loopblocking_iter_ti_to,
-                       (nested_loop_desc, tb, orders, resource, cost, part_occ,
-                        options))
+                       (nested_loop_desc, tb, orders, resource, bufshr, cost,
+                        part_occ, options))
         results.append(r)
 
     for lbs in heapq.nsmallest(options.ntops, retrieve_func,
