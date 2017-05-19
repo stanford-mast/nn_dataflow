@@ -3,6 +3,12 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+### Added
+
+- Hardware models.
+
+  - Buffer sharing scheme.
+
 
 ## [v1.3 -- v1.4] -- 2017-05-18
 

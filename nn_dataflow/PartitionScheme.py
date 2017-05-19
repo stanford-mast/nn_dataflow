@@ -94,6 +94,20 @@ class PartitionScheme(StringifyClass, ContentHashClass):
                      in zip(coord, self.pdims[penum], pidx[penum])]
         return PhyDim2(*coord)
 
+    def part_neighbor_dist(self, pae):
+        '''
+        Get the 2D distance between nearest neighbor nodes with the given
+        parallelism.
+        '''
+        # Accumulate over all levels below this.
+        nbr_dist = PhyDim2(1, 1)
+        for p in reversed(self.order):
+            if p == pae:
+                return nbr_dist
+            nbr_dist *= self.dim(p)
+
+        return PhyDim2(float('nan'), float('nan'))
+
     def part_layer(self, layer, batch_size):
         '''
         Get the partitioned layer structure and batch size. Return partitioned

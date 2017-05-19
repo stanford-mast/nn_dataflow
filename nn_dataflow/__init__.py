@@ -24,6 +24,7 @@ from . import LoopBlockingSolver
 from . import MemHierEnum
 from . import ParallelEnum
 from . import Partition
+from .BufShrScheme import BufShrScheme
 from .Cost import Cost
 from .DataLayout import DataLayout
 from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
