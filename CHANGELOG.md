@@ -7,6 +7,8 @@ List of major changes and improvements
 
 - Hardware models.
 
+  - Access forwarding.
+
   - Buffer sharing scheme.
 
 

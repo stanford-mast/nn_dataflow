@@ -24,6 +24,7 @@ from . import DataCategoryEnum as de
 
 OPTION_LIST = ['sw_gbuf_bypass',
                'sw_solve_loopblocking',
+               'hw_access_forwarding',
                'hw_gbuf_sharing',
                'partition_hybrid',
                'partition_batch',
@@ -54,6 +55,10 @@ class Option(namedtuple('Option', OPTION_LIST)):
         if any(ntp.sw_gbuf_bypass) and ntp.hw_gbuf_sharing:
             raise ValueError('Option: sw_gbuf_bypass and hw_gbuf_sharing '
                              'cannot be simultaneously enabled.')
+
+        if ntp.hw_access_forwarding and ntp.hw_gbuf_sharing:
+            raise ValueError('Option: hw_access_forwarding is implied by '
+                             'hw_gbuf_sharing, thus cannot be both enabled.')
 
         if ntp.partition_ifmaps and not ntp.partition_hybrid:
             raise ValueError('Option: partition_ifmaps requires '
