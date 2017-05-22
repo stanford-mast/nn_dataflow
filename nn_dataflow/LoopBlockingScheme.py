@@ -353,9 +353,8 @@ class LoopBlockingScheme(object):
                 fe[de.OFM] = self.fetch[bl-1][de.OFM] if bl > 0 else 1
             else:
                 bl_start = bl + (innermost_nt_lp != le.IFM)
-                # See equation (4) in Chen, et al., ISCA'16.
-                fe[de.OFM] = 2 * Util.prod(self.ti[:bl_start]) \
-                        - Util.prod(self.ti[:max(0, bl_start-1)])
+                # Only the first read-in can be saved (all zeros).
+                fe[de.OFM] = 2 * Util.prod(self.ti[:bl_start]) - 1
 
             self.fetch.append(fe)
 

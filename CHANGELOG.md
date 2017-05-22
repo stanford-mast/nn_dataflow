@@ -10,6 +10,11 @@ List of major changes and improvements
   - Lazily evaluate loop blocking stats.
 
 
+### Fixed
+
+- Output data fetch count.
+
+
 ## [v1.3 -- v1.4] -- 2017-05-18
 
 ### Added
