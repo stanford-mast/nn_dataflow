@@ -19,6 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from collections import OrderedDict
+import itertools
 
 from . import DataCategoryEnum as de
 from . import LoopEnum as le
@@ -260,6 +261,78 @@ class LoopBlockingScheme(object):
                             ('tb', tuple(self.tb)),
                             ('orders', self.orders)])
 
+    def gen_index(self):
+        '''
+        Generate the indexes of ifmap, ofmap and batch sample, based on the
+        loop blocking factors and the orders. Index will be 0 to total loop
+        count, e.g., 0 to `loopcnt_ifm`.
+
+        Return the indexes in the order of LoopEnum.
+        '''
+
+        # Index generators for all blocking levels.
+        bl_idxgen_list = []
+        # Counts of loop units for all blocking levels.
+        bl_cnt_list = []
+
+        assert self.BL.NUM == 2
+        bl_gbuf = self.BL.GBUF
+        bl_regf = self.BL.REGF
+
+        # Between DRAM and GBUF.
+        t_x = [float('nan')] * le.NUM
+        t_x[le.IFM] = self.ti[bl_gbuf]
+        t_x[le.OFM] = self.to[bl_gbuf]
+        t_x[le.BAT] = self.tb[bl_gbuf]
+        order_x = self.orders[bl_gbuf]
+        cnt_x = [1] * le.NUM
+        cnt_x[le.IFM] = Util.prod(self.ti[bl_gbuf+1:])
+        cnt_x[le.OFM] = Util.prod(self.to[bl_gbuf+1:])
+        cnt_x[le.BAT] = Util.prod(self.tb[bl_gbuf+1:])
+        bl_idxgen_list.append(self._gen_index_single_level(t_x, order_x))
+        bl_cnt_list.append(cnt_x)
+
+        # Between GBUF and REGF.
+        t_x = [float('nan')] * le.NUM
+        t_x[le.IFM] = self.ti[bl_regf]
+        t_x[le.OFM] = self.to[bl_regf]
+        t_x[le.BAT] = self.tb[bl_regf]
+        order_x = self.orders[bl_regf]
+        cnt_x = [1] * le.NUM
+        cnt_x[le.IFM] = Util.prod(self.ti[bl_regf+1:])
+        cnt_x[le.OFM] = Util.prod(self.to[bl_regf+1:])
+        cnt_x[le.BAT] = Util.prod(self.tb[bl_regf+1:])
+        bl_idxgen_list.append(self._gen_index_single_level(t_x, order_x))
+        bl_cnt_list.append(cnt_x)
+
+        # Between REGF and ALU.
+        t_x = [float('nan')] * le.NUM
+        t_x[le.IFM] = self.ti[2]
+        t_x[le.OFM] = self.to[2]
+        t_x[le.BAT] = self.tb[2]
+        order_x = (0, 1, 2)
+        cnt_x = (1,) * le.NUM
+        bl_idxgen_list.append(self._gen_index_single_level(t_x, order_x))
+        bl_cnt_list.append(cnt_x)
+
+        # Generate.
+        num = 0
+        for bl_idx_list in itertools.product(*bl_idxgen_list):
+            # Merge indexes of all levels.
+            idx = (0,) * le.NUM
+
+            # bl_idx_list is (i0, o0, b0), (i1, o1, b1), ...
+            # bl_cnt_list is (tip0, top0, tbp0), (tip1, top1, tbp1), ...
+            # idx should be (i0 * tip0 + i1 * tip1 + ..., ...)
+            for bl_idx, bl_cnt in zip(bl_idx_list, bl_cnt_list):
+                idx = tuple(i + bi * bc for i, bi, bc
+                            in zip(idx, bl_idx, bl_cnt))
+
+            num += 1
+            yield idx
+
+        assert num == self.tip * self.top * self.tbp
+
     def _set_unit_cnt(self):
         '''
         Set the buffered unit counts for all data categories at all blocking
@@ -414,4 +487,21 @@ class LoopBlockingScheme(object):
                    (self.to[bl_lvl] == 1, order[le.OFM], le.OFM),
                    (self.tb[bl_lvl] == 1, order[le.BAT], le.BAT),
                    (False, float('inf'), None))[2]
+
+    @staticmethod
+    def _gen_index_single_level(t_x, order_x):
+        '''
+        Generate the indexes of a single loop blocking level.
+        '''
+        # The element in order is the position from inner to outer, we list the
+        # generators from outer to inner.
+        gens = [None] * le.NUM
+        rev_order = [le.NUM - 1 - o for o in order_x]
+        for lpe in range(le.NUM):
+            gens[rev_order[lpe]] = xrange(t_x[lpe])
+
+        for idx in itertools.product(*gens):
+            # Index now is in the loop order from outer to inner. Reorder to be
+            # in LoopEnum order.
+            yield tuple(idx[rev_order[lpe]] for lpe in range(le.NUM))
 

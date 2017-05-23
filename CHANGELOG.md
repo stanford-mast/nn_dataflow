@@ -5,6 +5,10 @@ List of major changes and improvements
 
 ### Changed
 
+- Software models:
+
+  - Add loop index generator to LoopBlockingScheme class.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.
