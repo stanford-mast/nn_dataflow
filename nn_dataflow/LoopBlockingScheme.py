@@ -505,3 +505,112 @@ class LoopBlockingScheme(object):
             # in LoopEnum order.
             yield tuple(idx[rev_order[lpe]] for lpe in range(le.NUM))
 
+    def verify_fetch(self):
+        '''
+        Verify the data fetch times, by actually simulating and generating the
+        loops.
+        '''
+
+        if not self.is_valid():
+            return
+
+        # Counts of loop units for all blocking levels.
+        bl_cnt_list = []
+        for bl in range(self.BL.NUM):
+            cnt = [0] * de.NUM
+            cnt_ifm = Util.prod(self.ti[bl+1:])
+            cnt_ofm = Util.prod(self.to[bl+1:])
+            cnt_bat = Util.prod(self.tb[bl+1:])
+            cnt[de.FIL] = (cnt_ifm, cnt_ofm)
+            cnt[de.IFM] = (cnt_ifm, cnt_bat)
+            cnt[de.OFM] = (cnt_ofm, cnt_bat)
+            bl_cnt_list.append(cnt)
+
+        # Buffered data ranges.
+        # The range of each data category is a pair of ranges. Each range is the
+        # index range of one dimension. E.g., for IFM, the first is for i's,
+        # and the second is for b's. The range is represented by a pair of
+        # start and end.
+        gbuf_data = [((0, 0), (0, 0)) for _ in range(de.NUM)]
+        regf_data = [((0, 0), (0, 0)) for _ in range(de.NUM)]
+
+        # Accesses to upper level.
+        gbuf_access = [0] * de.NUM
+        regf_access = [0] * de.NUM
+
+        def _replace(data, access, dce, idx_pr, cnt_pr):
+            '''
+            Replace the data `dce` buffered in `data` and increment `access`.
+
+            `idx_pr` and `cnt_pr` are the index and count for all dimensions of
+            the new data.
+            '''
+            hit = all(rngs[0] <= idx < rngs[1]
+                      for idx, rngs in zip(idx_pr, data[dce]))
+            if not hit:
+                idxbase_pr = [idx // cnt * cnt
+                              for idx, cnt in zip(idx_pr, cnt_pr)]
+                data[dce] = tuple((ib, ib + cnt)
+                                  for ib, cnt in zip(idxbase_pr, cnt_pr))
+                access[dce] += Util.prod(cnt_pr)
+
+        for iidx, oidx, bidx in self.gen_index():
+
+            # GBUF.
+            _replace(gbuf_data, gbuf_access, de.FIL,
+                     (iidx, oidx), bl_cnt_list[self.BL.GBUF][de.FIL])
+            _replace(gbuf_data, gbuf_access, de.IFM,
+                     (iidx, bidx), bl_cnt_list[self.BL.GBUF][de.IFM])
+            _replace(gbuf_data, gbuf_access, de.OFM,
+                     (oidx, bidx), bl_cnt_list[self.BL.GBUF][de.OFM])
+
+            # REGF.
+            _replace(regf_data, regf_access, de.FIL,
+                     (iidx, oidx), bl_cnt_list[self.BL.REGF][de.FIL])
+            _replace(regf_data, regf_access, de.IFM,
+                     (iidx, bidx), bl_cnt_list[self.BL.REGF][de.IFM])
+            _replace(regf_data, regf_access, de.OFM,
+                     (oidx, bidx), bl_cnt_list[self.BL.REGF][de.OFM])
+
+        total_units = [0] * de.NUM
+        total_units[de.FIL] = self.tip * self.top
+        total_units[de.IFM] = self.tip * self.tbp
+        total_units[de.OFM] = self.top * self.tbp
+
+        if not all(a % u == 0 for a, u in zip(gbuf_access, total_units)):
+            raise RuntimeError('LoopBlockingScheme: fetch verification failed. '
+                               'GBUF access is not multiple of total units. '
+                               'access {}, units {}.'
+                               .format(gbuf_access, total_units))
+        if not all(a % u == 0 for a, u in zip(regf_access, total_units)):
+            raise RuntimeError('LoopBlockingScheme: fetch verification failed. '
+                               'REGF access is not multiple of total units. '
+                               'access {}, units {}.'
+                               .format(regf_access, total_units))
+
+        # Fetch times to upper level.
+        gbuf_fetch = [a // u for a, u in zip(gbuf_access, total_units)]
+        regf_fetch = [a // u for a, u in zip(regf_access, total_units)]
+
+        # Output is read/write.
+        gbuf_fetch[de.OFM] = 2 * gbuf_fetch[de.OFM] - 1
+        regf_fetch[de.OFM] = 2 * regf_fetch[de.OFM] - 1
+
+        # Verify.
+        if not all(f1 == f2 for f1, f2
+                   in zip(gbuf_fetch, self.fetch[self.BL.GBUF])):
+            raise RuntimeError('LoopBlockingScheme: fetch verification failed. '
+                               'GBUF fetch mismatch. model {}, sim {}, '
+                               'blocking {}, orders {}.'
+                               .format(self.fetch[self.BL.GBUF], gbuf_fetch,
+                                       (self.ti, self.to, self.tb),
+                                       self.orders))
+        if not all(f1 == f2 for f1, f2
+                   in zip(regf_fetch, self.fetch[self.BL.REGF])):
+            raise RuntimeError('LoopBlockingScheme: fetch verification failed. '
+                               'REGF fetch mismatch. model {}, sim {}, '
+                               'blocking {}, orders {}.'
+                               .format(self.fetch[self.BL.REGF], regf_fetch,
+                                       (self.ti, self.to, self.tb),
+                                       self.orders))
+

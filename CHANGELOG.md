@@ -9,6 +9,8 @@ List of major changes and improvements
 
   - Add loop index generator to LoopBlockingScheme class.
 
+  - Integrate verification into LoopBlockingScheme class.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.
