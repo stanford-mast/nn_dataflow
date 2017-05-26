@@ -538,39 +538,42 @@ class LoopBlockingScheme(object):
         gbuf_access = [0] * de.NUM
         regf_access = [0] * de.NUM
 
-        def _replace(data, access, dce, idx_pr, cnt_pr):
+        def _replace(data, access, dce, idx_pr, cnt_pr, buf_cnt_pr,
+                     bypass=False):
             '''
             Replace the data `dce` buffered in `data` and increment `access`.
 
+            Return whether hit in the buffer or not.
+
             `idx_pr` and `cnt_pr` are the index and count for all dimensions of
-            the new data.
+            the accessed data. `buf_cnt_pr` is the count for all dimensions of
+            the buffered data.
             '''
             hit = all(rngs[0] <= idx < rngs[1]
                       for idx, rngs in zip(idx_pr, data[dce]))
             if not hit:
-                idxbase_pr = [idx // cnt * cnt
-                              for idx, cnt in zip(idx_pr, cnt_pr)]
-                data[dce] = tuple((ib, ib + cnt)
-                                  for ib, cnt in zip(idxbase_pr, cnt_pr))
-                access[dce] += Util.prod(cnt_pr)
+                if bypass:
+                    access[dce] += Util.prod(cnt_pr)
+                else:
+                    idxb_pr = [idx // cnt * cnt
+                               for idx, cnt in zip(idx_pr, buf_cnt_pr)]
+                    data[dce] = tuple((ib, ib + cnt)
+                                      for ib, cnt in zip(idxb_pr, buf_cnt_pr))
+                    access[dce] += Util.prod(buf_cnt_pr)
+            return hit
 
         for iidx, oidx, bidx in self.gen_index():
 
-            # GBUF.
-            _replace(gbuf_data, gbuf_access, de.FIL,
-                     (iidx, oidx), bl_cnt_list[self.BL.GBUF][de.FIL])
-            _replace(gbuf_data, gbuf_access, de.IFM,
-                     (iidx, bidx), bl_cnt_list[self.BL.GBUF][de.IFM])
-            _replace(gbuf_data, gbuf_access, de.OFM,
-                     (oidx, bidx), bl_cnt_list[self.BL.GBUF][de.OFM])
-
-            # REGF.
-            _replace(regf_data, regf_access, de.FIL,
-                     (iidx, oidx), bl_cnt_list[self.BL.REGF][de.FIL])
-            _replace(regf_data, regf_access, de.IFM,
-                     (iidx, bidx), bl_cnt_list[self.BL.REGF][de.IFM])
-            _replace(regf_data, regf_access, de.OFM,
-                     (oidx, bidx), bl_cnt_list[self.BL.REGF][de.OFM])
+            for dce, idx_pr in zip([de.FIL, de.IFM, de.OFM],
+                                   [(iidx, oidx), (iidx, bidx), (oidx, bidx)]):
+                # REGF.
+                if not _replace(regf_data, regf_access, dce, idx_pr,
+                                (1, 1), bl_cnt_list[self.BL.REGF][dce]):
+                    # GBUF.
+                    _replace(gbuf_data, gbuf_access, dce, idx_pr,
+                             bl_cnt_list[self.BL.REGF][dce],
+                             bl_cnt_list[self.BL.GBUF][dce],
+                             not self.stored_in_gbuf[dce])
 
         total_units = [0] * de.NUM
         total_units[de.FIL] = self.tip * self.top
