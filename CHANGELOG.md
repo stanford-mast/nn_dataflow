@@ -3,6 +3,9 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+
+## [v1.4 -- v1.5] -- 2017-05-29
+
 ### Added
 
 - Software engineering.
