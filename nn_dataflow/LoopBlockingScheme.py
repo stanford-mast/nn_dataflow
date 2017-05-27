@@ -101,6 +101,11 @@ class LoopBlockingScheme(object):
         assert self.tbp >= nested_loop_desc.loopcnt_bat, \
                 'LoopBlocking: invalid blocking for bat: {}'.format(self.tb)
 
+        tps = [Util.prod(ts) for ts in self._bl_t(slice(None))]
+        self.total_units = self._t_data_cnt(tps)
+
+        self.lcnt = self.tip * self.top * self.tbp
+
         # Buffer data size for one unit.
         self.unit_size = [tuple() for _ in range(BL.NUM)]
         self.unit_size[BL.GBUF] = nested_loop_desc.usize_gbuf
@@ -280,36 +285,21 @@ class LoopBlockingScheme(object):
         bl_regf = self.BL.REGF
 
         # Between DRAM and GBUF.
-        t_x = [float('nan')] * le.NUM
-        t_x[le.IFM] = self.ti[bl_gbuf]
-        t_x[le.OFM] = self.to[bl_gbuf]
-        t_x[le.BAT] = self.tb[bl_gbuf]
+        t_x = self._bl_t(bl_gbuf)
         order_x = self.orders[bl_gbuf]
-        cnt_x = [1] * le.NUM
-        cnt_x[le.IFM] = Util.prod(self.ti[bl_gbuf+1:])
-        cnt_x[le.OFM] = Util.prod(self.to[bl_gbuf+1:])
-        cnt_x[le.BAT] = Util.prod(self.tb[bl_gbuf+1:])
+        cnt_x = [Util.prod(ts) for ts in self._bl_t(slice(bl_gbuf + 1, None))]
         bl_idxgen_list.append(self._gen_index_single_level(t_x, order_x))
         bl_cnt_list.append(cnt_x)
 
         # Between GBUF and REGF.
-        t_x = [float('nan')] * le.NUM
-        t_x[le.IFM] = self.ti[bl_regf]
-        t_x[le.OFM] = self.to[bl_regf]
-        t_x[le.BAT] = self.tb[bl_regf]
+        t_x = self._bl_t(bl_regf)
         order_x = self.orders[bl_regf]
-        cnt_x = [1] * le.NUM
-        cnt_x[le.IFM] = Util.prod(self.ti[bl_regf+1:])
-        cnt_x[le.OFM] = Util.prod(self.to[bl_regf+1:])
-        cnt_x[le.BAT] = Util.prod(self.tb[bl_regf+1:])
+        cnt_x = [Util.prod(ts) for ts in self._bl_t(slice(bl_regf + 1, None))]
         bl_idxgen_list.append(self._gen_index_single_level(t_x, order_x))
         bl_cnt_list.append(cnt_x)
 
         # Between REGF and ALU.
-        t_x = [float('nan')] * le.NUM
-        t_x[le.IFM] = self.ti[2]
-        t_x[le.OFM] = self.to[2]
-        t_x[le.BAT] = self.tb[2]
+        t_x = self._bl_t(2)
         order_x = (0, 1, 2)
         cnt_x = (1,) * le.NUM
         bl_idxgen_list.append(self._gen_index_single_level(t_x, order_x))
@@ -331,7 +321,7 @@ class LoopBlockingScheme(object):
             num += 1
             yield idx
 
-        assert num == self.tip * self.top * self.tbp
+        assert num == self.lcnt
 
     def _set_unit_cnt(self):
         '''
@@ -350,15 +340,8 @@ class LoopBlockingScheme(object):
         for bl in range(self.BL.NUM):
             # BL corresponds to the BL + 1 element in ti/to/tb.
             blp1 = bl + 1
-            pblti = Util.prod(self.ti[blp1:])
-            pblto = Util.prod(self.to[blp1:])
-            pbltb = Util.prod(self.tb[blp1:])
-
-            uc = [1] * de.NUM
-            uc[de.FIL] = pblti * pblto
-            uc[de.IFM] = pblti * pbltb
-            uc[de.OFM] = pblto * pbltb
-
+            bl_tps = [Util.prod(ts) for ts in self._bl_t(slice(blp1, None))]
+            uc = self._t_data_cnt(bl_tps)
             self.unit_cnt.append(uc)
 
     def _set_fetch(self):
@@ -406,28 +389,21 @@ class LoopBlockingScheme(object):
             # The innermost non-trivial loop.
             # If all loops are trivial, we will use the outer level reuse for
             # all data, so the loop is not used.
-            innermost_nt_lp = self._innermost_nontrivial_loop(bl)
+            innermost_nt_lp = self._innermost_nontrivial_loop(self._bl_t(bl),
+                                                              self.orders[bl])
+
+            cnt = self._t_data_cnt(self._bl_t(bl))
 
             fe = [0] * de.NUM
 
-            if self.ti[bl] * self.to[bl] == 1:
-                fe[de.FIL] = self.fetch[bl-1][de.FIL] if bl > 0 else 1
-            else:
-                bl_start = bl + (innermost_nt_lp != le.BAT)
-                fe[de.FIL] = Util.prod(self.tb[:bl_start])
-
-            if self.ti[bl] * self.tb[bl] == 1:
-                fe[de.IFM] = self.fetch[bl-1][de.IFM] if bl > 0 else 1
-            else:
-                bl_start = bl + (innermost_nt_lp != le.OFM)
-                fe[de.IFM] = Util.prod(self.to[:bl_start])
-
-            if self.to[bl] * self.tb[bl] == 1:
-                fe[de.OFM] = self.fetch[bl-1][de.OFM] if bl > 0 else 1
-            else:
-                bl_start = bl + (innermost_nt_lp != le.IFM)
-                # Only the first read-in can be saved (all zeros).
-                fe[de.OFM] = 2 * Util.prod(self.ti[:bl_start]) - 1
+            for dce, lpe in zip([de.FIL, de.IFM, de.OFM],
+                                [le.BAT, le.OFM, le.IFM]):
+                if cnt[dce] == 1:
+                    fe[dce] = self.fetch[bl-1][dce] if bl > 0 else 1
+                else:
+                    bl_start = bl + (innermost_nt_lp != lpe)
+                    f = Util.prod(self._bl_t(slice(bl_start))[lpe])
+                    fe[dce] = 2 * f - 1 if dce == de.OFM else f
 
             self.fetch.append(fe)
 
@@ -436,57 +412,71 @@ class LoopBlockingScheme(object):
         Lazily calculate stats.
         '''
 
-        total_units = [0] * de.NUM
-        total_units[de.FIL] = self.tip * self.top
-        total_units[de.IFM] = self.tip * self.tbp
-        total_units[de.OFM] = self.top * self.tbp
+        self.ops = self.unit_ops * self.lcnt * self.part_occ
+        self.time = self.unit_time * self.lcnt
 
-        lcnt = self.tip * self.top * self.tbp
-
-        self.ops = self.unit_ops * lcnt * self.part_occ
-        self.time = self.unit_time * lcnt
-
-        self.access[me.REGF] = [v * lcnt * t * self.part_occ for v, t
+        self.access[me.REGF] = [v * self.lcnt * t * self.part_occ for v, t
                                 in zip(self.unit_access[me.REGF],
                                        [1, 1, 2])]
 
         self.access[me.ITCN] = [v * u * f for v, u, f
                                 in zip(self.unit_access[me.ITCN],
-                                       total_units,
+                                       self.total_units,
                                        self.fetch[self.BL.REGF])]
 
         self.access[me.GBUF] = [v * u * f * s for v, u, f, s
                                 in zip(self.unit_access[me.GBUF],
-                                       total_units,
+                                       self.total_units,
                                        self.fetch[self.BL.REGF],
                                        self.stored_in_gbuf)]
 
         self.access[me.DRAM] = [v * u * f for v, u, f
                                 in zip(self.unit_access[me.DRAM],
-                                       total_units,
+                                       self.total_units,
                                        self.fetch[self.BL.GBUF])]
 
         self.finalized_stats = True
 
-    def _innermost_nontrivial_loop(self, bl_lvl):
+    def _bl_t(self, blvl):
         '''
-        Get the innermost non-trivial loop at blocking level `bl_lvl`. Return
-        None if all loops are trivial.
+        Get the loop blocking factors of level `blvl`.
+        '''
+        bl_t = [0] * le.NUM
+        bl_t[le.IFM] = self.ti[blvl]
+        bl_t[le.OFM] = self.to[blvl]
+        bl_t[le.BAT] = self.tb[blvl]
+        return bl_t
+
+    @staticmethod
+    def _t_data_cnt(bl_t):
+        '''
+        Get the corresponding data unit counts given the loop blocking factors.
+        '''
+        cnt = [0] * de.NUM
+        cnt[de.FIL] = bl_t[le.IFM] * bl_t[le.OFM]
+        cnt[de.IFM] = bl_t[le.IFM] * bl_t[le.BAT]
+        cnt[de.OFM] = bl_t[le.OFM] * bl_t[le.BAT]
+        return cnt
+
+    @staticmethod
+    def _innermost_nontrivial_loop(bl_t, bl_ord):
+        '''
+        Get the innermost non-trivial loop at a level. Return None if all loops
+        are trivial.
 
         The innermost non-trivial loop has a non-one blocking factor, and the
         smallest order value.
+
+        `bl_t` are the loop blocking factors, indexed by LoopEnum. `bl_ord` is
+        the loop order.
         '''
-        # Order of the current level, indexed by LoopEnum.
-        order = self.orders[bl_lvl]
-        # If not all loops are trivial, the first element in the tuple will
-        # pick them out (False < True). Then the second element returns the
-        # smallest order value.
-        # If all loops are trivial, the last tuple is the min one, which
-        # returns None.
-        return min((self.ti[bl_lvl] == 1, order[le.IFM], le.IFM),
-                   (self.to[bl_lvl] == 1, order[le.OFM], le.OFM),
-                   (self.tb[bl_lvl] == 1, order[le.BAT], le.BAT),
-                   (False, float('inf'), None))[2]
+        # The key is a tuple.
+        # The first element picks out the non-trivial loops (False < True). If
+        # all loops are trivial, None will be the only left one.
+        # The second element compares the order within the non-trivial loops.
+        return min([None] + range(le.NUM),
+                   key=lambda lpe: (bl_t[lpe] == 1, bl_ord[lpe]) \
+                           if lpe is not None else (False, le.NUM))
 
     @staticmethod
     def _gen_index_single_level(t_x, order_x):
@@ -575,25 +565,20 @@ class LoopBlockingScheme(object):
                              bl_cnt_list[self.BL.GBUF][dce],
                              not self.stored_in_gbuf[dce])
 
-        total_units = [0] * de.NUM
-        total_units[de.FIL] = self.tip * self.top
-        total_units[de.IFM] = self.tip * self.tbp
-        total_units[de.OFM] = self.top * self.tbp
-
-        if not all(a % u == 0 for a, u in zip(gbuf_access, total_units)):
+        if not all(a % u == 0 for a, u in zip(gbuf_access, self.total_units)):
             raise RuntimeError('LoopBlockingScheme: fetch verification failed. '
                                'GBUF access is not multiple of total units. '
                                'access {}, units {}.'
-                               .format(gbuf_access, total_units))
-        if not all(a % u == 0 for a, u in zip(regf_access, total_units)):
+                               .format(gbuf_access, self.total_units))
+        if not all(a % u == 0 for a, u in zip(regf_access, self.total_units)):
             raise RuntimeError('LoopBlockingScheme: fetch verification failed. '
                                'REGF access is not multiple of total units. '
                                'access {}, units {}.'
-                               .format(regf_access, total_units))
+                               .format(regf_access, self.total_units))
 
         # Fetch times to upper level.
-        gbuf_fetch = [a // u for a, u in zip(gbuf_access, total_units)]
-        regf_fetch = [a // u for a, u in zip(regf_access, total_units)]
+        gbuf_fetch = [a // u for a, u in zip(gbuf_access, self.total_units)]
+        regf_fetch = [a // u for a, u in zip(regf_access, self.total_units)]
 
         # Output is read/write.
         gbuf_fetch[de.OFM] = 2 * gbuf_fetch[de.OFM] - 1

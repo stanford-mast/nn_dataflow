@@ -3,6 +3,13 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+### Added
+
+- Software engineering.
+
+  - Add utilities to LoopBlockingScheme class.
+
+
 ### Changed
 
 - Software models:
