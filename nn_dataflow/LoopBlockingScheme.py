@@ -533,7 +533,7 @@ class LoopBlockingScheme(object):
             '''
             Replace the data `dce` buffered in `data` and increment `access`.
 
-            Return whether hit in the buffer or not.
+            Return the count for all dimensions of the accessed data.
 
             `idx_pr` and `cnt_pr` are the index and count for all dimensions of
             the accessed data. `buf_cnt_pr` is the count for all dimensions of
@@ -543,27 +543,37 @@ class LoopBlockingScheme(object):
                       for idx, rngs in zip(idx_pr, data[dce]))
             if not hit:
                 if bypass:
+                    # Bypass.
                     access[dce] += Util.prod(cnt_pr)
-                else:
-                    idxb_pr = [idx // cnt * cnt
-                               for idx, cnt in zip(idx_pr, buf_cnt_pr)]
-                    data[dce] = tuple((ib, ib + cnt)
-                                      for ib, cnt in zip(idxb_pr, buf_cnt_pr))
-                    access[dce] += Util.prod(buf_cnt_pr)
-            return hit
+                    return cnt_pr
+
+                # Miss.
+                idxb_pr = [idx // cnt * cnt
+                           for idx, cnt in zip(idx_pr, buf_cnt_pr)]
+                data[dce] = tuple((ib, ib + cnt)
+                                  for ib, cnt in zip(idxb_pr, buf_cnt_pr))
+                access[dce] += Util.prod(buf_cnt_pr)
+                return buf_cnt_pr
+
+            # Hit.
+            return (0, 0)
 
         for iidx, oidx, bidx in self.gen_index():
 
             for dce, idx_pr in zip([de.FIL, de.IFM, de.OFM],
                                    [(iidx, oidx), (iidx, bidx), (oidx, bidx)]):
+                cnt = (1, 1)
+
                 # REGF.
-                if not _replace(regf_data, regf_access, dce, idx_pr,
-                                (1, 1), bl_cnt_list[self.BL.REGF][dce]):
-                    # GBUF.
-                    _replace(gbuf_data, gbuf_access, dce, idx_pr,
-                             bl_cnt_list[self.BL.REGF][dce],
-                             bl_cnt_list[self.BL.GBUF][dce],
-                             not self.stored_in_gbuf[dce])
+                cnt = _replace(regf_data, regf_access, dce, idx_pr,
+                               cnt, bl_cnt_list[self.BL.REGF][dce])
+                if not any(cnt):
+                    continue
+
+                # GBUF.
+                cnt = _replace(gbuf_data, gbuf_access, dce, idx_pr,
+                               cnt, bl_cnt_list[self.BL.GBUF][dce],
+                               not self.stored_in_gbuf[dce])
 
         if not all(a % u == 0 for a, u in zip(gbuf_access, self.total_units)):
             raise RuntimeError('LoopBlockingScheme: fetch verification failed. '
