@@ -12,6 +12,33 @@ List of major changes and improvements
   - Buffer sharing scheme.
 
 
+## [v1.4 -- v1.5] -- 2017-05-30
+
+### Added
+
+- Software engineering.
+
+  - Add utilities to LoopBlockingScheme class.
+
+
+### Changed
+
+- Software models:
+
+  - Add loop index generator to LoopBlockingScheme class.
+
+  - Integrate verification into LoopBlockingScheme class.
+
+- Software engineering.
+
+  - Lazily evaluate loop blocking stats.
+
+
+### Fixed
+
+- Output data fetch count.
+
+
 ## [v1.3 -- v1.4] -- 2017-05-18
 
 ### Added

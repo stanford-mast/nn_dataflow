@@ -451,7 +451,8 @@ class MapStrategyEyeriss(MapStrategy):
                 'MapEyeriss: encounter negative access count to itcn {}' \
                 .format(uaccess[me.ITCN])
         # regf access is based on num ops.
-        uaccess[me.REGF] = (avgops_per_procpass,) * de.NUM
+        uaccess[me.REGF] = tuple(0 if dce == de.FIL else avgops_per_procpass
+                                 for dce in range(de.NUM))
 
         # Check unit access.
         Util.assert_float_eq_int(
