@@ -202,45 +202,73 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
     category.
     '''
 
-    nhops = [0] * de.NUM
-
     del options
 
-    pidx_mid_inpp = PhyDim2(h=part.dim(pe.INPP).h//2,
-                            w=part.dim(pe.INPP).w//2)
+    # FmapRange --> coordinates that need this data.
+    fil_dict = {}
+    ofm_dict = {}
+    ifm_dict = {}
 
     for pidx in part.gen_pidx():
         coord = part.coordinate(pidx)
 
         # Computation workload (as an ofmap range) of this node coordinate.
         ofrng = part_layer_ofmap_range(layer, batch_size, part, pidx)
+        ofm_dict.setdefault(ofrng, []).append(coord)
 
         # Required ifmap range.
         ifrng = part_layer_ifmap_range(layer, batch_size, part, pidx)
+        ifm_dict.setdefault(ifrng, []).append(coord)
 
-        # Ifmap access.
-        nhops[de.IFM] += ifmap_layout.total_transfer_nhops(ifrng, coord)
+        # Filters, as a tuple of ((i_beg, i_end), (o_beg, o_end)).
+        filrng = tuple(ifrng.beg_end('n')) + tuple(ofrng.beg_end('n'))
+        fil_dict.setdefault(filrng, []).append(coord)
 
-        # Ofmap access.
-        # Additional synchronization is necessary between INPP nodes. Only one
-        # node (the mid one) fetch the previously-partial-accumulated data from
-        # memory into buffers and start on it. Other nodes start on zero and
-        # send the results to the mid node to accumulate there.
-        if pidx[pe.INPP] == pidx_mid_inpp:
-            # The mid node. Fetch from memory
-            nhops[de.OFM] += ofmap_layout.total_transfer_nhops(ofrng, coord)
-        else:
-            # Others. Send to the mid node (one way).
-            pidx_mid = list(pidx)
-            pidx_mid[pe.INPP] = pidx_mid_inpp
-            dist = coord.hop_dist(part.coordinate(pidx_mid))
-            nhops[de.OFM] += ofrng.size() * dist / 2  # half because one way.
+    if isinstance(layer, ConvLayer):
+        assert all(len(v) == part.size(pe.INPP) for v in ofm_dict.values()), \
+                '{}\n{}'.format(part.size(pe.INPP),
+                                [(str(k), str(v)) for k, v in ofm_dict.items()])
+        assert all(len(v) == part.size(pe.OUTP) for v in ifm_dict.values()), \
+                '{}\n{}'.format(part.size(pe.OUTP),
+                                [(str(k), str(v)) for k, v in ifm_dict.items()])
+        assert all(len(v) == part.size(pe.OFMP, pe.BATP)
+                   for v in fil_dict.values()), \
+                '{}\n{}'.format(part.size(pe.OFMP, pe.BATP),
+                                [(str(k), str(v)) for k, v in fil_dict.items()])
 
-        # filter access.
-        if isinstance(layer, ConvLayer):
-            fil_size = ofrng.size('n') * ifrng.size('n') * layer.filter_size()
-            min_hops = min(coord.hop_dist(c) for c in filter_node_coord_list)
-            nhops[de.FIL] += fil_size * min_hops
+    nhops = [0] * de.NUM
+
+    # Ifmap access.
+    for ifrng, coord_list in ifm_dict.items():
+        nhops[de.IFM] += sum(ifmap_layout.total_transfer_nhops(ifrng, coord)
+                             for coord in coord_list)
+
+    # Ofmap access.
+    # Additional synchronization is necessary between INPP nodes. Only one node
+    # (the mid one) fetch the previously-partial-accumulated data from memory
+    # into buffers and start on it. Other nodes start on zero and send the
+    # results to the mid node to accumulate there.
+    for ofrng, coord_list in ofm_dict.items():
+        mid_idx = len(coord_list) // 2
+        for idx, coord in enumerate(coord_list):
+            if idx == mid_idx:
+                # The mid node. Fetch from memory
+                nhops[de.OFM] += ofmap_layout.total_transfer_nhops(ofrng, coord)
+            else:
+                # Others. Send to the mid node (one way).
+                dist = coord.hop_dist(coord_list[mid_idx])
+                nhops[de.OFM] += ofrng.size() * dist / 2  # 1/2 because one way.
+
+    # Filter access.
+    if isinstance(layer, ConvLayer):
+        for filrng, coord_list in fil_dict.items():
+            fil_size = (filrng[0][1] - filrng[0][0]) \
+                    * (filrng[1][1] - filrng[1][0]) \
+                    * layer.filter_size()
+            for coord in coord_list:
+                min_hops = min(coord.hop_dist(c)
+                               for c in filter_node_coord_list)
+                nhops[de.FIL] += fil_size * min_hops
 
     return nhops
 
