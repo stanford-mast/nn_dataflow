@@ -168,6 +168,11 @@ class LoopBlockingScheme(object):
         self.ops = float('nan')
         self.time = float('nan')
         self.access = [[float('nan')] * de.NUM for _ in range(me.NUM)]
+        # NoC access due to buffer sharing and access forwarding.
+        self.noc_access = [0] * de.NUM
+
+        # Access forwarding.
+        self._set_accfwd(bufshr, options)
 
     def is_valid(self):
         '''
@@ -222,6 +227,18 @@ class LoopBlockingScheme(object):
 
         return self.fetch[self.BL.GBUF]
 
+    def get_noc_access(self):
+        '''
+        Get the NoC accesses of each data category.
+        '''
+        if not self.is_valid():
+            return None
+
+        if not self.finalized_stats:
+            self._calc_stats()
+
+        return self.noc_access
+
     def get_cost(self, cost):
         '''
         Get the total cost of loop blocking.
@@ -238,6 +255,8 @@ class LoopBlockingScheme(object):
 
         access_total = [sum(acc) for acc in self.access]
         c += sum(mc * ma for mc, ma in zip(cost.mem_hier, access_total))
+
+        c += sum(self.noc_access) * cost.noc_hop
 
         c += self.time * cost.unit_static
 
@@ -267,7 +286,9 @@ class LoopBlockingScheme(object):
                             ('ti', tuple(self.ti)),
                             ('to', tuple(self.to)),
                             ('tb', tuple(self.tb)),
-                            ('orders', self.orders)])
+                            ('orders', self.orders),
+                            ('accfwd_reduction', self.accfwd_reduction),
+                           ])
 
     def gen_index(self):
         '''
@@ -433,10 +454,14 @@ class LoopBlockingScheme(object):
                                        self.fetch[self.BL.REGF],
                                        self.stored_in_gbuf)]
 
-        self.access[me.DRAM] = [v * u * f for v, u, f
+        self.access[me.DRAM] = [v * u * f / r for v, u, f, r
                                 in zip(self.unit_access[me.DRAM],
                                        self.total_units,
-                                       self.fetch[self.BL.GBUF])]
+                                       self.fetch[self.BL.GBUF],
+                                       self.accfwd_reduction)]
+
+        # NoC access.
+        # TODO
 
         self.finalized_stats = True
 
@@ -614,4 +639,21 @@ class LoopBlockingScheme(object):
                                .format(self.fetch[self.BL.REGF], regf_fetch,
                                        (self.ti, self.to, self.tb),
                                        self.orders))
+
+    def _set_accfwd(self, bufshr, options):
+        '''
+        Set access forwarding (AF).
+        '''
+        assert self.is_valid() and not self.finalized_stats
+
+        # DRAM access reduction due to AF. This is the average reduction. Each
+        # node does not need to fetch exactly 1/N data.
+        self.accfwd_reduction = [1] * de.NUM
+
+        if not options.hw_access_forwarding and not options.hw_gbuf_sharing:
+            return
+
+        # If n nodes share the data, each node fetches 1/n of the data.
+        for dce in range(de.NUM):
+            self.accfwd_reduction[dce] = bufshr.size(dce)
 

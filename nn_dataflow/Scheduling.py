@@ -229,18 +229,27 @@ class Scheduling(object):
         del options  # unused
 
         # Loop blocking.
-        cost_loop = lbs.get_cost(self.cost)
+        # Substrate NoC cost.
+        node_nhops = lbs.get_noc_access()
+        cost_loop = lbs.get_cost(self.cost) \
+                - self.cost.noc_hop * sum(node_nhops)
         dict_loop = OrderedDict([('cost', cost_loop)])
         dict_loop.update(lbs.get_scheme_dict())
 
         # Partitioning.
-        total_nhops = [unh * f
-                       for unh, f
-                       in zip(unit_nhops,
-                              lbs.get_top_level_fetch())]
+        # Memory access hops.
+        mem_nhops = [unh * f for unh, f
+                     in zip(unit_nhops, lbs.get_top_level_fetch())]
+        # Inter-node access hops.
+        node_nhops = [nnh * condition.resource.dim_nodes.size()
+                      for nnh in node_nhops]
+        # Total hops = memory hops + inter-node hops.
+        total_nhops = [nnh + mnh for nnh, mnh in zip(node_nhops, mem_nhops)]
         cost_part = self.cost.noc_hop * sum(total_nhops)
         dict_part = OrderedDict([('cost', cost_part),
                                  ('total_nhops', total_nhops),
+                                 ('mem_nhops', mem_nhops),
+                                 ('node_nhops', node_nhops),
                                  ('part', part.__dict__),
                                  ('unit_nhops', unit_nhops)])
 
