@@ -18,8 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-import itertools
-
 from . import DataCategoryEnum as de
 from . import ParallelEnum as pe
 from . import Util
@@ -156,85 +154,6 @@ class BufShrScheme(StringifyClass):
                 * (subgrp_size - 1) \
                 * (1. / subgrp_size) \
                 * (self.size(dce) // subgrp_size)
-
-        return nhops
-
-    def nhops_broadcast(self, dce, subgrp_size):
-        '''
-        Number of hops for broadcast operation.
-
-        The number of hops is relative to the total unique data size. E.g.,
-        when the data are in N nodes and each node has 1/M data, if all the
-        data have been transferred by 1 hop, the number of hops is N / M.
-
-        Broadcast means the following operation: initially each node holds 1/N
-        data, where N is the group size. Finally each node holds 1/M data,
-        where M is given by `subgrp_size`. The resulting state should match the
-        initial rotation state. See the rotation function about how the data
-        are distributed.
-        '''
-
-        subgrp_dim, idx_pr = self._subgrp_dim(dce, subgrp_size)
-        dim = self.dim(dce)
-        size = self.size(dce)
-
-        # Data index means which 1/M data; source index means which of the N
-        # nodes initially.
-
-        # Each element is a list of pairs for idx_data, where each pair is
-        # (idx_src, p), where p is the amount of idx_data data from this
-        # idx_src node.
-        data_src_list = [[] for _ in range(subgrp_size)]
-
-        idx_src = 0
-        for idx_data in range(subgrp_size):
-            # idx_src = idx_data / M * N
-            beg_src = idx_data * 1. / subgrp_size * size
-            end_src = (idx_data + 1) * 1. / subgrp_size * size
-            assert idx_src + 1 > beg_src - 1e-5
-
-            # E.g., (3.4, 5.2) will lead to [(3, 0.6), (4, 1), (5, 0.2)].
-            cbeg = beg_src
-            while True:
-                cend = min(end_src, idx_src + 1.)
-                pair = (idx_src, (cend - cbeg) / size)
-                data_src_list[idx_data].append(pair)
-                if idx_src + 1 > end_src - 1e-5:
-                    break
-                idx_src += 1
-                cbeg = cend
-
-        # Check total amount of source data.
-        _total = sum(sum(pair[1] for pair in dsrc) for dsrc in data_src_list)
-        assert Util.isclose(_total, 1., abs_tol=1e-3)
-        # Check per source amount of data.
-        _per_src = [0.] * size
-        for dsrc in data_src_list:
-            for pair in dsrc:
-                _per_src[pair[0]] += pair[1]
-        assert all(Util.isclose(p, 1. / size, rel_tol=1e-3) for p in _per_src)
-
-        nhops = 0
-
-        for sgch, sgcw in itertools.product(range(dim.h // subgrp_dim.h),
-                                            range(dim.w // subgrp_dim.w)):
-            c_base = PhyDim2(h=sgch * subgrp_dim.h, w=sgcw * subgrp_dim.w)
-            for index in range(subgrp_dim.size()):
-                c_offset = self._coordinate(index, subgrp_dim, idx_pr)
-                # Absolute coordinate of destination node in group.
-                c_data = c_base + c_offset
-
-                for pair in data_src_list[index % subgrp_size]:
-                    # Absolute coordinate of source node in group. Use the same
-                    # priority dimension as the subgroup.
-                    c_src = self._coordinate(pair[0], dim, idx_pr)
-
-                    # Distance between source and destination.
-                    dist = sum(abs(dst - src) * d
-                               for src, dst, d in zip(c_src, c_data,
-                                                      self.nbr_dists[dce]))
-
-                    nhops += pair[1] * dist
 
         return nhops
 

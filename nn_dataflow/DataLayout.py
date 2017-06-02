@@ -52,12 +52,16 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
 
         return ntp
 
-    def total_transfer_nhops(self, frng, dst_coord):
+    def total_transfer_nhops(self, frng, *dst_coord_list, **kwargs):
         '''
-        Get the total number of hops to transfer the FmapRange `frng` to
-        destination coordinate `dst_coord`.
+        Get the total number of hops to transfer the FmapRange `frng` to all
+        the destination coordinates in `dst_coord_list`. If `closest_first` is
+        True, then first transfer to the closest one node, and then forward
+        from there to all other nodes.
         '''
-        dst_coord_ofs = dst_coord - self.origin
+        closest_first = kwargs.get('closest_first', False)
+
+        dst_coord_ofs_list = [c - self.origin for c in dst_coord_list]
 
         coords_cnts = self.frmap.rget_counter(frng)
         # This assertion is invalid now, because layout is not padded while
@@ -66,7 +70,26 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
 
         nhops = 0
         for coords, cnt in coords_cnts.items():
-            nhops += cnt * sum(dst_coord_ofs.hop_dist(c) for c in coords)
+            nhops_list = [cnt * sum(dco.hop_dist(c) for c in coords)
+                          for dco in dst_coord_ofs_list]
+            if closest_first:
+                # First send to the closest node.
+                closest_idx = min(enumerate(nhops_list), key=lambda x: x[1])[0]
+                nhops += nhops_list[closest_idx]
+                # Then forward to others. We do chained forwarding, i.e., 1st
+                # node sends to the 2nd, 2nd node sends to the 3rd, etc..
+                dco_set = set(dst_coord_ofs_list)
+                cur = dst_coord_ofs_list[closest_idx]
+                while True:
+                    dco_set.remove(cur)
+                    if not dco_set:
+                        break
+                    nxt, dist = min([(nxt, cur.hop_dist(nxt))
+                                     for nxt in dco_set], key=lambda x: x[1])
+                    nhops += cnt * dist
+                    cur = nxt
+            else:
+                nhops += sum(nhops_list)
         return nhops
 
     def is_in_region(self, node_region):

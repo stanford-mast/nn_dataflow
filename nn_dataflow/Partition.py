@@ -202,8 +202,6 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
     category.
     '''
 
-    del options
-
     # FmapRange --> coordinates that need this data.
     fil_dict = {}
     ofm_dict = {}
@@ -236,12 +234,18 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
                 '{}\n{}'.format(part.size(pe.OFMP, pe.BATP),
                                 [(str(k), str(v)) for k, v in fil_dict.items()])
 
+    # When using access forwarding, each piece of data is only fetched by the
+    # closest node, and then forwarded by that node to ALL nodes that need it,
+    # regardless of which nodes initially store it. In this way, AF nhops is
+    # independent of BS scheme.
+    use_accfwd = options.hw_access_forwarding or options.hw_gbuf_sharing
+
     nhops = [0] * de.NUM
 
     # Ifmap access.
     for ifrng, coord_list in ifm_dict.items():
-        nhops[de.IFM] += sum(ifmap_layout.total_transfer_nhops(ifrng, coord)
-                             for coord in coord_list)
+        nhops[de.IFM] += ifmap_layout.total_transfer_nhops(
+            ifrng, *coord_list, closest_first=use_accfwd)
 
     # Ofmap access.
     # Additional synchronization is necessary between INPP nodes. Only one node
@@ -249,6 +253,19 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
     # into buffers and start on it. Other nodes start on zero and send the
     # results to the mid node to accumulate there.
     for ofrng, coord_list in ofm_dict.items():
+
+        if use_accfwd:
+            # The closest one becomes the "mid" one.
+            nhops_read = min(ofmap_layout.total_transfer_nhops(ofrng, c)
+                             for c in coord_list)
+            nhops_accum = ofmap_layout.total_transfer_nhops(
+                ofrng, *coord_list, closest_first=True)
+            # The path between mid node and memory is in both, and accumulation
+            # is one-way.
+            nhops[de.OFM] += (nhops_read + nhops_accum) / 2
+
+            continue
+
         mid_idx = len(coord_list) // 2
         for idx, coord in enumerate(coord_list):
             if idx == mid_idx:
@@ -265,10 +282,29 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
             fil_size = (filrng[0][1] - filrng[0][0]) \
                     * (filrng[1][1] - filrng[1][0]) \
                     * layer.filter_size()
-            for coord in coord_list:
-                min_hops = min(coord.hop_dist(c)
-                               for c in filter_node_coord_list)
-                nhops[de.FIL] += fil_size * min_hops
+            # Min hops to each node across all memory nodes.
+            min_hops = [min(coord.hop_dist(c) for c in filter_node_coord_list)
+                        for coord in coord_list]
+
+            if use_accfwd:
+                # First send to the closest node.
+                closest_idx, nh = min(enumerate(min_hops), key=lambda x: x[1])
+                # Then forward to others. We do chained forwarding, i.e., 1st
+                # node sends to the 2nd, 2nd node sends to the 3rd, etc..
+                coord_set = set(coord_list)
+                cur = coord_list[closest_idx]
+                while True:
+                    coord_set.remove(cur)
+                    if not coord_set:
+                        break
+                    nxt, dist = min([(nxt, cur.hop_dist(nxt))
+                                     for nxt in coord_set], key=lambda x: x[1])
+                    nh += dist
+                    cur = nxt
+                nhops[de.FIL] += fil_size * nh
+
+            else:
+                nhops[de.FIL] += fil_size * sum(min_hops)
 
     return nhops
 
