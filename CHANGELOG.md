@@ -25,6 +25,8 @@ List of major changes and improvements
 
   - Lazily evaluate loop blocking stats.
 
+  - Use rich comparison instead of __cmp__.
+
 
 ### Fixed
 

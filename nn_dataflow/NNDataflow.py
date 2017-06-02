@@ -89,16 +89,6 @@ class SchedulingResultDict(object):
         # read-only.
         return SchedulingResultDict(self.res_dict.copy())
 
-    def __cmp__(self, other):
-        if not isinstance(other, SchedulingResultDict):
-            raise TypeError('SchedulingResultDict: a SchedulingResultDict '
-                            'object is required.')
-        if self.total_cost > other.total_cost:
-            return 1
-        elif self.total_cost < other.total_cost:
-            return -1
-        return 0
-
 
 class NNDataflow(object):
     '''
@@ -201,7 +191,9 @@ class NNDataflow(object):
                 new_sched_res_dict_list.append(srd)
 
         # Always pick and keep top n at each layer.
-        return sorted(new_sched_res_dict_list)[:options.ntops]
+        return sorted(new_sched_res_dict_list,
+                      key=lambda srd: srd.scheduling_total_cost()
+                     )[:options.ntops]
 
     def _gen_layer_ifmap_layout(self, layer_name, sched_res_dict_list, options):
         '''
