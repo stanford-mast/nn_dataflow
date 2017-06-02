@@ -12,7 +12,7 @@ List of major changes and improvements
   - Buffer sharing scheme.
 
 
-## [v1.4 -- v1.5] -- 2017-05-30
+## [v1.4 -- v1.5] -- 2017-06-02
 
 ### Added
 
@@ -32,6 +32,8 @@ List of major changes and improvements
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.
+
+  - Use rich comparison instead of __cmp__.
 
 
 ### Fixed

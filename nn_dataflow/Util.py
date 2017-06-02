@@ -51,7 +51,7 @@ class ContentHashClass(object):
         return NotImplemented
 
     def __ne__(self, other):
-        return not self.__eq__(other)
+        return not self == other
 
     def __hash__(self):
         return hash(tuple(sorted(self.__dict__.items())))
