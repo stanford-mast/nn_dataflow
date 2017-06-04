@@ -175,7 +175,7 @@ class LoopBlockingScheme(object):
         self.noc_access = [0] * de.NUM
 
         # Buffer sharing.
-        self._set_bufshr(bufshr, options)
+        self._set_bufshr(resource, bufshr, options)
         if not self.is_valid():
             return
 
@@ -701,7 +701,7 @@ class LoopBlockingScheme(object):
         # Rotation unit counts.
         self.bufshr_rot_unit_cnt = [float('nan')] * de.NUM
 
-    def _set_bufshr(self, bufshr, options):
+    def _set_bufshr(self, resource, bufshr, options):
         '''
         Set buffer sharing (BS).
 
@@ -765,6 +765,24 @@ class LoopBlockingScheme(object):
         nt_loops_bs = set(lpe for lpe in range(le.NUM) if t_bs[lpe] > 1)
         inlp_bs = self._innermost_nontrivial_loop(t_bs, ord_bs)
 
+        def _min_subgrp_size(*dce_list):
+            '''
+            Get the minimum BS subgroup size. Minimize in the order of the
+            given `dce_list`.
+            '''
+            cur_sgs = list(self.bufshr_subgrp_size)
+            min_sgs = list(self.bufshr_subgrp_size)
+            free_cap = resource.size_gbuf - self.data_size(bl)
+            for dce in dce_list:
+                dce_size = self.data_size(bl, dce)
+                assert dce_size > 0
+                dce_tot_size = dce_size * cur_sgs[dce]
+                # dce_tot_size / sgs - dce_size <= free_cap
+                min_sgs[dce] = Util.idivc(dce_tot_size, free_cap + dce_size)
+                free_cap -= dce_tot_size / min_sgs[dce] - dce_size
+                assert free_cap >= 0
+            return tuple(min_sgs)
+
         def _rotation(ord_loops):
             '''
             Get the rotation information.
@@ -802,23 +820,29 @@ class LoopBlockingScheme(object):
 
                 rotrnd_cnt, rotunit_cnt = _rotation(ord_loops)
 
-                # Wide fetch.
-                # FIXME: support wide fetch.
-                if any(c < s for c, s in zip(rotunit_cnt,
-                                             self.bufshr_subgrp_size)):
-                    # TODO: could try to reduce subgroup size.
-                    continue
+                # Reduce subgroup size if data can fit in fewer nodes. Need to
+                # decide an order about which data first shrink.
+                dce_list = [dce for dce in range(de.NUM)
+                            if self.bufshr_subgrp_size[dce] > 1]
+                for dce_order in itertools.permutations(dce_list):
+                    subgrp_size = _min_subgrp_size(*dce_order)
 
-                # Rotation.
-                fetch_per_rot = [
-                    bufshr.nhops_rotate_all(dce, self.bufshr_subgrp_size[dce])
-                    for dce in range(de.NUM)]
-                rot_fetch = [nh * r for nh, r in zip(fetch_per_rot, rotrnd_cnt)]
+                    # Wide fetch.
+                    # FIXME: support wide fetch.
+                    if any(c < s for c, s in zip(rotunit_cnt, subgrp_size)):
+                        continue
 
-                yield rot_fetch, rotrnd_cnt, rotunit_cnt
+                    # Rotation.
+                    # FIXME: optimize rotation rounds.
+                    fetch_per_rot = [
+                        bufshr.nhops_rotate_all(dce, subgrp_size[dce])
+                        for dce in range(de.NUM)]
+                    rot_fetch = [nh * r for nh, r in zip(fetch_per_rot, rotrnd_cnt)]
+
+                    yield rot_fetch, rotrnd_cnt, rotunit_cnt, subgrp_size
 
         try:
-            rot_fetch, rotrnd_cnt, rotunit_cnt = min(
+            rot_fetch, rotrnd_cnt, rotunit_cnt, subgrp_size = min(
                 _sweep_rotation(),
                 key=lambda tpl: sum(self._calc_bufshr_rotation_access(tpl[0])))
         except ValueError:
@@ -828,6 +852,7 @@ class LoopBlockingScheme(object):
         self.bufshr_rot_fetch = rot_fetch
         self.bufshr_rot_round_cnt = rotrnd_cnt
         self.bufshr_rot_unit_cnt = rotunit_cnt
+        self.bufshr_subgrp_size = subgrp_size
 
     def _calc_bufshr_rotation_access(self, bufshr_rot_fetch):
         ''' Calculate the BS rotation NoC accesses. '''
