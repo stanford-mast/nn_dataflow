@@ -52,9 +52,6 @@ class Option(namedtuple('Option', OPTION_LIST)):
             raise ValueError('Option: sw_solve_loopblocking and '
                              'hw_gbuf_sharing cannot be simultaneously '
                              'enabled.')
-        if any(ntp.sw_gbuf_bypass) and ntp.hw_gbuf_sharing:
-            raise ValueError('Option: sw_gbuf_bypass and hw_gbuf_sharing '
-                             'cannot be simultaneously enabled.')
 
         if ntp.hw_access_forwarding and ntp.hw_gbuf_sharing:
             raise ValueError('Option: hw_access_forwarding is implied by '

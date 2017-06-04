@@ -129,6 +129,11 @@ class BufShrScheme(StringifyClass):
         Overall, each node except for the last one sends its 1/M data to the
         right neighbor at each of the M-1 step. And the (M-1)-th node also
         sends its 1/M data to the 0-th node.
+
+        Note that we do not restore the initial state after one rotation round
+        (missing one step). Even in the case of multiple rotation rounds, this
+        is OK, as the node does not care about which piece of shared data it
+        starts with, as long as each node sees all data at the end.
         '''
 
         subgrp_dim, idx_pr = self._subgrp_dim(dce, subgrp_size)
