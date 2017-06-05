@@ -374,9 +374,9 @@ class MapStrategyEyeriss(MapStrategy):
         usz_regf = [0] * de.NUM
         # No sfil.
         usz_regf[de.FIL] = 0
-        # Similar to a line buffer, ifm needs to store the (sliding) region,
-        # while ofm can have only 1 element.
-        usz_regf[de.IFM] = self.layer.region_size()
+        # Each ofm element is assigned to one PE, so we can simply flow ifm
+        # elements in vertical and horizontal directions.
+        usz_regf[de.IFM] = 1
         usz_regf[de.OFM] = 1
         usize_regf = tuple(usz_regf)
 

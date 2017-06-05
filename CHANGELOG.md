@@ -21,6 +21,8 @@ List of major changes and improvements
 
   - Integrate verification into LoopBlockingScheme class.
 
+  - PE array mapping for `LocalRegionLayer` reduces regfile size.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.
