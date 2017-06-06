@@ -162,6 +162,41 @@ class BufShrScheme(StringifyClass):
 
         return nhops
 
+    def nhops_wide_fetch_once(self, dce, subgrp_size, fetch_width):
+        '''
+        Number of hops for one wide fetch operation.
+
+        The number of hops is relative to the total unique data size. E.g.,
+        when the data are in N nodes and each node has 1/M data, if all the
+        data have been transferred by 1 hop, the number of hops is N / M.
+
+        The data in the subgroup are spread in M' nodes, where M' rounds up M,
+        given by `subgrp_size`, to a factor of the group size N. Each node
+        holds 1/M data. See the rotation function about how the data are
+        distributed.
+
+        Wide fetch means the following operation: a node needs to access W/M >
+        1/M data without rotation, where W is given by `fetch_width`.
+
+        The ceil(W) nodes that will feed the data are those on the upstream
+        (senders) of the rotation chain to this node.
+
+        The returned number of hops is the sum across all nodes in the group.
+        The number of hops for all nodes to get data from their (W - 1)
+        upstream nodes is equal to the number of hops for (W - 1) rotation
+        steps.
+        '''
+        if fetch_width <= 1:
+            return 0
+        elif fetch_width > subgrp_size:
+            raise ValueError('BufShrScheme: fetch width is larger than '
+                             'subgroup size. {} vs. {}.'
+                             .format(fetch_width, subgrp_size))
+
+        nhops_rot_perstep = self.nhops_rotate_all(dce, subgrp_size) \
+                / (subgrp_size - 1)
+        return nhops_rot_perstep * max(0, fetch_width - 1)
+
     def _subgrp_dim(self, dce, subgrp_size):
         '''
         Decide the subgroup dimensions and the priority dimension index.

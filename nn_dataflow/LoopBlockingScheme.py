@@ -302,6 +302,8 @@ class LoopBlockingScheme(object):
                             ('bufshr_rot_fetch', self.bufshr_rot_fetch),
                             ('bufshr_rot_round_cnt', self.bufshr_rot_round_cnt),
                             ('bufshr_rot_unit_cnt', self.bufshr_rot_unit_cnt),
+                            ('bufshr_wide_fetch', self.bufshr_wide_fetch),
+                            ('bufshr_wide_fetch_width', self.bufshr_wide_fetch_width),
                            ])
 
     def gen_index(self):
@@ -477,7 +479,10 @@ class LoopBlockingScheme(object):
         # NoC access.
         bufshr_rot_access = self._calc_bufshr_rotation_access(
             self.bufshr_rot_fetch)
-        self.noc_access = bufshr_rot_access
+        bufshr_wf_access = self._calc_bufshr_widefetch_access(
+            self.bufshr_wide_fetch)
+        self.noc_access = [a1 + a2 for a1, a2
+                           in zip(bufshr_rot_access, bufshr_wf_access)]
 
         self.finalized_stats = True
 
@@ -701,6 +706,11 @@ class LoopBlockingScheme(object):
         # Rotation unit counts.
         self.bufshr_rot_unit_cnt = [float('nan')] * de.NUM
 
+        # NoC fetch due to wide fetch. Meaning similar to `bufshr_rot_fetch`.
+        self.bufshr_wide_fetch = [0.] * de.NUM
+        # Wide fetch widths.
+        self.bufshr_wide_fetch_width = [0.] * de.NUM
+
     def _set_bufshr(self, resource, bufshr, options):
         '''
         Set buffer sharing (BS).
@@ -828,9 +838,19 @@ class LoopBlockingScheme(object):
                     subgrp_size = _min_subgrp_size(*dce_order)
 
                     # Wide fetch.
-                    # FIXME: support wide fetch.
-                    if any(c < s for c, s in zip(rotunit_cnt, subgrp_size)):
-                        continue
+                    wf_width = [1. * s / c for s, c
+                                in zip(subgrp_size, rotunit_cnt)]
+                    fetch_per_bufacc = [
+                        bufshr.nhops_wide_fetch_once(dce, subgrp_size[dce],
+                                                     wf_width[dce])
+                        for dce in range(de.NUM)]
+                    # Wide fetch counts, equal to GBUF access (REGF filling).
+                    bufacc_cnt = self.fetch[blp1]
+                    # The last wide fetch can be combined with the rotation.
+                    wide_fetch = [nh * (r - f) for nh, r, f
+                                  in zip(fetch_per_bufacc, bufacc_cnt,
+                                         rotrnd_cnt)]
+                    assert all(wf >= 0 - 1e-4 for wf in wide_fetch)
 
                     # Rotation.
                     # FIXME: optimize rotation rounds.
@@ -849,12 +869,16 @@ class LoopBlockingScheme(object):
                                         self.fetch[bl])]
                     assert all(rf >= 0 - 1e-4 for rf in rot_fetch)
 
-                    yield rot_fetch, subgrp_size, rotrnd_cnt, rotunit_cnt
+                    yield rot_fetch, wide_fetch, subgrp_size, \
+                            rotrnd_cnt, rotunit_cnt, wf_width
 
         try:
-            rot_fetch, subgrp_size, rotrnd_cnt, rotunit_cnt = min(
-                _sweep_rotation(),
-                key=lambda tpl: sum(self._calc_bufshr_rotation_access(tpl[0])))
+            def _key_func(tuple_):
+                return sum(self._calc_bufshr_rotation_access(tuple_[0])) \
+                        + sum(self._calc_bufshr_widefetch_access(tuple_[1]))
+            rot_fetch, wide_fetch, subgrp_size, \
+                    rotrnd_cnt, rotunit_cnt, wf_width \
+                    = min(_sweep_rotation(), key=_key_func)
         except ValueError:
             self.valid = False
             return
@@ -862,6 +886,8 @@ class LoopBlockingScheme(object):
         self.bufshr_rot_fetch = rot_fetch
         self.bufshr_rot_round_cnt = rotrnd_cnt
         self.bufshr_rot_unit_cnt = rotunit_cnt
+        self.bufshr_wide_fetch = wide_fetch
+        self.bufshr_widefetch_width = wf_width
         self.bufshr_subgrp_size = subgrp_size
 
     def _calc_bufshr_rotation_access(self, bufshr_rot_fetch):
@@ -871,4 +897,11 @@ class LoopBlockingScheme(object):
         return [v * u * f / r for v, u, f, r
                 in zip(self.unit_access[me.GBUF], self.total_units,
                        bufshr_rot_fetch, self.bufshr_grp_size)]
+
+    def _calc_bufshr_widefetch_access(self, bufshr_wide_fetch):
+        ''' Calculate the BS wide fetch NoC accesses. '''
+        # Per-node access needs to divide by group size.
+        return [v * u * f / r for v, u, f, r
+                in zip(self.unit_access[me.GBUF], self.total_units,
+                       bufshr_wide_fetch, self.bufshr_grp_size)]
 
