@@ -695,7 +695,7 @@ class LoopBlockingScheme(object):
         # (considered all replica) traverals over the entire nested loops.
         # The total number of hops of all data over all nodes will be this
         # value multiplying the size of unique data (without replica).
-        self.bufshr_rot_fetch = [0] * de.NUM
+        self.bufshr_rot_fetch = [0.] * de.NUM
         # Rotation round counts.
         self.bufshr_rot_round_cnt = [0] * de.NUM
         # Rotation unit counts.
@@ -837,12 +837,22 @@ class LoopBlockingScheme(object):
                     fetch_per_rot = [
                         bufshr.nhops_rotate_all(dce, subgrp_size[dce])
                         for dce in range(de.NUM)]
-                    rot_fetch = [nh * r for nh, r in zip(fetch_per_rot, rotrnd_cnt)]
+                    # The first rotation can be combined with the initial
+                    # broadcast.
+                    # After fetching from DRAM, data will be broadcast to all
+                    # nodes regardless of who stores it (see Partition). So
+                    # initially each node receives all data. This saves one
+                    # rotation. Afterwards each node only stores partial data
+                    # and relies on rotation to see all the data.
+                    rot_fetch = [nh * (r - f) for nh, r, f
+                                 in zip(fetch_per_rot, rotrnd_cnt,
+                                        self.fetch[bl])]
+                    assert all(rf >= 0 - 1e-4 for rf in rot_fetch)
 
-                    yield rot_fetch, rotrnd_cnt, rotunit_cnt, subgrp_size
+                    yield rot_fetch, subgrp_size, rotrnd_cnt, rotunit_cnt
 
         try:
-            rot_fetch, rotrnd_cnt, rotunit_cnt, subgrp_size = min(
+            rot_fetch, subgrp_size, rotrnd_cnt, rotunit_cnt = min(
                 _sweep_rotation(),
                 key=lambda tpl: sum(self._calc_bufshr_rotation_access(tpl[0])))
         except ValueError:
