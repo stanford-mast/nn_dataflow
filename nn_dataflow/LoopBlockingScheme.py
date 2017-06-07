@@ -752,6 +752,31 @@ class LoopBlockingScheme(object):
         Rotation unit size does not affect the NoC access of rotation rounds,
         but there may be remote accesses without rotation, called wide fetch,
         if the rotation unit does not fit in a single node GBUF.
+
+        - Rotation round optimization.
+
+        Only the data with the inner two loops are rotated multiple times per
+        DRAM access (GBUF filling) and can be optimized. We do not touch the
+        innermost loop, to keep GBUF fetch times unchanged. Therefore we only
+        try to split the middle loop into two: across-node and within-node, and
+        bring the across-node loop outside.
+
+        With above loop structure example, it will be
+
+        for i-across-node
+          for o
+            for i-within-node
+              for b
+
+        This optimization reduces IFM (i, b) rotation rounds from `to` to 1,
+        and increases OFM (o, b) rotation rounds from 1 to `i-across-node`,
+        i.e., subgroup size of IFM; it does not change FIL (i, o) rotation
+        rounds.
+
+        This optimization does not change the wide fetch times. FIL (i, o) is
+        still seq-acc once but with a different order; OFM (o, b) is still
+        non-seq-acc; IFM (i, b) becomes non-seq-acc, but if we ensure the inner
+        i loop is within a node, no wide fetch is needed.
         '''
         assert self.is_valid() and not self.finalized_stats
 
@@ -814,7 +839,7 @@ class LoopBlockingScheme(object):
                 # Reduce rotation rounds by the fetch times to the inner dim.
                 rotrnd_cnt[nseq_dce] //= t_bs[ord_loops[1]]
 
-            return rotrnd_cnt, rotunit_cnt
+            return rotrnd_cnt, rotunit_cnt, nseq_dce
 
         def _sweep_rotation():
             '''
@@ -828,7 +853,7 @@ class LoopBlockingScheme(object):
                 # Ordered loops, from outermost to innermost.
                 ord_loops = non_inlp + (inlp_bs,)
 
-                rotrnd_cnt, rotunit_cnt = _rotation(ord_loops)
+                rotrnd_cnt, rotunit_cnt, nseq_dce = _rotation(ord_loops)
 
                 # Reduce subgroup size if data can fit in fewer nodes. Need to
                 # decide an order about which data first shrink.
@@ -853,7 +878,6 @@ class LoopBlockingScheme(object):
                     assert all(wf >= 0 - 1e-4 for wf in wide_fetch)
 
                     # Rotation.
-                    # FIXME: optimize rotation rounds.
                     fetch_per_rot = [
                         bufshr.nhops_rotate_all(dce, subgrp_size[dce])
                         for dce in range(de.NUM)]
@@ -871,6 +895,26 @@ class LoopBlockingScheme(object):
 
                     yield rot_fetch, wide_fetch, subgrp_size, \
                             rotrnd_cnt, rotunit_cnt, wf_width
+
+                    if len(ord_loops) == 3:
+                        # Optimize rotation rounds.
+                        rotrnd_cnt_opt = list(rotrnd_cnt)
+                        # The target data category is the one with the inner
+                        # two loops.
+                        dce_to_opt = (de.FIL if ord_loops[0] == le.BAT
+                                      else (de.IFM if ord_loops[0] == le.OFM
+                                            else de.OFM))
+                        rotrnd_cnt_opt[dce_to_opt] //= t_bs[ord_loops[0]]
+                        # And the non-seq-acc data rotation rounds increase.
+                        rotrnd_cnt_opt[nseq_dce] *= subgrp_size[dce_to_opt]
+
+                        rot_fetch_opt = [nh * (r - f) for nh, r, f
+                                         in zip(fetch_per_rot, rotrnd_cnt_opt,
+                                                self.fetch[bl])]
+                        assert all(rf >= 0 - 1e-4 for rf in rot_fetch_opt)
+
+                        yield rot_fetch_opt, wide_fetch, subgrp_size, \
+                                rotrnd_cnt_opt, rotunit_cnt, wf_width
 
         try:
             def _key_func(tuple_):
