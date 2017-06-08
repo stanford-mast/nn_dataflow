@@ -8,6 +8,10 @@ List of major changes and improvements
 
 ### Added
 
+- Workload models.
+
+  - `Network` method to return next layers.
+
 - Software engineering.
 
   - Add utilities to LoopBlockingScheme class.

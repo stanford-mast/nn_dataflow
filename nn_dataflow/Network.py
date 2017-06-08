@@ -33,6 +33,7 @@ class Network(object):
         self.net_name = net_name
         self.layer_dict = OrderedDict()
         self.prevs_dict = {}
+        self.nexts_dict = {}
 
     def set_input(self, input_layer):
         '''
@@ -91,6 +92,9 @@ class Network(object):
             del self.prevs_dict[layer_name]
             raise
 
+        for pl in prevs:
+            self.nexts_dict.setdefault(pl, []).append(layer_name)
+
     def prev_layers(self, layer_name):
         '''
         Get the previous layers of the given layer name, and the merge approach.
@@ -98,6 +102,15 @@ class Network(object):
         Return a tuple of all the previous layer names, and the merge symbol.
         '''
         return self.prevs_dict[layer_name], self._merge_symbol(layer_name)
+
+    def next_layers(self, layer_name):
+        '''
+        Get the next layers of the given layer name, i.e., the layers that need
+        the output of this layer.
+
+        Return a tuple of all the next layer names.
+        '''
+        return tuple(self.nexts_dict[layer_name])
 
     def input_layer(self):
         '''
