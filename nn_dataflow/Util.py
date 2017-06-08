@@ -139,6 +139,30 @@ def closest_factor(value, factor):
     return res
 
 
+def quantize_pow2(value, approx=False):
+    '''
+    Quantize by ceiling to a number of power of two. Also allow some small
+    "good" numbers like 6, 12, 20, etc..
+    '''
+    n = 0
+    while True:
+        qval = 2 ** n
+        if qval >= value:
+            # qval is the first power of two value no less than value.
+            if approx:
+                # Try qval * 5/8, but no 5 and 10.
+                qval5 = qval * 5 // 8
+                if qval5 >= 20 and qval5 >= value:
+                    return qval5
+                # Try qval * 3/4, but no 3.
+                qval3 = qval * 3 // 4
+                if qval3 >= 6 and qval3 >= value:
+                    return qval3
+            return qval
+        else:
+            n += 1
+
+
 def get_ith_range(rng, idx, num):
     '''
     Divide the full range `rng` into `num` parts, and get the `idx`-th range.
