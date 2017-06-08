@@ -21,6 +21,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import itertools
 from collections import namedtuple
 
+from . import Util
 from .PhyDim2 import PhyDim2
 
 NODE_REGION_LIST = ['dim',
@@ -31,7 +32,7 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
     '''
     A node region defined by the dimension and origin offset.
 
-    NOTES: we cannot overload __contains__ and __iter__ as a node container,
+    NOTE: we cannot overload __contains__ and __iter__ as a node container,
     because the base namedtuple already defines them.
     '''
 
@@ -63,6 +64,61 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
             assert self.contains_node(coord)
             cnt += 1
             yield coord
+
+    def allocate(self, request_list):
+        '''
+        Allocate node subregions spatially within the node region according to
+        the given `request_list`. Return a list of NodeRegion instances, or
+        empty list if failed. The origin offset is absolute, not relative to
+        the origin of self.
+
+        Requests are given as a list of number of nodes.
+        '''
+
+        if sum(request_list) > self.dim.size():
+            return []
+
+        # The strategy is to allocate stripe-wise. First determine a stripe
+        # height, then allocate each request as (stripe height, request size /
+        # stripe height) to fill in the stripe, and move to next stripe after
+        # the current one is filled.
+
+        # Prefer larger stripe height, which can split intra-layer and
+        # inter-layer to different dimensions.
+        hstrp_cands = sorted([h for h, _ in Util.factorize(self.dim.h, 2)],
+                             reverse=True)
+
+        for hstrp in hstrp_cands:
+            # Try each strip height.
+            subregions = []
+
+            offset = PhyDim2(0, 0)
+            for req in request_list:
+                # Subregion.
+                width = Util.idivc(req, hstrp)
+                subdim = PhyDim2(hstrp, width)
+
+                if offset.w + width <= self.dim.w:
+                    # Still fit in this stripe.
+                    pass
+                elif offset.h + hstrp + hstrp <= self.dim.h \
+                        and width <= self.dim.w:
+                    # Fit in the next stripe. Update offset.
+                    offset = PhyDim2(h=offset.h+hstrp, w=0)
+                else:
+                    # Cannot allocate any more.
+                    break
+
+                subregions.append(NodeRegion(dim=subdim,
+                                             origin=self.origin+offset))
+                offset += PhyDim2(h=0, w=width)
+
+            if len(subregions) == len(request_list):
+                # All allocated.
+                return subregions
+
+        # None of the stripes works.
+        return []
 
 
 RESOURCE_LIST = ['dim_nodes',
