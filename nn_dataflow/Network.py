@@ -35,6 +35,8 @@ class Network(object):
         self.prevs_dict = {}
         self.nexts_dict = {}
 
+        self._merge_symbol_cache = {}
+
     def set_input(self, input_layer):
         '''
         Set the input layer.
@@ -123,6 +125,9 @@ class Network(object):
         Get the symbol to merge the previous layers as the input to the given
         layer.
         '''
+        if layer_name in self._merge_symbol_cache:
+            return self._merge_symbol_cache[layer_name]
+
         layer = self.layer_dict[layer_name]
 
         prev_layer_names = self.prevs_dict[layer_name]
@@ -151,14 +156,17 @@ class Network(object):
             if same_nfmaps:
                 assert len(prev_layer_names) == 1
             # Fmaps are concatenated.
-            return '|'
+            symbol = '|'
         elif same_nfmaps:
             # Fmaps are summed up.
-            return '+'
+            symbol = '+'
         else:
             raise ValueError('Network: cannot figure out how to merge {}, '
                              'which are the previous layers of {}'
                              .format(' '.join(prev_layer_names), layer_name))
+
+        self._merge_symbol_cache[layer_name] = symbol
+        return symbol
 
     @staticmethod
     def check_padded_fmap(layer1, layer2):
