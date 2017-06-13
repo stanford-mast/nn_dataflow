@@ -156,6 +156,8 @@ class LoopBlockingScheme(object):
         self.unit_time = nested_loop_desc.unit_time
         self.unit_access = nested_loop_desc.unit_access
 
+        # Parallel partitioning.
+        self.num_nodes = resource.dim_nodes.size()
         # Occupation.
         # Occupation only affects op counts and REGF accesses.
         self.part_occ = 1.  # set later.
@@ -236,11 +238,11 @@ class LoopBlockingScheme(object):
         access_total = [sum(acc) for acc in self.access]
         c += sum(mc * ma for mc, ma in zip(cost.mem_hier, access_total))
 
-        c += self.time * cost.unit_static
+        c += self.time * cost.unit_static * self.num_nodes
 
         return c
 
-    def get_scheme_dict(self):
+    def get_scheme_dict(self, cost):
         '''
         Get an OrderedDict of scheme summary.
         '''
@@ -253,7 +255,8 @@ class LoopBlockingScheme(object):
         size = [[self.data_size(bl, dce) for dce in range(de.NUM)]
                 for bl in range(self.BL.NUM)]
 
-        return OrderedDict([('ops', self.ops),
+        return OrderedDict([('cost', self.get_cost(cost)),
+                            ('ops', self.ops),
                             ('time', self.time),
                             ('access', self.access),
                             ('fetch', self.fetch),
@@ -412,25 +415,26 @@ class LoopBlockingScheme(object):
         Lazily calculate stats.
         '''
 
-        self.ops = self.unit_ops * self.lcnt * self.part_occ
+        self.ops = self.unit_ops * self.lcnt * self.num_nodes * self.part_occ
         self.time = self.unit_time * self.lcnt
 
-        self.access[me.REGF] = [v * self.lcnt * t * self.part_occ for v, t
+        self.access[me.REGF] = [v * self.lcnt * t
+                                * self.num_nodes * self.part_occ for v, t
                                 in zip(self.unit_access[me.REGF],
                                        [1, 1, 2])]
 
-        self.access[me.ITCN] = [v * u * f for v, u, f
+        self.access[me.ITCN] = [v * u * f * self.num_nodes for v, u, f
                                 in zip(self.unit_access[me.ITCN],
                                        self.total_units,
                                        self.fetch[self.BL.REGF])]
 
-        self.access[me.GBUF] = [v * u * f * s for v, u, f, s
+        self.access[me.GBUF] = [v * u * f * s * self.num_nodes for v, u, f, s
                                 in zip(self.unit_access[me.GBUF],
                                        self.total_units,
                                        self.fetch[self.BL.REGF],
                                        self.stored_in_gbuf)]
 
-        self.access[me.DRAM] = [v * u * f for v, u, f
+        self.access[me.DRAM] = [v * u * f * self.num_nodes for v, u, f
                                 in zip(self.unit_access[me.DRAM],
                                        self.total_units,
                                        self.fetch[self.BL.GBUF])]

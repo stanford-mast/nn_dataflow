@@ -14,24 +14,26 @@ List of major changes and improvements
 
 - Software engineering.
 
-  - Add utilities to LoopBlockingScheme class.
+  - Add utilities to `LoopBlockingScheme` class.
 
 
 ### Changed
 
 - Software models:
 
-  - Add loop index generator to LoopBlockingScheme class.
+  - Add loop index generator to `LoopBlockingScheme` class.
 
-  - Integrate verification into LoopBlockingScheme class.
+  - Integrate verification into `LoopBlockingScheme` class.
 
   - PE array mapping for `LocalRegionLayer` reduces regfile size.
+
+  - Loop blocking scheme result stats change from one node to all nodes.
 
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.
 
-  - Use rich comparison instead of __cmp__.
+  - Use rich comparison instead of `__cmp__`.
 
 
 ### Fixed
