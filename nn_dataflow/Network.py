@@ -77,9 +77,9 @@ class Network(object):
             # Ensure previous layers are already added.
             for pl in prevs:
                 if pl not in self.layer_dict:
-                    raise ValueError('Network: given previous layer {} '
-                                     'has not been added to the network'.
-                                     format(pl))
+                    raise KeyError('Network: given previous layer {} '
+                                   'has not been added to the network'.
+                                   format(pl))
         else:
             prevs = (self.layer_dict.keys()[-1],)
 
@@ -200,7 +200,10 @@ class Network(object):
 
     def __getitem__(self, layer_name):
         ''' Get the layer by name. '''
-        return self.layer_dict[layer_name]
+        try:
+            return self.layer_dict[layer_name]
+        except KeyError as e:
+            raise KeyError('Network: {} layer not found.'.format(str(e)))
 
     def __str__(self):
         str_ = 'Network: {}\n'.format(self.net_name)

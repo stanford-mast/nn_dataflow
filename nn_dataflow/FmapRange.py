@@ -257,8 +257,8 @@ class FmapRangeMap(object):
         for key in counts.keys():
             if counts[key] == frng.size():
                 return key
-        raise ValueError('FmapRange: given fmap range does not correspond to '
-                         'a single value.')
+        raise ValueError('FmapRangeMap: given fmap range does not correspond '
+                         'to a single value.')
 
     def __str__(self):
         str_ = '{}:\n'.format(self.__class__.__name__)

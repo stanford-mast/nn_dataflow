@@ -40,6 +40,8 @@ List of major changes and improvements
 
 - Output data fetch count.
 
+- Error types and message typos.
+
 
 ## [v1.3 -- v1.4] -- 2017-05-18
 
