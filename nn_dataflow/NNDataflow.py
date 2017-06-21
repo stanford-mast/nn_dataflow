@@ -133,7 +133,7 @@ class NNDataflow(object):
         sched_res_dict_list = []
         for input_layout in self._gen_input_layout(options):
             srd = SchedulingResultDict()
-            srd[self.network.INPUT_LAYER_KEY] = SchedulingResult(
+            srd[None] = SchedulingResult(
                 total_cost=0, dict_loop=OrderedDict(), dict_part=OrderedDict(),
                 ofmap_layout=input_layout)
             sched_res_dict_list.append(srd)

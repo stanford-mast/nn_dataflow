@@ -102,17 +102,34 @@ class Network(object):
         Get the previous layers of the given layer name, and the merge approach.
 
         Return a tuple of all the previous layer names, and the merge symbol.
+        Use `None` to represent the input layer in the returned tuple.
         '''
-        return self.prevs_dict[layer_name], self._merge_symbol(layer_name)
+        if layer_name == self.INPUT_LAYER_KEY:
+            raise ValueError('Network: cannot get previous layers for '
+                             'input layer.')
+
+        prevs = tuple(None if pl == self.INPUT_LAYER_KEY else pl
+                      for pl in self.prevs_dict[layer_name])
+        assert prevs
+        merge_symbol = self._merge_symbol(layer_name)
+
+        return prevs, merge_symbol
 
     def next_layers(self, layer_name):
         '''
         Get the next layers of the given layer name, i.e., the layers that need
         the output of this layer.
 
-        Return a tuple of all the next layer names.
+        Return a tuple of all the next layer names. Use `None` to represent the
+        output of the last layer in the returned tuple.
         '''
-        return tuple(self.nexts_dict[layer_name])
+        try:
+            nexts = tuple(self.nexts_dict[layer_name])
+        except KeyError:
+            nexts = tuple([None])
+        assert nexts
+
+        return nexts
 
     def input_layer(self):
         '''
@@ -209,7 +226,9 @@ class Network(object):
         str_ = 'Network: {}\n'.format(self.net_name)
         for layer_name in self:
             prev_layer_names, merge_symbol = self.prev_layers(layer_name)
+            prev_str = merge_symbol.join(['None' if n is None else n
+                                          for n in prev_layer_names])
             str_ += '  Layer {} <- {}\n'.format(
-                layer_name, ' {} '.format(merge_symbol).join(prev_layer_names))
+                layer_name, ' {} '.format(prev_str))
         return str_
 

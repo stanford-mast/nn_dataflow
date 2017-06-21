@@ -12,6 +12,8 @@ List of major changes and improvements
 
   - `Network` method to return next layers.
 
+  - `Network` uses `None` in previous/next layers for the input/output layers.
+
   - Add batch size argument to layer fmap size methods.
 
   - Add default filter size to `FCLayer`.
