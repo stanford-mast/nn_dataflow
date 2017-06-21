@@ -82,37 +82,37 @@ class Layer(StringifyClass, ContentHashClass):
         ''' Fmap width of input layer. '''
         return self.input_layer().wofm
 
-    def ofmap_size(self, word_size=1):
+    def ofmap_size(self, batch_size=1, word_size=1):
         '''
-        Get size of one output fmap.
+        Get size of one output fmap with `batch_size`.
 
         If `word_size` is set to word byte size, return size in bytes.
         '''
-        return self.hofm * self.wofm * word_size
+        return self.hofm * self.wofm * batch_size * word_size
 
-    def total_ofmap_size(self, word_size=1):
+    def total_ofmap_size(self, batch_size=1, word_size=1):
         '''
-        Get total size of all output fmaps.
-
-        If `word_size` is set to word byte size, return size in bytes.
-        '''
-        return self.nofm * self.ofmap_size(word_size)
-
-    def ifmap_size(self, word_size=1):
-        '''
-        Get size of one input fmap.
+        Get total size of all output fmaps with `batch_size`.
 
         If `word_size` is set to word byte size, return size in bytes.
         '''
-        return self.input_layer().ofmap_size(word_size)
+        return self.nofm * self.ofmap_size(batch_size, word_size)
 
-    def total_ifmap_size(self, word_size=1):
+    def ifmap_size(self, batch_size=1, word_size=1):
         '''
-        Get total size of all input fmaps.
+        Get size of one input fmap with `batch_size`.
 
         If `word_size` is set to word byte size, return size in bytes.
         '''
-        return self.input_layer().total_ofmap_size(word_size)
+        return self.input_layer().ofmap_size(batch_size, word_size)
+
+    def total_ifmap_size(self, batch_size=1, word_size=1):
+        '''
+        Get total size of all input fmaps with `batch_size`.
+
+        If `word_size` is set to word byte size, return size in bytes.
+        '''
+        return self.input_layer().total_ofmap_size(batch_size, word_size)
 
     def ops_per_neuron(self):
         ''' Number of operations per neuron. '''

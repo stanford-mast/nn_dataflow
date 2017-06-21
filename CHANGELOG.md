@@ -12,6 +12,8 @@ List of major changes and improvements
 
   - `Network` method to return next layers.
 
+  - Add batch size argument to layer fmap size methods.
+
 - Software engineering.
 
   - Add utilities to `LoopBlockingScheme` class.

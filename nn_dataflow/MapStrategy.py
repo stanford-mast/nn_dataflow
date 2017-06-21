@@ -300,12 +300,12 @@ class MapStrategyEyeriss(MapStrategy):
             Util.assert_float_eq_int(
                 # Need to consider amplified access for IFM.
                 uaccess[me.DRAM][de.IFM] * lcnt_ifm * lcnt_bat / amp_acc_ifm,
-                self.layer.total_ifmap_size() * self.batch_size,
+                self.layer.total_ifmap_size(self.batch_size),
                 'MapEyeriss: unit access at DRAM for IFM {} is incorrect.'
                 .format(uaccess[me.DRAM][de.IFM]))
             Util.assert_float_eq_int(
                 uaccess[me.DRAM][de.OFM] * lcnt_ofm * lcnt_bat,
-                self.layer.total_ofmap_size() * self.batch_size,
+                self.layer.total_ofmap_size(self.batch_size),
                 'MapEyeriss: unit access at DRAM for OFM {} is incorrect.'
                 .format(uaccess[me.DRAM][de.OFM]))
 
@@ -463,12 +463,12 @@ class MapStrategyEyeriss(MapStrategy):
         Util.assert_float_eq_int(
             # Need to consider amplified access for IFM.
             uaccess[me.DRAM][de.IFM] * lcnt_ifm * lcnt_bat / amp_acc_ifm,
-            self.layer.total_ifmap_size() * self.batch_size,
+            self.layer.total_ifmap_size(self.batch_size),
             'MapEyeriss: unit access at DRAM for IFM {} is incorrect.'
             .format(uaccess[me.DRAM][de.IFM]))
         Util.assert_float_eq_int(
             uaccess[me.DRAM][de.OFM] * lcnt_ofm * lcnt_bat,
-            self.layer.total_ofmap_size() * self.batch_size,
+            self.layer.total_ofmap_size(self.batch_size),
             'MapEyeriss: unit access at DRAM for OFM {} is incorrect.'
             .format(uaccess[me.DRAM][de.OFM]))
 
