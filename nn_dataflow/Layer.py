@@ -189,7 +189,7 @@ class FCLayer(ConvLayer):
     hifm = wifm = sfil, strd = 1, hofm = wofm = 1
     '''
 
-    def __init__(self, nifm, nofm, sfil):
+    def __init__(self, nifm, nofm, sfil=1):
         super(FCLayer, self).__init__(nifm, nofm, 1, sfil)
         assert self.hofm == 1 and self.wofm == 1
 

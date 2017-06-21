@@ -97,5 +97,5 @@ _PREVS = add_inception(NN, '5b', 7, 832, 384, 192, 384, 48, 128, 128,
 
 NN.add('pool5', PoolingLayer(1024, 1, 7), prevs=_PREVS)
 
-NN.add('fc', FCLayer(1024, 1000, 1))
+NN.add('fc', FCLayer(1024, 1000))
 

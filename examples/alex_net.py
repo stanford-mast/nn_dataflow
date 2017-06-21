@@ -53,6 +53,6 @@ NN.add('pool3_a', PoolingLayer(128, 6, 3, strd=2), prevs=('conv5_a',))
 NN.add('pool3_b', PoolingLayer(128, 6, 3, strd=2), prevs=('conv5_b',))
 
 NN.add('fc1', FCLayer(256, 4096, 6), prevs=('pool3_a', 'pool3_b'))
-NN.add('fc2', FCLayer(4096, 4096, 1))
-NN.add('fc3', FCLayer(4096, 1000, 1))
+NN.add('fc2', FCLayer(4096, 4096))
+NN.add('fc3', FCLayer(4096, 1000))
 

@@ -42,6 +42,6 @@ NN.add('conv4', ConvLayer(512, 1024, 13, 3))
 NN.add('conv5', ConvLayer(1024, 512, 13, 3))
 NN.add('pool3', PoolingLayer(512, 6, 3, strd=2))
 NN.add('fc1', FCLayer(512, 4096, 6))
-NN.add('fc2', FCLayer(4096, 4096, 1))
-NN.add('fc3', FCLayer(4096, 1000, 1))
+NN.add('fc2', FCLayer(4096, 4096))
+NN.add('fc3', FCLayer(4096, 1000))
 

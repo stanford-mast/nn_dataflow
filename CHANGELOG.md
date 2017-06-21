@@ -14,6 +14,8 @@ List of major changes and improvements
 
   - Add batch size argument to layer fmap size methods.
 
+  - Add default filter size to `FCLayer`.
+
 - Software engineering.
 
   - Add utilities to `LoopBlockingScheme` class.
