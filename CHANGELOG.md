@@ -42,6 +42,8 @@ List of major changes and improvements
 
 - Error types and message typos.
 
+- `FmapRange` comparison: overlapping ranges cannot compare.
+
 
 ## [v1.3 -- v1.4] -- 2017-05-18
 

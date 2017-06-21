@@ -135,20 +135,21 @@ class FmapRange(StringifyClass, ContentHashClass):
         return self > other or self == other
 
     def _compare(self, other):
-        # We compare the two range using their begin points.
-        if self.fp_beg > other.fp_beg:
-            return 1
-        elif self.fp_beg < other.fp_beg:
-            return -1
-
-        # If the begin points are identical, either the same range or overlap.
-        if self.fp_end == other.fp_end \
+        # Identical or empty ranges.
+        if (self.fp_beg == other.fp_beg and self.fp_end == other.fp_end) \
                 or (self.size() == 0 and other.size() == 0):
             return 0
 
-        assert self.overlap(other).size() > 0
-        raise ValueError('FmapRange: comparing two overlap ranges. '
-                         '{} vs. {}'.format(self, other))
+        # Overlap check.
+        if self.overlap(other).size() > 0:
+            raise ValueError('FmapRange: comparing two overlap ranges. '
+                             '{} vs. {}'.format(self, other))
+
+        # We compare the two range using their begin points.
+        if self.fp_beg > other.fp_beg:
+            return 1
+        assert self.fp_beg < other.fp_beg
+        return -1
 
 
 class FmapRangeMap(object):
@@ -172,13 +173,15 @@ class FmapRangeMap(object):
         if frng.size() == 0:
             return
 
-        idx = sum([1 if kv[0] < frng else 0 for kv in self.keyvals])
-        if idx < len(self.keyvals) and not (self.keyvals[idx][0] > frng):
-            prev = self.keyvals[idx-1][0] if idx > 0 else None
+        try:
+            idx = sum([1 if kv[0] < frng else 0 for kv in self.keyvals])
+            assert not (idx < len(self.keyvals) \
+                    and not (self.keyvals[idx][0] > frng))
+        except ValueError:
             raise ValueError('FmapRangeMap: added FmapRange overlaps with '
-                             'its next range. New: {}, prev: {}, next: {}.'
-                             .format(str(frng), str(prev),
-                                     str(self.keyvals[idx][0])))
+                             'existing ranges. Added: {}, existing: {}.'
+                             .format(str(frng),
+                                     [k for k, _ in self.keyvals]))
         self.keyvals.insert(idx, (frng, val))
 
         self.min_fpos = [min(a, b) for a, b in zip(self.min_fpos, frng.fp_beg)]
