@@ -27,6 +27,10 @@ List of major changes and improvements
 
 ### Changed
 
+- Workload models.
+
+  - Relax `__len__` of `Network` to work before setting input layer.
+
 - Software models:
 
   - Add loop index generator to `LoopBlockingScheme` class.

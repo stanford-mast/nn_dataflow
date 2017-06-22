@@ -231,7 +231,9 @@ class Network(object):
 
     def __len__(self):
         ''' Number of layers in the network. '''
-        assert self.INPUT_LAYER_KEY in self.layer_dict
+        if self.INPUT_LAYER_KEY not in self.layer_dict:
+            assert not self.layer_dict
+            return 0
         return len(self.layer_dict) - 1
 
     def __iter__(self):
