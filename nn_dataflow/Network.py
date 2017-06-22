@@ -137,6 +137,32 @@ class Network(object):
         '''
         return self.layer_dict[self.INPUT_LAYER_KEY]
 
+    def first_layers(self):
+        '''
+        Get a tuple of the first layers, i.e., those with only the input layer
+        as their previous layers.
+
+        If a layer has other layers and the input layer as its previous layers,
+        it does not count as a first layer.
+        '''
+        first_layers = []
+        for layer_name in self:
+            prevs, _ = self.prev_layers(layer_name)
+            if len(prevs) == 1 and None in prevs:
+                first_layers.append(layer_name)
+        return tuple(first_layers)
+
+    def last_layers(self):
+        '''
+        Get a tuple of the last layers, i.e., those with no next layer.
+        '''
+        last_layers = []
+        for layer_name in self:
+            nexts = self.next_layers(layer_name)
+            if len(nexts) == 1 and None in nexts:
+                last_layers.append(layer_name)
+        return tuple(last_layers)
+
     def _merge_symbol(self, layer_name):
         '''
         Get the symbol to merge the previous layers as the input to the given
