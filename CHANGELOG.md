@@ -56,6 +56,8 @@ List of major changes and improvements
 
 - `FmapRange` comparison: overlapping ranges cannot compare.
 
+- Multiple bugs fixed in `Util`.
+
 
 ## [v1.3 -- v1.4] -- 2017-05-18
 
