@@ -24,6 +24,10 @@ List of major changes and improvements
 
   - Add utilities to `LoopBlockingScheme` class.
 
+- Test.
+
+  - Add unit tests.
+
 
 ### Changed
 
