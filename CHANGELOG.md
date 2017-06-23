@@ -45,6 +45,8 @@ List of major changes and improvements
 
   - Loop blocking scheme result stats change from one node to all nodes.
 
+  - Move partition occupation into `LoopBlockingScheme` constructor.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.

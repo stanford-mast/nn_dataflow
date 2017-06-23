@@ -38,14 +38,6 @@ For our problem, only deal with nifm, nofm, and batch loops.
 
 _DEBUG = False
 
-def _make_loopblockingscheme(nested_loop_desc, tifm, tofm, tbat, orders,
-                             resource, part_occ, options):
-    lbs = LoopBlockingScheme(nested_loop_desc, tifm, tofm, tbat, orders,
-                             resource, options)
-    lbs.set_partition_occupation(part_occ)
-    return lbs
-
-
 def _skip_ti_to_tb_orders(tifm, tofm, tbat, orders):
     '''
     Skip the given loop blocking scheme if:
@@ -93,8 +85,8 @@ def _loopblocking_iter_ti_to(nested_loop_desc, tbat, orders, resource, cost,
                 Util.factorize(nested_loop_desc.loopcnt_ofm, 3)):
             if (not _DEBUG) and _skip_ti_to_tb_orders(ti, to, tbat, orders):
                 continue
-            lbs = _make_loopblockingscheme(nested_loop_desc, ti, to, tbat,
-                                           orders, resource, part_occ, options)
+            lbs = LoopBlockingScheme(nested_loop_desc, ti, to, tbat, orders,
+                                     resource, part_occ, options)
             if _DEBUG:
                 lbs.verify_fetch()
             yield lbs
@@ -112,9 +104,9 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
         gen = LoopBlockingSolver.gen_loopblocking_gbuf_regf
 
         for ti, to, tb, orders in gen(nested_loop_desc, resource, options):
-            yield _make_loopblockingscheme(nested_loop_desc, ti, to, tb,
-                                           orders, resource, part_occ,
-                                           options)
+            lbs = LoopBlockingScheme(nested_loop_desc, ti, to, tb, orders,
+                                     resource, part_occ, options)
+            yield lbs
         return
 
     ## Exhaustive search.

@@ -43,7 +43,7 @@ class LoopBlockingScheme(object):
         NUM = 2
 
     def __init__(self, nested_loop_desc, tifm, tofm, tbat, orders,
-                 resource, options):
+                 resource, part_occ, options):
         '''
         Given tiling factors `ti`, `to`, and `tb` for ifm, ofm and batching,
         and the loop `orders` of each tiling level, construct the loop blocking
@@ -72,6 +72,8 @@ class LoopBlockingScheme(object):
         entry is a 3-permutation of (0, 1, 2), which is indexed by LoopEnum and
         gives the position of the ifm, ofm, bat loops. Smaller number means
         inner loop.
+
+        `part_occ` is the partitioning occupation.
         '''
 
         # pylint: disable=invalid-name
@@ -160,7 +162,7 @@ class LoopBlockingScheme(object):
         self.num_nodes = resource.dim_nodes.size()
         # Occupation.
         # Occupation only affects op counts and REGF accesses.
-        self.part_occ = 1.  # set later.
+        self.part_occ = part_occ
 
         # Stats: lazy evaluation.
         self.finalized_stats = False
@@ -186,13 +188,6 @@ class LoopBlockingScheme(object):
             size *= 1 if self.stored_in_gbuf[dce] else 0
 
         return size
-
-    def set_partition_occupation(self, part_occ):
-        ''' Set and scale by the given partitioning occupation. '''
-        if not self.is_valid():
-            return
-        assert not self.finalized_stats
-        self.part_occ = part_occ
 
     def get_access(self):
         '''
