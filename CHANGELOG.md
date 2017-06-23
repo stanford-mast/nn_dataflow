@@ -58,6 +58,8 @@ List of major changes and improvements
 
 - Multiple bugs fixed in `Util`.
 
+- Multiple bugs fixed in `PartitionScheme`.
+
 
 ## [v1.3 -- v1.4] -- 2017-05-18
 

@@ -40,7 +40,7 @@ class PartitionScheme(StringifyClass, ContentHashClass):
         parallelism indexed by ParallelEnum.
         '''
 
-        if len(order) != pe.NUM or len(set(order)) != pe.NUM:
+        if len(order) != pe.NUM or set(order) != set(range(pe.NUM)):
             raise ValueError('PartitionScheme: order must be a permutation of '
                              '0 to {}.'.format(pe.NUM - 1))
         self.order = tuple(order)
@@ -48,7 +48,11 @@ class PartitionScheme(StringifyClass, ContentHashClass):
         if len(pdims) != pe.NUM:
             raise ValueError('PartitionScheme: pdims must have length {}.'
                              .format(pe.NUM))
-        self.pdims = tuple(PhyDim2(*dim) for dim in pdims)
+        try:
+            self.pdims = tuple(PhyDim2(*dim) for dim in pdims)
+        except TypeError:
+            raise ValueError('PartitionScheme: elements in pdims must have '
+                             'length 2.')
 
     def dim(self, *paes):
         '''
@@ -82,7 +86,7 @@ class PartitionScheme(StringifyClass, ContentHashClass):
             gens.append(g)
 
         for pidx in itertools.product(*gens):
-            yield [PhyDim2(*idx) for idx in pidx]
+            yield tuple(PhyDim2(*idx) for idx in pidx)
 
     def coordinate(self, pidx):
         '''
@@ -109,13 +113,16 @@ class PartitionScheme(StringifyClass, ContentHashClass):
             p_layer = ConvLayer(p_nifm, p_nofm, (p_hofm, p_wofm), layer.sfil,
                                 strd=(layer.htrd, layer.wtrd))
         elif isinstance(layer, LocalRegionLayer):
+            if self.pdims[pe.INPP].size() > 1:
+                raise ValueError('PartitionScheme: input partitioning is '
+                                 'invalid for LocalRegionLayer.')
             p_layer = LocalRegionLayer(p_nofm, (p_hofm, p_wofm),
                                        layer.nreg, (layer.hreg, layer.wreg),
                                        strd=(layer.htrd, layer.wtrd))
         else:
             raise TypeError('PartitionScheme: unrecognized layer type.')
 
-        p_batch_size = batch_size / self.pdims[pe.BATP].size()
+        p_batch_size = Util.idivc(batch_size, self.pdims[pe.BATP].size())
 
         p_occ = 1. * layer.total_ops(batch_size) \
                 / (p_layer.total_ops(p_batch_size) * self.size())
