@@ -39,13 +39,13 @@ List of major changes and improvements
 
   - Add loop index generator to `LoopBlockingScheme` class.
 
-  - Integrate verification into `LoopBlockingScheme` class.
-
   - PE array mapping for `LocalRegionLayer` reduces regfile size.
 
   - Loop blocking scheme result stats change from one node to all nodes.
 
   - Move partition occupation into `LoopBlockingScheme` constructor.
+
+  - Move `LoopBlockingScheme` verification to tests.
 
 - Software engineering.
 

@@ -36,9 +36,7 @@ Include loop blocking and reordering.
 For our problem, only deal with nifm, nofm, and batch loops.
 '''
 
-_DEBUG = False
-
-def _skip_ti_to_tb_orders(tifm, tofm, tbat, orders):
+def skip(tifm, tofm, tbat, orders):
     '''
     Skip the given loop blocking scheme if:
 
@@ -83,12 +81,10 @@ def _loopblocking_iter_ti_to(nested_loop_desc, tbat, orders, resource, cost,
         for ti, to in itertools.product(
                 Util.factorize(nested_loop_desc.loopcnt_ifm, 3),
                 Util.factorize(nested_loop_desc.loopcnt_ofm, 3)):
-            if (not _DEBUG) and _skip_ti_to_tb_orders(ti, to, tbat, orders):
+            if skip(ti, to, tbat, orders):
                 continue
             lbs = LoopBlockingScheme(nested_loop_desc, ti, to, tbat, orders,
                                      resource, part_occ, options)
-            if _DEBUG:
-                lbs.verify_fetch()
             yield lbs
 
     return heapq.nsmallest(options.ntops, _sweep(),
