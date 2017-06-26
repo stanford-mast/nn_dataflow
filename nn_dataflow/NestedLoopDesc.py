@@ -21,11 +21,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 from collections import namedtuple
 
 from . import DataCategoryEnum as de
+from . import LoopEnum as le
 from . import MemHierEnum as me
 
-NESTED_LOOP_DESC_LIST = ['loopcnt_ifm',
-                         'loopcnt_ofm',
-                         'loopcnt_bat',
+NESTED_LOOP_DESC_LIST = ['loopcnt',
                          'usize_gbuf',
                          'usize_regf',
                          'unit_access',
@@ -35,13 +34,19 @@ NESTED_LOOP_DESC_LIST = ['loopcnt_ifm',
 
 class NestedLoopDesc(namedtuple('NestedLoopDesc', NESTED_LOOP_DESC_LIST)):
     '''
-    Naive 3-nested loop (nifm, nofm, batch) description.
+    Naive nested loop description.
 
-    For our problem, only deal with nifm, nofm, and batch loops.
+    For our problem, only deal with the loops given by `LoopEnum`.
     '''
 
     def __new__(cls, *args, **kwargs):
         ntp = super(NestedLoopDesc, cls).__new__(cls, *args, **kwargs)
+
+        if not isinstance(ntp.loopcnt, tuple):
+            raise TypeError('NestedLoopDesc: loopcnt must be a tuple.')
+        if len(ntp.loopcnt) != le.NUM:
+            raise ValueError('NestedLoopDesc: loopcnt must have length {}.'
+                             .format(le.NUM))
 
         if not isinstance(ntp.usize_gbuf, tuple):
             raise TypeError('NestedLoopDesc: usize_gbuf must be a tuple.')

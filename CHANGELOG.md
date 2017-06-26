@@ -49,6 +49,8 @@ List of major changes and improvements
 
   - Improve the workload partitioning for loop blocking exhaustive search.
 
+  - Merge `loopcnt` attribute of `NestedLoopDesc` to a tuple.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.

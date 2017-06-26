@@ -96,11 +96,11 @@ class LoopBlockingScheme(object):
         assert len(self.to) == BL.NUM + 1, 'LoopBlocking: wrong length for to.'
         assert len(self.tb) == BL.NUM + 1, 'LoopBlocking: wrong length for tb.'
 
-        assert self.tip >= nested_loop_desc.loopcnt_ifm, \
+        assert self.tip >= nested_loop_desc.loopcnt[le.IFM], \
                 'LoopBlocking: invalid blocking for ifm: {}'.format(self.ti)
-        assert self.top >= nested_loop_desc.loopcnt_ofm, \
+        assert self.top >= nested_loop_desc.loopcnt[le.OFM], \
                 'LoopBlocking: invalid blocking for ofm: {}'.format(self.to)
-        assert self.tbp >= nested_loop_desc.loopcnt_bat, \
+        assert self.tbp >= nested_loop_desc.loopcnt[le.BAT], \
                 'LoopBlocking: invalid blocking for bat: {}'.format(self.tb)
 
         tps = [Util.prod(ts) for ts in self._bl_t(slice(None))]
@@ -268,7 +268,7 @@ class LoopBlockingScheme(object):
         '''
         Generate the indexes of ifmap, ofmap and batch sample, based on the
         loop blocking factors and the orders. Index will be 0 to total loop
-        count, e.g., 0 to `loopcnt_ifm`.
+        count, e.g., 0 to `loopcnt[le.IFM]`.
 
         Return the indexes in the order of LoopEnum.
         '''

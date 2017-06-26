@@ -22,6 +22,7 @@ import math
 import itertools
 
 from . import DataCategoryEnum as de
+from . import LoopEnum as le
 from . import Util
 
 '''
@@ -82,21 +83,21 @@ def _solve_lpbl_iofmap_gbuf_reside(nested_loop_desc, resource, reside_dce):
     dce_y = reside_dce
     if dce_y == de.OFM:
         dce_x = de.IFM
-        nfmaps_x = nested_loop_desc.loopcnt_ifm
-        nfmaps_y = nested_loop_desc.loopcnt_ofm
+        nfmaps_x = nested_loop_desc.loopcnt[le.IFM]
+        nfmaps_y = nested_loop_desc.loopcnt[le.OFM]
         facc_x = 1
         facc_y = 2
     elif dce_y == de.IFM:
         dce_x = de.OFM
-        nfmaps_x = nested_loop_desc.loopcnt_ofm
-        nfmaps_y = nested_loop_desc.loopcnt_ifm
+        nfmaps_x = nested_loop_desc.loopcnt[le.OFM]
+        nfmaps_y = nested_loop_desc.loopcnt[le.IFM]
         facc_x = 2
         facc_y = 1
     else:
         raise RuntimeError('LoopBlockingSolver: only allow ifmap or ofmap '
                            'to bypass.')
 
-    nbats = nested_loop_desc.loopcnt_bat
+    nbats = nested_loop_desc.loopcnt[le.BAT]
 
     usize_gbuf_x = nested_loop_desc.usize_gbuf_of(dce_x)
     usize_gbuf_y = nested_loop_desc.usize_gbuf_of(dce_y)
@@ -237,21 +238,21 @@ def _solve_lpbl_filter_gbuf_reside(nested_loop_desc, resource):
     for dce_y in [de.IFM, de.OFM]:
         if dce_y == de.OFM:
             dce_x = de.IFM
-            nfmaps_x = nested_loop_desc.loopcnt_ifm
-            nfmaps_y = nested_loop_desc.loopcnt_ofm
+            nfmaps_x = nested_loop_desc.loopcnt[le.IFM]
+            nfmaps_y = nested_loop_desc.loopcnt[le.OFM]
             facc_x = 1
             facc_y = 2
         elif dce_y == de.IFM:
             dce_x = de.OFM
-            nfmaps_x = nested_loop_desc.loopcnt_ofm
-            nfmaps_y = nested_loop_desc.loopcnt_ifm
+            nfmaps_x = nested_loop_desc.loopcnt[le.OFM]
+            nfmaps_y = nested_loop_desc.loopcnt[le.IFM]
             facc_x = 2
             facc_y = 1
         else:
             raise RuntimeError('LoopBlockingSolver: only allow ifmap or ofmap '
                                'to bypass.')
 
-        nbats = nested_loop_desc.loopcnt_bat
+        nbats = nested_loop_desc.loopcnt[le.BAT]
 
         usize_gbuf_x = nested_loop_desc.usize_gbuf_of(dce_x)
         usize_gbuf_y = nested_loop_desc.usize_gbuf_of(dce_y)

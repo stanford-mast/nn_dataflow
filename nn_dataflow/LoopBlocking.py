@@ -134,9 +134,9 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
         retrieve_func = retrieve_result_st()
 
     # Exhaustive generators.
-    gen_tifm = Util.factorize(nested_loop_desc.loopcnt_ifm, 3)
-    gen_tofm = Util.factorize(nested_loop_desc.loopcnt_ofm, 3)
-    gen_tbat = Util.factorize(nested_loop_desc.loopcnt_bat, 3)
+    gen_tifm = Util.factorize(nested_loop_desc.loopcnt[le.IFM], 3)
+    gen_tofm = Util.factorize(nested_loop_desc.loopcnt[le.OFM], 3)
+    gen_tbat = Util.factorize(nested_loop_desc.loopcnt[le.BAT], 3)
     gen_ords = itertools.product(
         [None], itertools.permutations(range(le.NUM)),
         [None], itertools.permutations(range(le.NUM)))

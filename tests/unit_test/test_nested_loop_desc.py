@@ -29,9 +29,7 @@ class TestNestedLoopDesc(unittest.TestCase):
 
     def test_valid_args(self):
         ''' Valid arguments. '''
-        nld = NestedLoopDesc(loopcnt_ifm=3,
-                             loopcnt_ofm=8,
-                             loopcnt_bat=4,
+        nld = NestedLoopDesc(loopcnt=(3, 8, 4),
                              usize_gbuf=(20, 30, 9),
                              usize_regf=(3, 3, 1),
                              unit_access=((19, 29, 9),
@@ -41,9 +39,7 @@ class TestNestedLoopDesc(unittest.TestCase):
                              unit_ops=7,
                              unit_time=7
                             )
-        self.assertEqual(nld.loopcnt_ifm, 3, 'loopcnt_ifm')
-        self.assertEqual(nld.loopcnt_ofm, 8, 'loopcnt_ofm')
-        self.assertEqual(nld.loopcnt_bat, 4, 'loopcnt_bat')
+        self.assertEqual(nld.loopcnt, (3, 8, 4), 'loopcnt')
         self.assertEqual(nld.usize_gbuf, (20, 30, 9), 'usize_gbuf')
         self.assertEqual(nld.usize_regf, (3, 3, 1), 'usize_regf')
         self.assertEqual(nld.unit_access, ((19, 29, 9),
@@ -53,13 +49,41 @@ class TestNestedLoopDesc(unittest.TestCase):
         self.assertEqual(nld.unit_ops, 7, 'unit_ops')
         self.assertEqual(nld.unit_time, 7, 'unit_time')
 
+    def test_invalid_loopcnt_type(self):
+        ''' Invalid loopcnt type. '''
+        with self.assertRaisesRegexp(TypeError,
+                                     'NestedLoopDesc: .*loopcnt.*'):
+            _ = NestedLoopDesc(loopcnt=[3, 8, 4],
+                               usize_gbuf=(20, 30, 9),
+                               usize_regf=(3, 3, 1),
+                               unit_access=((19, 29, 9),
+                                            (18, 28, 8),
+                                            (35, 45, 15),
+                                            (1, 1, 2)),
+                               unit_ops=7,
+                               unit_time=7
+                              )
+
+    def test_invalid_loopcnt_len(self):
+        ''' Invalid loopcnt len. '''
+        with self.assertRaisesRegexp(ValueError,
+                                     'NestedLoopDesc: .*loopcnt.*'):
+            _ = NestedLoopDesc(loopcnt=(3, 8),
+                               usize_gbuf=(20, 30, 9),
+                               usize_regf=(3, 3, 1),
+                               unit_access=((19, 29, 9),
+                                            (18, 28, 8),
+                                            (35, 45, 15),
+                                            (1, 1, 2)),
+                               unit_ops=7,
+                               unit_time=7
+                              )
+
     def test_invalid_usize_gbuf_type(self):
         ''' Invalid usize_gbuf type. '''
         with self.assertRaisesRegexp(TypeError,
                                      'NestedLoopDesc: .*usize_gbuf.*'):
-            _ = NestedLoopDesc(loopcnt_ifm=3,
-                               loopcnt_ofm=8,
-                               loopcnt_bat=4,
+            _ = NestedLoopDesc(loopcnt=(3, 8, 4),
                                usize_gbuf=[20, 30, 9],
                                usize_regf=(3, 3, 1),
                                unit_access=((19, 29, 9),
@@ -74,9 +98,7 @@ class TestNestedLoopDesc(unittest.TestCase):
         ''' Invalid usize_gbuf len. '''
         with self.assertRaisesRegexp(ValueError,
                                      'NestedLoopDesc: .*usize_gbuf.*'):
-            _ = NestedLoopDesc(loopcnt_ifm=3,
-                               loopcnt_ofm=8,
-                               loopcnt_bat=4,
+            _ = NestedLoopDesc(loopcnt=(3, 8, 4),
                                usize_gbuf=(20, 30),
                                usize_regf=(3, 3, 1),
                                unit_access=((19, 29, 9),
@@ -91,9 +113,7 @@ class TestNestedLoopDesc(unittest.TestCase):
         ''' Invalid usize_regf type. '''
         with self.assertRaisesRegexp(TypeError,
                                      'NestedLoopDesc: .*usize_regf.*'):
-            _ = NestedLoopDesc(loopcnt_ifm=3,
-                               loopcnt_ofm=8,
-                               loopcnt_bat=4,
+            _ = NestedLoopDesc(loopcnt=(3, 8, 4),
                                usize_gbuf=(20, 30, 9),
                                usize_regf=[3, 3, 1],
                                unit_access=((19, 29, 9),
@@ -108,9 +128,7 @@ class TestNestedLoopDesc(unittest.TestCase):
         ''' Invalid usize_regf len. '''
         with self.assertRaisesRegexp(ValueError,
                                      'NestedLoopDesc: .*usize_regf.*'):
-            _ = NestedLoopDesc(loopcnt_ifm=3,
-                               loopcnt_ofm=8,
-                               loopcnt_bat=4,
+            _ = NestedLoopDesc(loopcnt=(3, 8, 4),
                                usize_gbuf=(20, 30, 9),
                                usize_regf=(3, 3),
                                unit_access=((19, 29, 9),
@@ -125,9 +143,7 @@ class TestNestedLoopDesc(unittest.TestCase):
         ''' Invalid unit_access type. '''
         with self.assertRaisesRegexp(TypeError,
                                      'NestedLoopDesc: .*unit_access.*'):
-            _ = NestedLoopDesc(loopcnt_ifm=3,
-                               loopcnt_ofm=8,
-                               loopcnt_bat=4,
+            _ = NestedLoopDesc(loopcnt=(3, 8, 4),
                                usize_gbuf=(20, 30, 9),
                                usize_regf=(3, 3, 1),
                                unit_access=[(19, 29, 9),
@@ -139,9 +155,7 @@ class TestNestedLoopDesc(unittest.TestCase):
                               )
         with self.assertRaisesRegexp(TypeError,
                                      'NestedLoopDesc: .*unit_access.*'):
-            _ = NestedLoopDesc(loopcnt_ifm=3,
-                               loopcnt_ofm=8,
-                               loopcnt_bat=4,
+            _ = NestedLoopDesc(loopcnt=(3, 8, 4),
                                usize_gbuf=(20, 30, 9),
                                usize_regf=(3, 3, 1),
                                unit_access=((19, 29, 9),
@@ -156,9 +170,7 @@ class TestNestedLoopDesc(unittest.TestCase):
         ''' Invalid unit_access len. '''
         with self.assertRaisesRegexp(ValueError,
                                      'NestedLoopDesc: .*unit_access.*'):
-            _ = NestedLoopDesc(loopcnt_ifm=3,
-                               loopcnt_ofm=8,
-                               loopcnt_bat=4,
+            _ = NestedLoopDesc(loopcnt=(3, 8, 4),
                                usize_gbuf=(20, 30, 9),
                                usize_regf=(3, 3, 1),
                                unit_access=((19, 29, 9),
@@ -169,9 +181,7 @@ class TestNestedLoopDesc(unittest.TestCase):
                               )
         with self.assertRaisesRegexp(ValueError,
                                      'NestedLoopDesc: .*unit_access.*'):
-            _ = NestedLoopDesc(loopcnt_ifm=3,
-                               loopcnt_ofm=8,
-                               loopcnt_bat=4,
+            _ = NestedLoopDesc(loopcnt=(3, 8, 4),
                                usize_gbuf=(20, 30, 9),
                                usize_regf=(3, 3, 1),
                                unit_access=((19, 29, 9),
@@ -184,9 +194,7 @@ class TestNestedLoopDesc(unittest.TestCase):
 
     def test_usize_gbuf_of(self):
         ''' Accessor usize_gbuf. '''
-        nld = NestedLoopDesc(loopcnt_ifm=3,
-                             loopcnt_ofm=8,
-                             loopcnt_bat=4,
+        nld = NestedLoopDesc(loopcnt=(3, 8, 4),
                              usize_gbuf=(20, 30, 9),
                              usize_regf=(3, 3, 1),
                              unit_access=((19, 29, 9),
@@ -202,9 +210,7 @@ class TestNestedLoopDesc(unittest.TestCase):
 
     def test_usize_regf_of(self):
         ''' Accessor usize_regf. '''
-        nld = NestedLoopDesc(loopcnt_ifm=3,
-                             loopcnt_ofm=8,
-                             loopcnt_bat=4,
+        nld = NestedLoopDesc(loopcnt=(3, 8, 4),
                              usize_gbuf=(20, 30, 9),
                              usize_regf=(3, 3, 1),
                              unit_access=((19, 29, 9),
@@ -220,9 +226,7 @@ class TestNestedLoopDesc(unittest.TestCase):
 
     def test_unit_access_at_of(self):
         ''' Accessor unit_access. '''
-        nld = NestedLoopDesc(loopcnt_ifm=3,
-                             loopcnt_ofm=8,
-                             loopcnt_bat=4,
+        nld = NestedLoopDesc(loopcnt=(3, 8, 4),
                              usize_gbuf=(20, 30, 9),
                              usize_regf=(3, 3, 1),
                              unit_access=((19, 29, 9),
