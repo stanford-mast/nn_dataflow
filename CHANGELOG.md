@@ -47,6 +47,8 @@ List of major changes and improvements
 
   - Move `LoopBlockingScheme` verification to tests.
 
+  - Improve the workload partitioning for loop blocking exhaustive search.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.

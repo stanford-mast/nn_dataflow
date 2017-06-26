@@ -75,16 +75,19 @@ def skip(tifm, tofm, tbat, orders):
     return False
 
 
-def _loopblocking_iter_ti_to(nested_loop_desc, tbat, orders, resource, cost,
-                             part_occ, options):
+def _gen_loopblocking_perprocess(
+        nested_loop_desc, resource, cost, part_occ, options,
+        gen_tifm, gen_tofm, gen_tbat, gen_ords):
+
     def _sweep():
-        for ti, to in itertools.product(
-                Util.factorize(nested_loop_desc.loopcnt_ifm, 3),
-                Util.factorize(nested_loop_desc.loopcnt_ofm, 3)):
-            if skip(ti, to, tbat, orders):
+        ''' Sweep all. '''
+        for ti, to, tb, orders in itertools.product(gen_tifm, gen_tofm,
+                                                    gen_tbat, gen_ords):
+            if skip(ti, to, tb, orders):
                 continue
-            lbs = LoopBlockingScheme(nested_loop_desc, ti, to, tbat, orders,
-                                     resource, part_occ, options)
+            lbs = LoopBlockingScheme(
+                nested_loop_desc, ti, to, tb, orders, resource, part_occ,
+                options)
             yield lbs
 
     return heapq.nsmallest(options.ntops, _sweep(),
@@ -130,16 +133,26 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
         apply_func = apply
         retrieve_func = retrieve_result_st()
 
-    # Split the design space iteration for multiprocessing: make tb and orders
-    # inter-process, and ti and to intra-process.
-    for tb, orders in itertools.product(
-            Util.factorize(nested_loop_desc.loopcnt_bat, 3),
-            itertools.product(
-                [None], itertools.permutations(range(le.NUM)),
-                [None], itertools.permutations(range(le.NUM)))):
-        r = apply_func(_loopblocking_iter_ti_to,
-                       (nested_loop_desc, tb, orders, resource, cost, part_occ,
-                        options))
+    # Exhaustive generators.
+    gen_tifm = Util.factorize(nested_loop_desc.loopcnt_ifm, 3)
+    gen_tofm = Util.factorize(nested_loop_desc.loopcnt_ofm, 3)
+    gen_tbat = Util.factorize(nested_loop_desc.loopcnt_bat, 3)
+    gen_ords = itertools.product(
+        [None], itertools.permutations(range(le.NUM)),
+        [None], itertools.permutations(range(le.NUM)))
+
+    # Split the design space for multiprocessing.
+    # Let each process factorize tbat and orders, which constantly have many
+    # factors that can amortize the multiprocessing overhead.
+    # Note that we must materialize them into lists, since generators cannot be
+    # pickled. See
+    # http://peadrop.com/blog/2009/12/29/why-you-cannot-pickle-generators/
+    list_tbat = list(gen_tbat)
+    list_ords = list(gen_ords)
+    for tifm, tofm in itertools.product(gen_tifm, gen_tofm):
+        r = apply_func(_gen_loopblocking_perprocess,
+                       (nested_loop_desc, resource, cost, part_occ, options,
+                        [tifm], [tofm], list_tbat, list_ords))
         results.append(r)
 
     for lbs in heapq.nsmallest(options.ntops, retrieve_func,
