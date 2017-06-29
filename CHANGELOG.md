@@ -62,6 +62,8 @@ List of major changes and improvements
 
   - Use rich comparison instead of `__cmp__`.
 
+  - Convert `RuntimeError` exceptions to assertions.
+
 
 ### Fixed
 

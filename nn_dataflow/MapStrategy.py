@@ -544,11 +544,10 @@ class MapStrategyEyeriss(MapStrategy):
                                   Util.idivc(self.dim_flpeset.w * self.repl.w,
                                              f_w2h))
 
-        if not (self.dim_ppeset.h <= self.dim_array.h
-                and self.dim_ppeset.w <= self.dim_array.w):
-            raise RuntimeError('MapEyeriss: dim_ppeset with size {} does not '
-                               'fit in dim_array with size {}.'
-                               .format(self.dim_ppeset, self.dim_array))
+        assert (self.dim_ppeset.h <= self.dim_array.h
+                and self.dim_ppeset.w <= self.dim_array.w), \
+            'MapEyeriss: dim_ppeset {} does not fit in dim_array {}.' \
+            .format(self.dim_ppeset, self.dim_array)
 
     def _calc_unit_size_gbuf_conv(self, rows_per_flpeset, ifms_per_procpass,
                                   ofms_per_procpass, ppesets_per_procpass):

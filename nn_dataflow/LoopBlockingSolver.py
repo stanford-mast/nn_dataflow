@@ -87,15 +87,13 @@ def _solve_lpbl_iofmap_gbuf_reside(nested_loop_desc, resource, reside_dce):
         nfmaps_y = nested_loop_desc.loopcnt[le.OFM]
         facc_x = 1
         facc_y = 2
-    elif dce_y == de.IFM:
+    else:
+        assert dce_y == de.IFM
         dce_x = de.OFM
         nfmaps_x = nested_loop_desc.loopcnt[le.OFM]
         nfmaps_y = nested_loop_desc.loopcnt[le.IFM]
         facc_x = 2
         facc_y = 1
-    else:
-        raise RuntimeError('LoopBlockingSolver: only allow ifmap or ofmap '
-                           'to bypass.')
 
     nbats = nested_loop_desc.loopcnt[le.BAT]
 
@@ -241,15 +239,13 @@ def _solve_lpbl_filter_gbuf_reside(nested_loop_desc, resource):
             nfmaps_y = nested_loop_desc.loopcnt[le.OFM]
             facc_x = 1
             facc_y = 2
-        elif dce_y == de.IFM:
+        else:
+            assert dce_y == de.IFM
             dce_x = de.OFM
             nfmaps_x = nested_loop_desc.loopcnt[le.OFM]
             nfmaps_y = nested_loop_desc.loopcnt[le.IFM]
             facc_x = 2
             facc_y = 1
-        else:
-            raise RuntimeError('LoopBlockingSolver: only allow ifmap or ofmap '
-                               'to bypass.')
 
         nbats = nested_loop_desc.loopcnt[le.BAT]
 
