@@ -37,36 +37,69 @@ For our problem, only deal with nifm, nofm, and batch loops.
 
 def skip(bl_ts, bl_ords):
     '''
-    Skip the given loop blocking scheme if:
+    Skip the given loop blocking scheme if it has regularized equivalent, or it
+    is suboptimal.
 
-    - trivial loops with blocking factor 1 are not all at the top.
-    - the LP values of the outer two loops in each level are not in order,
-      since the order of the outer two loops does not matter.
-    - the innermost and outermost non-trivial loops of adjacent levels are the
-      same, which is equal to merge into one loop at the outer level.
+    Equivalence of loop blocking schemes:
+
+    - changing the position of a trivial loop (with blocking factor 1) makes no
+      difference to the access pattern.
+    - reorder non-innermost non-trivial loops has no effect on reuse, although
+      the access pattern changes.
+
+    Therefore a scheme is regularized if:
+
+    - all the trivial loops (with blocking factor 1) are at the outermost of
+      this level, and are in order, i.e., smaller LoopEnum at inner.
+    - the non-innermost non-trivial loops are in order, i.e., smaller LoopEnum
+      at inner.
+
+    A scheme is suboptimal if the closest innermost non-trivial loop of an
+    outer level (skipping the levels with all trivial loops) is the same type
+    (i.e., has the same LoopEnum value) as one of the non-innermost non-trivial
+    loops of this level. For the last (innermost) level, all non-trivial loops
+    should be considered, i.e., no innermost non-trivial loop.
+
+    This is because an equivalent scheme can reorder the non-innermost loops to
+    put the one loop adjacent to the outer-level innermost loop. Then this loop
+    can be merged to the outer level, which results in the same access pattern
+    but has smaller data size for this level.
     '''
 
     outer_level_innermost_nt_loop = None
 
-    for t_, ord_ in zip(bl_ts, bl_ords):
+    for t_, ord_ in itertools.izip_longest(bl_ts, bl_ords, fillvalue=None):
 
         # Non-trivial loops.
-        nt_loop_list = tuple(lpe for lpe in range(le.NUM) if t_[lpe] > 1)
-        nt_loop_num = len(nt_loop_list)
-        if not all(ord_[lpe] < nt_loop_num for lpe in nt_loop_list):
-            return True
+        nt_loops = [lpe for lpe in range(le.NUM) if t_[lpe] > 1]
 
-        # Outer two loops. Only allow the larger LoopEnum at the outermost.
-        if nt_loop_num == le.NUM and (ord_[le.BAT] == 1 or ord_[le.IFM] == 2):
-            return True
+        # Innermost non-trivial loops.
+        try:
+            innermost_nt_loop = min(nt_loops, key=lambda lpe, o=ord_: o[lpe])
+        except (ValueError, TypeError):
+            # All trivial loops, or order is None type (last level).
+            innermost_nt_loop = None
 
-        # Outermost loop should not equal to the innermost loop of the outer
-        # level.
-        if nt_loop_num > 1:
-            outermost_nt_loop = ord_.index(nt_loop_num - 1)
-            if outermost_nt_loop == outer_level_innermost_nt_loop:
+        # Scheme is suboptimal if the outer-level innermost non-trivial loop is
+        # a non-innermost non-trivial loops at this level.
+        if outer_level_innermost_nt_loop != innermost_nt_loop \
+                and outer_level_innermost_nt_loop in nt_loops:
+            return True
+        if innermost_nt_loop is not None:
+            outer_level_innermost_nt_loop = innermost_nt_loop
+
+        if ord_:
+            # Order the LoopEnum values, from innermost to outermost.
+            # The sort key is a three-tuple:
+            # - innermost non-trivial loop should be kept at the innermost.
+            # - non-trivial loops should be inside trivial loops.
+            # - within each part, order by LoopEnum value.
+            lp_ord = sorted(range(le.NUM),
+                            key=lambda lpe, inl=innermost_nt_loop, nls=nt_loops:
+                            (lpe != inl, lpe not in nls, lpe))
+
+            if any(lp_ord[ord_[lpe]] != lpe for lpe in range(le.NUM)):
                 return True
-            outer_level_innermost_nt_loop = ord_.index(0)
 
     return False
 
