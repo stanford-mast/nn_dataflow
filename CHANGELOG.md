@@ -51,6 +51,8 @@ List of major changes and improvements
 
   - Merge `loopcnt` attribute of `NestedLoopDesc` to a tuple.
 
+  - Change `LoopBlockingScheme` interface for blocking factors and loop orders.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.

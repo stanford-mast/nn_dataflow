@@ -24,7 +24,6 @@ from multiprocessing import Pool
 
 from . import LoopBlockingSolver
 from . import LoopEnum as le
-from . import MemHierEnum as me
 from . import Util
 from .LoopBlockingScheme import LoopBlockingScheme
 
@@ -36,7 +35,7 @@ Include loop blocking and reordering.
 For our problem, only deal with nifm, nofm, and batch loops.
 '''
 
-def skip(tifm, tofm, tbat, orders):
+def skip(bl_ts, bl_ords):
     '''
     Skip the given loop blocking scheme if:
 
@@ -49,13 +48,10 @@ def skip(tifm, tofm, tbat, orders):
 
     outer_level_innermost_nt_loop = None
 
-    for idx, mhe in enumerate([me.GBUF, me.REGF]):
-        ord_ = orders[mhe]
+    for t_, ord_ in zip(bl_ts, bl_ords):
 
         # Non-trivial loops.
-        nt_loop_list = tuple(lpe for lpe, t in [(le.IFM, tifm[idx]),
-                                                (le.OFM, tofm[idx]),
-                                                (le.BAT, tbat[idx])] if t > 1)
+        nt_loop_list = tuple(lpe for lpe in range(le.NUM) if t_[lpe] > 1)
         nt_loop_num = len(nt_loop_list)
         if not all(ord_[lpe] < nt_loop_num for lpe in nt_loop_list):
             return True
@@ -79,15 +75,27 @@ def _gen_loopblocking_perprocess(
         nested_loop_desc, resource, cost, part_occ, options,
         gen_tifm, gen_tofm, gen_tbat, gen_ords):
 
+    def _gen_bl_ts():
+        '''
+        Generator for blocking factors.
+
+        Transpose LoopEnum-major to BL-major.
+        '''
+        gen_lp_ts = [None] * le.NUM
+        gen_lp_ts[le.IFM] = gen_tifm
+        gen_lp_ts[le.OFM] = gen_tofm
+        gen_lp_ts[le.BAT] = gen_tbat
+        for lp_ts in itertools.product(*gen_lp_ts):
+            bl_ts = tuple(zip(*lp_ts))
+            yield bl_ts
+
     def _sweep():
         ''' Sweep all. '''
-        for ti, to, tb, orders in itertools.product(gen_tifm, gen_tofm,
-                                                    gen_tbat, gen_ords):
-            if skip(ti, to, tb, orders):
+        for bl_ts, bl_ords in itertools.product(_gen_bl_ts(), gen_ords):
+            if skip(bl_ts, bl_ords):
                 continue
             lbs = LoopBlockingScheme(
-                nested_loop_desc, ti, to, tb, orders, resource, part_occ,
-                options)
+                nested_loop_desc, bl_ts, bl_ords, resource, part_occ, options)
             yield lbs
 
     return heapq.nsmallest(options.ntops, _sweep(),
@@ -102,8 +110,8 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
     if options.sw_solve_loopblocking:
         gen = LoopBlockingSolver.gen_loopblocking_gbuf_regf
 
-        for ti, to, tb, orders in gen(nested_loop_desc, resource, options):
-            lbs = LoopBlockingScheme(nested_loop_desc, ti, to, tb, orders,
+        for bl_ts, bl_ords in gen(nested_loop_desc, resource, options):
+            lbs = LoopBlockingScheme(nested_loop_desc, bl_ts, bl_ords,
                                      resource, part_occ, options)
             yield lbs
         return
@@ -137,9 +145,8 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
     gen_tifm = Util.factorize(nested_loop_desc.loopcnt[le.IFM], 3)
     gen_tofm = Util.factorize(nested_loop_desc.loopcnt[le.OFM], 3)
     gen_tbat = Util.factorize(nested_loop_desc.loopcnt[le.BAT], 3)
-    gen_ords = itertools.product(
-        [None], itertools.permutations(range(le.NUM)),
-        [None], itertools.permutations(range(le.NUM)))
+    gen_ords = itertools.product(itertools.permutations(range(le.NUM)),
+                                 itertools.permutations(range(le.NUM)))
 
     # Split the design space for multiprocessing.
     # Let each process factorize tbat and orders, which constantly have many

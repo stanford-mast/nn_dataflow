@@ -42,12 +42,11 @@ class LoopBlockingScheme(object):
         REGF = 1
         NUM = 2
 
-    def __init__(self, nested_loop_desc, tifm, tofm, tbat, orders,
-                 resource, part_occ, options):
+    def __init__(self, nested_loop_desc, bl_ts, bl_ords, resource, part_occ,
+                 options):
         '''
-        Given tiling factors `ti`, `to`, and `tb` for ifm, ofm and batching,
-        and the loop `orders` of each tiling level, construct the loop blocking
-        scheme.
+        Given blocking factors `bl_ts` and the loop orders `bl_ords`, construct
+        the loop blocking scheme.
 
         Nested loop order is:
 
@@ -67,11 +66,14 @@ class LoopBlockingScheme(object):
             // Data ranges below in this loop body are buffered in REGF.
             for ti[2]/to[2]/tb[2]
 
-        `orders` indicates the order of ifm, ofm, bat loops at each level. Only
-        GBUF and REGF entries are valid. It is indexed by MemHierEnum, and each
-        entry is a 3-permutation of (0, 1, 2), which is indexed by LoopEnum and
-        gives the position of the ifm, ofm, bat loops. Smaller number means
-        inner loop.
+        `bl_ts` are the blocking factors of all levels, indexed by BL, but with
+        length of `BL.NUM + 1`, where the last entry corresponds to the
+        computation within one PE. Each entry is a tuple indexed by LoopEnum
+        and gives the loop blocking factors at this level.
+
+        `bl_ords` indicate the loop orders of all levels, indexed by BL. Each
+        entry is a permutation tuple indexed by LoopEnum and gives the
+        positions of the loops at this level. Smaller number means inner loop.
 
         `part_occ` is the partitioning occupation.
         '''
@@ -79,34 +81,28 @@ class LoopBlockingScheme(object):
         # pylint: disable=invalid-name
         BL = self.BL
 
-        self.ti = tuple(tifm)
-        self.to = tuple(tofm)
-        self.tb = tuple(tbat)
-
-        self.orders = [tuple() for _ in range(BL.NUM)]
-        self.orders[BL.GBUF] = tuple(orders[me.GBUF])
-        self.orders[BL.REGF] = tuple(orders[me.REGF])
-
-        self.tip = Util.prod(self.ti)
-        self.top = Util.prod(self.to)
-        self.tbp = Util.prod(self.tb)
-
         # Check lengths and values.
-        assert len(self.ti) == BL.NUM + 1, 'LoopBlocking: wrong length for ti.'
-        assert len(self.to) == BL.NUM + 1, 'LoopBlocking: wrong length for to.'
-        assert len(self.tb) == BL.NUM + 1, 'LoopBlocking: wrong length for tb.'
+        assert len(bl_ts) == BL.NUM + 1, \
+                'LoopBlockingScheme: bl_ts has invalid length.'
+        assert all(len(bl_t) == le.NUM for bl_t in bl_ts), \
+                'LoopBlockingScheme: bl_ts elements have invalid length.'
+        assert len(bl_ords) == BL.NUM, \
+                'LoopBlockingScheme: bl_ords has invalid length.'
+        assert all(sorted(bl_ord) == range(le.NUM) for bl_ord in bl_ords), \
+                'LoopBlockingScheme: bl_ords elements are invalid.'
 
-        assert self.tip >= nested_loop_desc.loopcnt[le.IFM], \
-                'LoopBlocking: invalid blocking for ifm: {}'.format(self.ti)
-        assert self.top >= nested_loop_desc.loopcnt[le.OFM], \
-                'LoopBlocking: invalid blocking for ofm: {}'.format(self.to)
-        assert self.tbp >= nested_loop_desc.loopcnt[le.BAT], \
-                'LoopBlocking: invalid blocking for bat: {}'.format(self.tb)
+        self.bl_ts = [tuple(bl_t) for bl_t in bl_ts]
+        self.bl_ords = [tuple(bl_ord) for bl_ord in bl_ords]
 
-        tps = [Util.prod(ts) for ts in self._bl_t(slice(None))]
-        self.total_units = self._t_data_cnt(tps)
+        # Check blocking.
+        bl_tp = self._bl_tp(slice(None))
+        for lpe in range(le.NUM):
+            assert bl_tp[lpe] >= nested_loop_desc.loopcnt[lpe], \
+                    'LoopBlockingScheme: invalid blocking LP {}: {} for {}.' \
+                    .format(lpe, self.bl_ts, nested_loop_desc.loopcnt)
 
-        self.lcnt = self.tip * self.top * self.tbp
+        self.lcnt = Util.prod(bl_tp)
+        self.total_units = self._t_data_cnt(bl_tp)
 
         # Buffer data size for one unit.
         self.unit_size = [tuple() for _ in range(BL.NUM)]
@@ -250,6 +246,8 @@ class LoopBlockingScheme(object):
         size = [[self.data_size(bl, dce) for dce in range(de.NUM)]
                 for bl in range(self.BL.NUM)]
 
+        lp_ts = zip(*self.bl_ts)
+
         return OrderedDict([('cost', self.get_cost(cost)),
                             ('ops', self.ops),
                             ('time', self.time),
@@ -259,10 +257,11 @@ class LoopBlockingScheme(object):
                             ('unit_size', self.unit_size),
                             ('unit_cnt', self.unit_cnt),
                             ('part_occ', self.part_occ),
-                            ('ti', tuple(self.ti)),
-                            ('to', tuple(self.to)),
-                            ('tb', tuple(self.tb)),
-                            ('orders', self.orders)])
+                            ('ti', tuple(lp_ts[le.IFM])),
+                            ('to', tuple(lp_ts[le.OFM])),
+                            ('tb', tuple(lp_ts[le.BAT])),
+                            ('orders', self.bl_ords),
+                           ])
 
     def gen_index(self):
         '''
@@ -283,21 +282,21 @@ class LoopBlockingScheme(object):
         bl_regf = self.BL.REGF
 
         # Between DRAM and GBUF.
-        t_x = self._bl_t(bl_gbuf)
-        order_x = self.orders[bl_gbuf]
-        cnt_x = [Util.prod(ts) for ts in self._bl_t(slice(bl_gbuf + 1, None))]
+        t_x = self.bl_ts[bl_gbuf]
+        order_x = self.bl_ords[bl_gbuf]
+        cnt_x = self._bl_tp(slice(bl_gbuf + 1, None))
         bl_idxgen_list.append(self._gen_index_single_level(t_x, order_x))
         bl_cnt_list.append(cnt_x)
 
         # Between GBUF and REGF.
-        t_x = self._bl_t(bl_regf)
-        order_x = self.orders[bl_regf]
-        cnt_x = [Util.prod(ts) for ts in self._bl_t(slice(bl_regf + 1, None))]
+        t_x = self.bl_ts[bl_regf]
+        order_x = self.bl_ords[bl_regf]
+        cnt_x = self._bl_tp(slice(bl_regf + 1, None))
         bl_idxgen_list.append(self._gen_index_single_level(t_x, order_x))
         bl_cnt_list.append(cnt_x)
 
         # Between REGF and ALU.
-        t_x = self._bl_t(2)
+        t_x = self.bl_ts[2]
         order_x = (0, 1, 2)
         cnt_x = (1,) * le.NUM
         bl_idxgen_list.append(self._gen_index_single_level(t_x, order_x))
@@ -337,9 +336,7 @@ class LoopBlockingScheme(object):
 
         for bl in range(self.BL.NUM):
             # BL corresponds to the BL + 1 element in ti/to/tb.
-            blp1 = bl + 1
-            bl_tps = [Util.prod(ts) for ts in self._bl_t(slice(blp1, None))]
-            uc = self._t_data_cnt(bl_tps)
+            uc = self._t_data_cnt(self._bl_tp(slice(bl + 1, None)))
             self.unit_cnt.append(uc)
 
     def _set_fetch(self):
@@ -387,10 +384,10 @@ class LoopBlockingScheme(object):
             # The innermost non-trivial loop.
             # If all loops are trivial, we will use the outer level reuse for
             # all data, so the loop is not used.
-            innermost_nt_lp = self._innermost_nontrivial_loop(self._bl_t(bl),
-                                                              self.orders[bl])
+            innermost_nt_lp = self._innermost_nontrivial_loop(self.bl_ts[bl],
+                                                              self.bl_ords[bl])
 
-            cnt = self._t_data_cnt(self._bl_t(bl))
+            cnt = self._t_data_cnt(self.bl_ts[bl])
 
             fe = [0] * de.NUM
 
@@ -400,7 +397,7 @@ class LoopBlockingScheme(object):
                     fe[dce] = self.fetch[bl-1][dce] if bl > 0 else 1
                 else:
                     bl_start = bl + (innermost_nt_lp != lpe)
-                    f = Util.prod(self._bl_t(slice(bl_start))[lpe])
+                    f = self._bl_tp(slice(bl_start))[lpe]
                     fe[dce] = 2 * f - 1 if dce == de.OFM else f
 
             self.fetch.append(fe)
@@ -436,20 +433,20 @@ class LoopBlockingScheme(object):
 
         self.finalized_stats = True
 
-    def _bl_t(self, blvl):
+    def _bl_tp(self, bl_lvls):
         '''
-        Get the loop blocking factors of level `blvl`.
+        Get the products of the loop blocking factors for the given levels
+        `bl_lvls`.
         '''
-        bl_t = [0] * le.NUM
-        bl_t[le.IFM] = self.ti[blvl]
-        bl_t[le.OFM] = self.to[blvl]
-        bl_t[le.BAT] = self.tb[blvl]
-        return bl_t
+        assert isinstance(bl_lvls, slice)
+        return [Util.prod(ts[bl_lvls]) for ts in zip(*self.bl_ts)]
 
     @staticmethod
     def _t_data_cnt(bl_t):
         '''
         Get the corresponding data unit counts given the loop blocking factors.
+
+        `bl_t` are the loop blocking factors, indexed by LoopEnum.
         '''
         cnt = [0] * de.NUM
         cnt[de.FIL] = bl_t[le.IFM] * bl_t[le.OFM]

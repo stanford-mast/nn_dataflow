@@ -193,16 +193,15 @@ def _solve_lpbl_iofmap_gbuf_reside(nested_loop_desc, resource, reside_dce):
 
     # Compose return values.
     # For orders see docstring: at gbuf, b, y, x; at regf, b, x, y.
-    if dce_x == de.IFM:
-        ti = tx
-        to = ty
-        orders = (None, (0, 1, 2), None, (1, 0, 2))
-    elif dce_x == de.OFM:
-        ti = ty
-        to = tx
-        orders = (None, (1, 0, 2), None, (0, 1, 2))
+    lp_ts = [None] * le.NUM
+    lp_ts[le.BAT] = tb
+    lp_ts[le.IFM] = tx if dce_x == de.IFM else ty
+    lp_ts[le.OFM] = tx if dce_x == de.OFM else ty
+    bl_ts = tuple(zip(*lp_ts))
+    bl_ords = ((0, 1, 2), (1, 0, 2)) if dce_x == de.IFM \
+            else ((1, 0, 2), (0, 1, 2))
 
-    return ti, to, tb, orders
+    return bl_ts, bl_ords
 
 
 def _solve_lpbl_filter_gbuf_reside(nested_loop_desc, resource):
@@ -303,16 +302,15 @@ def _solve_lpbl_filter_gbuf_reside(nested_loop_desc, resource):
 
             # Compose return values.
             # For orders see docstring: at gbuf, b, y, x; at regf, b, y, x.
-            if dce_x == de.IFM:
-                ti = tx
-                to = ty
-                orders = (None, (0, 1, 2), None, (0, 1, 2))
-            elif dce_x == de.OFM:
-                ti = ty
-                to = tx
-                orders = (None, (1, 0, 2), None, (1, 0, 2))
+            lp_ts = [None] * le.NUM
+            lp_ts[le.BAT] = tb
+            lp_ts[le.IFM] = tx if dce_x == de.IFM else ty
+            lp_ts[le.OFM] = tx if dce_x == de.OFM else ty
+            bl_ts = tuple(zip(*lp_ts))
+            bl_ords = ((0, 1, 2), (0, 1, 2)) if dce_x == de.IFM \
+                    else ((1, 0, 2), (1, 0, 2))
 
-    return ti, to, tb, orders
+    return bl_ts, bl_ords
 
 
 def gen_loopblocking_gbuf_regf(nested_loop_desc, resource, options):
@@ -330,11 +328,9 @@ def gen_loopblocking_gbuf_regf(nested_loop_desc, resource, options):
 
     for reside_dce in reside_dce_list:
         if reside_dce == de.FIL:
-            ti, to, tb, orders = _solve_lpbl_filter_gbuf_reside(
-                nested_loop_desc, resource)
+            yield _solve_lpbl_filter_gbuf_reside(nested_loop_desc, resource)
         else:
             assert reside_dce == de.IFM or reside_dce == de.OFM
-            ti, to, tb, orders = _solve_lpbl_iofmap_gbuf_reside(
-                nested_loop_desc, resource, reside_dce)
-        yield ti, to, tb, orders
+            yield _solve_lpbl_iofmap_gbuf_reside(nested_loop_desc, resource,
+                                                 reside_dce)
 
