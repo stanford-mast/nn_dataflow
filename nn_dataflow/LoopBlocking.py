@@ -141,7 +141,7 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
     '''
 
     if options.sw_solve_loopblocking:
-        gen = LoopBlockingSolver.gen_loopblocking_gbuf_regf
+        gen = LoopBlockingSolver.gen_loopblocking_gbuf_reside
 
         for bl_ts, bl_ords in gen(nested_loop_desc, resource, options):
             lbs = LoopBlockingScheme(nested_loop_desc, bl_ts, bl_ords,

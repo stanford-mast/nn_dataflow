@@ -56,6 +56,8 @@ List of major changes and improvements
   - Loop blocking exhaustive search introduces regularized schemes and
     suboptimal schemes, to enable more skips.
 
+  - Refactor loop blocking bypass solvers.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.
