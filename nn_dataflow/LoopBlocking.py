@@ -24,7 +24,6 @@ from multiprocessing import Pool
 
 from . import LoopBlockingSolver
 from . import LoopEnum as le
-from . import MemHierEnum as me
 from . import Util
 from .BufShrScheme import BufShrScheme
 from .LoopBlockingScheme import LoopBlockingScheme
@@ -37,68 +36,101 @@ Include loop blocking and reordering.
 For our problem, only deal with nifm, nofm, and batch loops.
 '''
 
-_DEBUG = False
-
-def _make_loopblockingscheme(nested_loop_desc, tifm, tofm, tbat, orders,
-                             resource, bufshr, part_occ, options):
-    lbs = LoopBlockingScheme(nested_loop_desc, tifm, tofm, tbat, orders,
-                             resource, bufshr, options)
-    lbs.set_partition_occupation(part_occ)
-    return lbs
-
-
-def _skip_ti_to_tb_orders(tifm, tofm, tbat, orders):
+def skip(bl_ts, bl_ords):
     '''
-    Skip the given loop blocking scheme if:
+    Skip the given loop blocking scheme if it has regularized equivalent, or it
+    is suboptimal.
 
-    - trivial loops with blocking factor 1 are not all at the top.
-    - the LP values of the outer two loops in each level are not in order,
-      since the order of the outer two loops does not matter.
-    - the innermost and outermost non-trivial loops of adjacent levels are the
-      same, which is equal to merge into one loop at the outer level.
+    Equivalence of loop blocking schemes:
+
+    - changing the position of a trivial loop (with blocking factor 1) makes no
+      difference to the access pattern.
+    - reorder non-innermost non-trivial loops has no effect on reuse, although
+      the access pattern changes.
+
+    Therefore a scheme is regularized if:
+
+    - all the trivial loops (with blocking factor 1) are at the outermost of
+      this level, and are in order, i.e., smaller LoopEnum at inner.
+    - the non-innermost non-trivial loops are in order, i.e., smaller LoopEnum
+      at inner.
+
+    A scheme is suboptimal if the closest innermost non-trivial loop of an
+    outer level (skipping the levels with all trivial loops) is the same type
+    (i.e., has the same LoopEnum value) as one of the non-innermost non-trivial
+    loops of this level. For the last (innermost) level, all non-trivial loops
+    should be considered, i.e., no innermost non-trivial loop.
+
+    This is because an equivalent scheme can reorder the non-innermost loops to
+    put the one loop adjacent to the outer-level innermost loop. Then this loop
+    can be merged to the outer level, which results in the same access pattern
+    but has smaller data size for this level.
     '''
 
     outer_level_innermost_nt_loop = None
 
-    for idx, mhe in enumerate([me.GBUF, me.REGF]):
-        ord_ = orders[mhe]
+    for t_, ord_ in itertools.izip_longest(bl_ts, bl_ords, fillvalue=None):
 
         # Non-trivial loops.
-        nt_loop_list = tuple(lpe for lpe, t in [(le.IFM, tifm[idx]),
-                                                (le.OFM, tofm[idx]),
-                                                (le.BAT, tbat[idx])] if t > 1)
-        nt_loop_num = len(nt_loop_list)
-        if not all(ord_[lpe] < nt_loop_num for lpe in nt_loop_list):
-            return True
+        nt_loops = [lpe for lpe in range(le.NUM) if t_[lpe] > 1]
 
-        # Outer two loops. Only allow the larger LoopEnum at the outermost.
-        if nt_loop_num == le.NUM and (ord_[le.BAT] == 1 or ord_[le.IFM] == 2):
-            return True
+        # Innermost non-trivial loops.
+        try:
+            innermost_nt_loop = min(nt_loops, key=lambda lpe, o=ord_: o[lpe])
+        except (ValueError, TypeError):
+            # All trivial loops, or order is None type (last level).
+            innermost_nt_loop = None
 
-        # Outermost loop should not equal to the innermost loop of the outer
-        # level.
-        if nt_loop_num > 1:
-            outermost_nt_loop = ord_.index(nt_loop_num - 1)
-            if outermost_nt_loop == outer_level_innermost_nt_loop:
+        # Scheme is suboptimal if the outer-level innermost non-trivial loop is
+        # a non-innermost non-trivial loops at this level.
+        if outer_level_innermost_nt_loop != innermost_nt_loop \
+                and outer_level_innermost_nt_loop in nt_loops:
+            return True
+        if innermost_nt_loop is not None:
+            outer_level_innermost_nt_loop = innermost_nt_loop
+
+        if ord_:
+            # Order the LoopEnum values, from innermost to outermost.
+            # The sort key is a three-tuple:
+            # - innermost non-trivial loop should be kept at the innermost.
+            # - non-trivial loops should be inside trivial loops.
+            # - within each part, order by LoopEnum value.
+            lp_ord = sorted(range(le.NUM),
+                            key=lambda lpe, inl=innermost_nt_loop, nls=nt_loops:
+                            (lpe != inl, lpe not in nls, lpe))
+
+            if any(lp_ord[ord_[lpe]] != lpe for lpe in range(le.NUM)):
                 return True
-            outer_level_innermost_nt_loop = ord_.index(0)
 
     return False
 
 
-def _loopblocking_iter_ti_to(nested_loop_desc, tbat, orders, resource, bufshr,
-                             cost, part_occ, options):
+def _gen_loopblocking_perprocess(
+        nested_loop_desc, resource, bufshr, cost, part_occ, options,
+        gen_tifm, gen_tofm, gen_tbat, gen_ords):
+
+    def _gen_bl_ts():
+        '''
+        Generator for blocking factors.
+
+        Transpose LoopEnum-major to BL-major.
+        '''
+        gen_lp_ts = [None] * le.NUM
+        gen_lp_ts[le.IFM] = gen_tifm
+        gen_lp_ts[le.OFM] = gen_tofm
+        gen_lp_ts[le.BAT] = gen_tbat
+        for lp_ts in itertools.product(*gen_lp_ts):
+            bl_ts = tuple(zip(*lp_ts))
+            yield bl_ts
+
     def _sweep():
-        for ti, to in itertools.product(
-                Util.factorize(nested_loop_desc.loopcnt_ifm, 3),
-                Util.factorize(nested_loop_desc.loopcnt_ofm, 3)):
-            if (not _DEBUG) and _skip_ti_to_tb_orders(ti, to, tbat, orders):
+        ''' Sweep all. '''
+        for bl_ts, bl_ords in itertools.product(_gen_bl_ts(), gen_ords):
+            if skip(bl_ts, bl_ords):
                 continue
-            lbs = _make_loopblockingscheme(nested_loop_desc, ti, to, tbat,
-                                           orders, resource, bufshr, part_occ,
-                                           options)
-            if _DEBUG:
-                lbs.verify_fetch()
+            lbs = LoopBlockingScheme(
+                nested_loop_desc, bl_ts, bl_ords, resource, bufshr, part_occ,
+                options)
             yield lbs
 
     return heapq.nsmallest(options.ntops, _sweep(),
@@ -114,12 +146,12 @@ def gen_loopblocking(nested_loop_desc, resource, part, cost, part_occ, options):
     bufshr = BufShrScheme(part)
 
     if options.sw_solve_loopblocking:
-        gen = LoopBlockingSolver.gen_loopblocking_gbuf_regf
+        gen = LoopBlockingSolver.gen_loopblocking_gbuf_reside
 
-        for ti, to, tb, orders in gen(nested_loop_desc, resource, options):
-            yield _make_loopblockingscheme(nested_loop_desc, ti, to, tb,
-                                           orders, resource, bufshr, part_occ,
-                                           options)
+        for bl_ts, bl_ords in gen(nested_loop_desc, resource, options):
+            lbs = LoopBlockingScheme(nested_loop_desc, bl_ts, bl_ords,
+                                     resource, bufshr, part_occ, options)
+            yield lbs
         return
 
     ## Exhaustive search.
@@ -147,16 +179,25 @@ def gen_loopblocking(nested_loop_desc, resource, part, cost, part_occ, options):
         apply_func = apply
         retrieve_func = retrieve_result_st()
 
-    # Split the design space iteration for multiprocessing: make tb and orders
-    # inter-process, and ti and to intra-process.
-    for tb, orders in itertools.product(
-            Util.factorize(nested_loop_desc.loopcnt_bat, 3),
-            itertools.product(
-                [None], itertools.permutations(range(le.NUM)),
-                [None], itertools.permutations(range(le.NUM)))):
-        r = apply_func(_loopblocking_iter_ti_to,
-                       (nested_loop_desc, tb, orders, resource, bufshr, cost,
-                        part_occ, options))
+    # Exhaustive generators.
+    gen_tifm = Util.factorize(nested_loop_desc.loopcnt[le.IFM], 3)
+    gen_tofm = Util.factorize(nested_loop_desc.loopcnt[le.OFM], 3)
+    gen_tbat = Util.factorize(nested_loop_desc.loopcnt[le.BAT], 3)
+    gen_ords = itertools.product(itertools.permutations(range(le.NUM)),
+                                 itertools.permutations(range(le.NUM)))
+
+    # Split the design space for multiprocessing.
+    # Let each process factorize tbat and orders, which constantly have many
+    # factors that can amortize the multiprocessing overhead.
+    # Note that we must materialize them into lists, since generators cannot be
+    # pickled. See
+    # http://peadrop.com/blog/2009/12/29/why-you-cannot-pickle-generators/
+    list_tbat = list(gen_tbat)
+    list_ords = list(gen_ords)
+    for tifm, tofm in itertools.product(gen_tifm, gen_tofm):
+        r = apply_func(_gen_loopblocking_perprocess,
+                       (nested_loop_desc, resource, bufshr, cost, part_occ,
+                        options, [tifm], [tofm], list_tbat, list_ords))
         results.append(r)
 
     for lbs in heapq.nsmallest(options.ntops, retrieve_func,

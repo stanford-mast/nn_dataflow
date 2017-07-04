@@ -53,8 +53,8 @@ def stats_dict(sched_res_dict, network, batch_size, resource, cost):
 
     total_noc_cost = 0
 
-    total_ops_per_node = 0
-    total_accesses_per_node = np.zeros((me.NUM,))
+    total_ops = 0
+    total_accesses = np.zeros((me.NUM,))
 
     max_dram_bw_per_node = 0
     max_dram_bw_layer = None
@@ -70,24 +70,23 @@ def stats_dict(sched_res_dict, network, batch_size, resource, cost):
 
         total_noc_cost += sched.dict_part['cost']
 
-        total_ops_per_node += sched.dict_loop['ops']
-        total_accesses_per_node += aggr_accesses_per_node
+        total_ops += sched.dict_loop['ops']
+        total_accesses += aggr_accesses_per_node
 
         dram_bw_per_node = aggr_accesses_per_node[me.DRAM] / time
         if dram_bw_per_node > max_dram_bw_per_node:
             max_dram_bw_per_node = dram_bw_per_node
             max_dram_bw_layer = name
 
-    total_op_cost = total_ops_per_node * cost.mac_op * num_nodes
-    total_access_cost = np.sum(total_accesses_per_node * cost.mem_hier
-                               * num_nodes)
+    total_op_cost = total_ops * cost.mac_op
+    total_access_cost = sum(total_accesses * cost.mem_hier)
     total_static_cost = total_time * cost.unit_static * num_nodes
 
     sum_cost = total_op_cost + total_access_cost + total_noc_cost \
             + total_static_cost
     assert abs(sum_cost / total_cost - 1) < 0.001
 
-    avg_active_pes = total_ops_per_node / total_time
+    avg_active_pes = total_ops / num_nodes / total_time
 
     stats = OrderedDict()
 
@@ -100,8 +99,7 @@ def stats_dict(sched_res_dict, network, batch_size, resource, cost):
     stats['total_static_cost'] = total_static_cost
 
     stats['avg_active_pes'] = avg_active_pes
-    stats['total_ops_per_node'] = total_ops_per_node
-    stats['total_accesses_per_node'] = tuple(total_accesses_per_node)
+    stats['total_accesses'] = tuple(total_accesses)
     stats['max_dram_bw_per_node'] = max_dram_bw_per_node
     stats['max_dram_bw_layer'] = max_dram_bw_layer
 

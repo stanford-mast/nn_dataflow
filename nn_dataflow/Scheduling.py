@@ -23,6 +23,7 @@ from collections import OrderedDict, namedtuple
 
 from . import LoopBlocking
 from . import Partition
+from . import Util
 from .Cost import Cost
 from .DataLayout import DataLayout
 from .Layer import Layer
@@ -141,8 +142,7 @@ class Scheduling(object):
                     part, condition.resource, options):
 
                 # Make scheduling result.
-                r = self._get_result(lbs, part, unit_nhops, ofmap_layout,
-                                     condition, options)
+                r = self._get_result(lbs, part, unit_nhops, ofmap_layout)
                 tops.append(r)
 
         # Pick the top n.
@@ -152,9 +152,8 @@ class Scheduling(object):
         # Initial occupation also applies to layer.
         total_layer_ops = self.layer.total_ops(self.batch_size)
         for t in tops:
-            sum_part_layer_ops = t.dict_loop['ops'] \
-                    * condition.resource.dim_nodes.size()
-            assert abs(float(total_layer_ops) / sum_part_layer_ops - 1) < 1e-4
+            actual_layer_ops = t.dict_loop['ops']
+            assert Util.isclose(total_layer_ops, actual_layer_ops, rel_tol=1e-4)
 
         # Check ofmap layout matches the layer.
         for t in tops:
@@ -221,28 +220,22 @@ class Scheduling(object):
 
         return top_lbs_list
 
-    def _get_result(self, lbs, part, unit_nhops, ofmap_layout, condition,
-                    options):
+    def _get_result(self, lbs, part, unit_nhops, ofmap_layout):
         '''
         Make the schedule result from loop blocking and partitioning.
         '''
-        del options  # unused
 
         # Loop blocking.
+        dict_loop = lbs.get_scheme_dict(self.cost)
         # Substrate NoC cost.
         node_nhops = lbs.get_noc_access()
-        cost_loop = lbs.get_cost(self.cost) \
-                - self.cost.noc_hop * sum(node_nhops)
-        dict_loop = OrderedDict([('cost', cost_loop)])
-        dict_loop.update(lbs.get_scheme_dict())
+        dict_loop['cost'] -= self.cost.noc_hop * sum(node_nhops)
+        cost_loop = dict_loop['cost']
 
         # Partitioning.
         # Memory access hops.
         mem_nhops = [unh * f for unh, f
                      in zip(unit_nhops, lbs.get_top_level_fetch())]
-        # Inter-node access hops.
-        node_nhops = [nnh * condition.resource.dim_nodes.size()
-                      for nnh in node_nhops]
         # Total hops = memory hops + inter-node hops.
         total_nhops = [nnh + mnh for nnh, mnh in zip(node_nhops, mem_nhops)]
         cost_part = self.cost.noc_hop * sum(total_nhops)
@@ -254,7 +247,7 @@ class Scheduling(object):
                                  ('unit_nhops', unit_nhops)])
 
         # Result.
-        total_cost = cost_loop * condition.resource.dim_nodes.size() + cost_part
+        total_cost = cost_loop + cost_part
 
         return SchedulingResult(total_cost=total_cost,
                                 dict_loop=dict_loop,

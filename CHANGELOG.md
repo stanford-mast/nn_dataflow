@@ -12,33 +12,80 @@ List of major changes and improvements
   - Buffer sharing scheme.
 
 
-## [v1.4 -- v1.5] -- 2017-06-02
+## [v1.4 -- v1.5] -- 2017-06-30
 
 ### Added
 
+- Workload models.
+
+  - `Network` method to return next layers.
+
+  - `Network` uses `None` in previous/next layers for the input/output layers.
+
+  - `Network` methods to return the first/last layers.
+
+  - Add batch size argument to layer fmap size methods.
+
+  - Add default filter size to `FCLayer`.
+
 - Software engineering.
 
-  - Add utilities to LoopBlockingScheme class.
+  - Add utilities to `LoopBlockingScheme` class.
+
+- Test.
+
+  - Add unit tests.
 
 
 ### Changed
 
+- Workload models.
+
+  - Relax `__len__` of `Network` to work before setting input layer.
+
 - Software models:
 
-  - Add loop index generator to LoopBlockingScheme class.
+  - Add loop index generator to `LoopBlockingScheme` class.
 
-  - Integrate verification into LoopBlockingScheme class.
+  - PE array mapping for `LocalRegionLayer` reduces regfile size.
+
+  - Loop blocking scheme result stats change from one node to all nodes.
+
+  - Move partition occupation into `LoopBlockingScheme` constructor.
+
+  - Move `LoopBlockingScheme` verification to tests.
+
+  - Improve the workload partitioning for loop blocking exhaustive search.
+
+  - Merge `loopcnt` attribute of `NestedLoopDesc` to a tuple.
+
+  - Change `LoopBlockingScheme` interface for blocking factors and loop orders.
+
+  - Loop blocking exhaustive search introduces regularized schemes and
+    suboptimal schemes, to enable more skips.
+
+  - Refactor loop blocking bypass solvers.
 
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.
 
-  - Use rich comparison instead of __cmp__.
+  - Use rich comparison instead of `__cmp__`.
+
+  - Convert `RuntimeError` exceptions to assertions.
 
 
 ### Fixed
 
 - Output data fetch count.
+
+- Error types and message typos.
+
+- `FmapRange` comparison: overlapping ranges cannot compare.
+
+- Multiple bugs fixed in `Util`.
+
+- Multiple bugs fixed in `PartitionScheme`.
 
 
 ## [v1.3 -- v1.4] -- 2017-05-18
