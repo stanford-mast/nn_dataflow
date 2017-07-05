@@ -29,6 +29,8 @@ class TestOption(unittest.TestCase):
         ''' Valid arguments. '''
         options = Option(sw_gbuf_bypass=(False, False, False),
                          sw_solve_loopblocking=False,
+                         hw_access_forwarding=False,
+                         hw_gbuf_sharing=False,
                          partition_hybrid=True,
                          partition_batch=False,
                          partition_ifmaps=False,
@@ -40,6 +42,10 @@ class TestOption(unittest.TestCase):
                          'sw_gbuf_bypass')
         self.assertEqual(options.sw_solve_loopblocking, False,
                          'sw_solve_loopblocking')
+        self.assertEqual(options.hw_access_forwarding, False,
+                         'hw_access_forwarding')
+        self.assertEqual(options.hw_gbuf_sharing, False,
+                         'hw_gbuf_sharing')
         self.assertEqual(options.partition_hybrid, True,
                          'partition_hybrid')
         self.assertEqual(options.partition_batch, False,
@@ -55,6 +61,8 @@ class TestOption(unittest.TestCase):
         with self.assertRaisesRegexp(TypeError, 'Option: .*sw_gbuf_bypass.*'):
             _ = Option(sw_gbuf_bypass=[False, False, False],
                        sw_solve_loopblocking=False,
+                       hw_access_forwarding=False,
+                       hw_gbuf_sharing=False,
                        partition_hybrid=True,
                        partition_batch=False,
                        partition_ifmaps=False,
@@ -68,9 +76,45 @@ class TestOption(unittest.TestCase):
         with self.assertRaisesRegexp(ValueError, 'Option: .*sw_gbuf_bypass.*'):
             _ = Option(sw_gbuf_bypass=(False, False),
                        sw_solve_loopblocking=False,
+                       hw_access_forwarding=False,
+                       hw_gbuf_sharing=False,
                        partition_hybrid=True,
                        partition_batch=False,
                        partition_ifmaps=False,
+                       ntops=10,
+                       nprocesses=16,
+                       verbose=False
+                      )
+
+    def test_invalid_swsol_hwbufshr(self):
+        ''' Invalid sw_solve_loopblocking and hw_gbuf_sharing comb. '''
+        with self.assertRaisesRegexp(ValueError,
+                                     'Option: .*sw_solve_loopblocking.*'
+                                     'hw_gbuf_sharing.*'):
+            _ = Option(sw_gbuf_bypass=(False, False, False),
+                       sw_solve_loopblocking=True,
+                       hw_access_forwarding=False,
+                       hw_gbuf_sharing=True,
+                       partition_hybrid=False,
+                       partition_batch=False,
+                       partition_ifmaps=True,
+                       ntops=10,
+                       nprocesses=16,
+                       verbose=False
+                      )
+
+    def test_invalid_hwaccfwd_hwbufshr(self):
+        ''' Invalid hw_access_forwarding and hw_gbuf_sharing comb. '''
+        with self.assertRaisesRegexp(ValueError,
+                                     'Option: .*hw_access_forwarding.*'
+                                     'hw_gbuf_sharing.*'):
+            _ = Option(sw_gbuf_bypass=(False, False, False),
+                       sw_solve_loopblocking=False,
+                       hw_access_forwarding=True,
+                       hw_gbuf_sharing=True,
+                       partition_hybrid=False,
+                       partition_batch=False,
+                       partition_ifmaps=True,
                        ntops=10,
                        nprocesses=16,
                        verbose=False
@@ -83,6 +127,8 @@ class TestOption(unittest.TestCase):
                                      'partition_hybrid.*'):
             _ = Option(sw_gbuf_bypass=(False, False, False),
                        sw_solve_loopblocking=False,
+                       hw_access_forwarding=False,
+                       hw_gbuf_sharing=False,
                        partition_hybrid=False,
                        partition_batch=False,
                        partition_ifmaps=True,
@@ -95,6 +141,8 @@ class TestOption(unittest.TestCase):
         ''' Accessor option_list. '''
         options = Option(sw_gbuf_bypass=(False, False, False),
                          sw_solve_loopblocking=False,
+                         hw_access_forwarding=False,
+                         hw_gbuf_sharing=False,
                          partition_hybrid=True,
                          partition_batch=False,
                          partition_ifmaps=False,

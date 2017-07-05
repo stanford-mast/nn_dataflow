@@ -119,6 +119,67 @@ class TestDataLayout(unittest.TestCase):
         self.assertEqual(dly.total_transfer_nhops(fr, PhyDim2(-1, -2)),
                          nhops, 'total_transfer_nhops')
 
+    def test_total_transfer_nhops_md(self):
+        ''' Get total_transfer_nhops multiple destinations. '''
+        fr = FmapRange((0,) * 4, (4, 4, 16, 16))
+        nhops = 2 * 4 * 8 * 16 * (5 + 6 + 6 + 7) \
+                + 2 * 4 * 8 * 16 * (7 + 8 + 8 + 9) \
+                + 2 * 4 * 8 * 16 * (2 + 1 + 1 + 0)
+        self.assertEqual(self.dly.total_transfer_nhops(
+            fr, PhyDim2(-1, -2), PhyDim2(-2, -3), PhyDim2(2, 2)),
+                         nhops, 'total_transfer_nhops multidest')
+
+        frm = self.frm.copy()
+        frm.add(FmapRange((0, 0, 0, 16), (4, 4, 16, 20)),
+                (PhyDim2(2, 2), PhyDim2(3, 3)))
+        frm.add(FmapRange((0, 0, 16, 0), (4, 4, 20, 20)),
+                (PhyDim2(1, 1), PhyDim2(3, 3), PhyDim2(5, 5)))
+        dly = DataLayout(origin=PhyDim2(1, 1), frmap=frm)
+
+        self.assertEqual(dly.total_transfer_nhops(
+            fr, PhyDim2(-1, -2), PhyDim2(-2, -3), PhyDim2(2, 2)),
+                         nhops, 'total_transfer_nhops multidest')
+
+        nhops += 4 * 4 * 16 * 4 * (9 + 11) + 4 * 4 * 4 * 20 * (7 + 11 + 15) \
+                + 4 * 4 * 16 * 4 * (11 + 13) + 4 * 4 * 4 * 20 * (9 + 13 + 17) \
+                + 4 * 4 * 16 * 4 * (2 + 4) + 4 * 4 * 4 * 20 * (0 + 4 + 8)
+        fr = FmapRange((0,) * 4, (20,) * 4)
+        self.assertEqual(dly.total_transfer_nhops(
+            fr, PhyDim2(-1, -2), PhyDim2(-2, -3), PhyDim2(2, 2)),
+                         nhops, 'total_transfer_nhops multidest')
+
+    def test_total_transfer_nhops_md_cl(self):
+        ''' Get total_transfer_nhops multiple destinations closest-first. '''
+        fr = FmapRange((0,) * 4, (4, 4, 16, 16))
+        nhops = 2 * 4 * 8 * 16 * (2 + 1 + 1 + 0) \
+                + 2 * 4 * 8 * 16 * (4 * 7) \
+                + 2 * 4 * 8 * 16 * (4 * 2)
+        self.assertEqual(self.dly.total_transfer_nhops(
+            fr, PhyDim2(-1, -2), PhyDim2(-2, -3), PhyDim2(2, 2),
+            closest_first=True),
+                         nhops, 'total_transfer_nhops multidest closest first')
+
+        frm = self.frm.copy()
+        frm.add(FmapRange((0, 0, 0, 16), (4, 4, 16, 20)),
+                (PhyDim2(2, 2), PhyDim2(3, 3)))
+        frm.add(FmapRange((0, 0, 16, 0), (4, 4, 20, 20)),
+                (PhyDim2(1, 1), PhyDim2(3, 3), PhyDim2(5, 5)))
+        dly = DataLayout(origin=PhyDim2(1, 1), frmap=frm)
+
+        self.assertEqual(dly.total_transfer_nhops(
+            fr, PhyDim2(-1, -2), PhyDim2(-2, -3), PhyDim2(2, 2),
+            closest_first=True),
+                         nhops, 'total_transfer_nhops multidest closest first')
+
+        nhops += 4 * 4 * 16 * 4 * (2 + 4) + 4 * 4 * 4 * 20 * (0 + 4 + 8) \
+                + 4 * 4 * 16 * 4 * (7) + 4 * 4 * 4 * 20 * (7) \
+                + 4 * 4 * 16 * 4 * (2) + 4 * 4 * 4 * 20 * (2)
+        fr = FmapRange((0,) * 4, (20,) * 4)
+        self.assertEqual(dly.total_transfer_nhops(
+            fr, PhyDim2(-1, -2), PhyDim2(-2, -3), PhyDim2(2, 2),
+            closest_first=True),
+                         nhops, 'total_transfer_nhops multidest closest first')
+
     def test_view(self):
         ''' Get view. '''
         frm = self.frm.copy()

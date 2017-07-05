@@ -21,6 +21,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import itertools
 import unittest
 
+from nn_dataflow import BufShrScheme
 from nn_dataflow import ConvLayer, PoolingLayer
 from nn_dataflow import Cost
 from nn_dataflow import DataCategoryEnum as de
@@ -31,12 +32,15 @@ from nn_dataflow import MemHierEnum as me
 from nn_dataflow import NestedLoopDesc
 from nn_dataflow import NodeRegion
 from nn_dataflow import Option
+from nn_dataflow import ParallelEnum as pe
+from nn_dataflow import PartitionScheme
 from nn_dataflow import PhyDim2
 from nn_dataflow import Resource
 from nn_dataflow import Util
 
 class TestLoopBlockingFixture(unittest.TestCase):
     ''' Base fixture class for LoopBlocking tests. '''
+    # pylint: disable=too-many-instance-attributes
 
     def setUp(self):
 
@@ -79,31 +83,42 @@ class TestLoopBlockingFixture(unittest.TestCase):
                                                        (3, 9, 7), (1, 1, 1)),
                                           unit_ops=1, unit_time=1)
 
+        # Fake partition scheme.
+        self.part = PartitionScheme(range(pe.NUM), ((1, 1),) * pe.NUM)
+
+        # Fake buffer sharing scheme.
+        self.bufshr = BufShrScheme(self.part)
+
         # Options.
         self.options = {}
         # Basic.
         self.options['BASE'] = Option(
             sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
+            hw_access_forwarding=False, hw_gbuf_sharing=False,
             partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
             ntops=2 ** 30, nprocesses=1, verbose=False)
         # Multiprocessing.
         self.options['MP'] = Option(
             sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
+            hw_access_forwarding=False, hw_gbuf_sharing=False,
             partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
             ntops=2 ** 30, nprocesses=8, verbose=False)
         # Limited top schemes.
         self.options['NTOPS'] = Option(
             sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
+            hw_access_forwarding=False, hw_gbuf_sharing=False,
             partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
             ntops=10, nprocesses=1, verbose=False)
         # Bypass.
         self.options['BYP'] = Option(
             sw_gbuf_bypass=(True,) * 3, sw_solve_loopblocking=False,
+            hw_access_forwarding=False, hw_gbuf_sharing=False,
             partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
             ntops=2 ** 30, nprocesses=1, verbose=False)
         # Bypass solver.
         self.options['BYPSOL'] = Option(
             sw_gbuf_bypass=(True,) * 3, sw_solve_loopblocking=True,
+            hw_access_forwarding=False, hw_gbuf_sharing=False,
             partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
             ntops=2 ** 30, nprocesses=1, verbose=False)
 
@@ -121,8 +136,8 @@ class TestLoopBlockingFixture(unittest.TestCase):
         bl_ords = (tuple(range(le.NUM)), tuple(range(le.NUM))) \
                 if not bl_ords else bl_ords
         return LoopBlockingScheme(self.nld[wlkey], bl_ts, bl_ords,
-                                  self.resource[rsrckey], part_occ,
-                                  self.options[optkey])
+                                  self.resource[rsrckey], self.bufshr,
+                                  part_occ, self.options[optkey])
 
     def _gen_loopblocking_all(self, wlkey='BASE'):
         ''' Generate all combinations of loop blocking factors and orders. '''

@@ -20,6 +20,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import collections
 import itertools
+import math
 import unittest
 
 from nn_dataflow import Layer, ConvLayer, PoolingLayer
@@ -149,6 +150,23 @@ class TestPartitionScheme(unittest.TestCase):
         self.assertEqual(self.ps2.coordinate(pidx),
                          self.ps2.dim(pe.OFMP, pe.BATP, pe.INPP)
                          * PhyDim2(1, 1))
+
+    def test_part_neighbor_dist(self):
+        ''' Get part_neighbor_dist. '''
+        for ps in [self.ps1, self.ps2]:
+            self.assertTupleEqual(ps.part_neighbor_dist(ps.order[-1]),
+                                  (1, 1))
+            self.assertTupleEqual(ps.part_neighbor_dist(ps.order[-2]),
+                                  ps.dim(ps.order[-1]))
+            self.assertTupleEqual(ps.part_neighbor_dist(ps.order[-3]),
+                                  ps.dim(*ps.order[-2:]))
+            self.assertTupleEqual(ps.part_neighbor_dist(ps.order[-4]),
+                                  ps.dim(*ps.order[-3:]))
+
+    def test_part_neighbor_dist_inv(self):
+        ''' Get part_neighbor_dist invalid arg. '''
+        dist = self.ps1.part_neighbor_dist(pe.NUM)
+        self.assertTrue(all(math.isnan(d) for d in dist))
 
     def test_part_layer(self):
         ''' Get part_layer. '''
