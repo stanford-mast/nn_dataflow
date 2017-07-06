@@ -30,7 +30,7 @@ from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
 from .Layer import Layer, InputLayer, ConvLayer, FCLayer, \
         LocalRegionLayer, PoolingLayer
 from .LoopBlockingScheme import LoopBlockingScheme
-from .MapStrategy import MapStrategyEyeriss
+from .MapStrategy import MapStrategy, MapStrategyEyeriss
 from .NestedLoopDesc import NestedLoopDesc
 from .Network import Network
 from .NNDataflow import SchedulingResultDict
