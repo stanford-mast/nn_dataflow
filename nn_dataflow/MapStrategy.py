@@ -19,7 +19,6 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 import math
-import warnings
 
 from . import DataCategoryEnum as de
 from . import LoopEnum as le
@@ -33,14 +32,15 @@ class MapStrategy(object):
     '''
     Base mapping strategy.
 
-    Map is the procedure to map the 2D convolution computation onto the 2D PE array.
+    Map is the procedure to map the 2D convolution computation onto the 2D PE
+    array.
     '''
 
     def __init__(self, layer, batch_size, dim_array):
         if not isinstance(layer, Layer):
-            raise TypeError('Map: layer must be a Layer object.')
+            raise TypeError('MapStrategy: layer must be a Layer object.')
         if not isinstance(dim_array, PhyDim2):
-            raise TypeError('Map: dim_array must be a PhyDim2 object.')
+            raise TypeError('MapStrategy: dim_array must be a PhyDim2 object.')
         self.layer = layer
         self.batch_size = batch_size
         self.dim_array = dim_array
@@ -49,13 +49,13 @@ class MapStrategy(object):
         '''
         PE utilization, i.e., average percentage of active PEs.
         '''
-        raise NotImplementedError('Map: derived class must overwrite.')
+        raise NotImplementedError('MapStrategy: derived class must overwrite.')
 
     def gen_nested_loop_desc(self):
         '''
         Generate all the NestedLoopDesc objects after mapping.
         '''
-        raise NotImplementedError('Map: derived class must overwrite.')
+        raise NotImplementedError('MapStrategy: derived class must overwrite.')
 
 
 class MapStrategyEyeriss(MapStrategy):
@@ -96,12 +96,12 @@ class MapStrategyEyeriss(MapStrategy):
                 / (self.dim_array.size() * self.fold.size())
         assert self.util <= 1. + 1e-6
 
-        if self.util < 0.5:
-            warnings.warn('MapEyeriss: PE array resource utilization < 50%. '
-                          'Physical PE set {}; array size {}; logic PE set {}; '
-                          'folded logic PE set {}. Can\'t we fit more?'
-                          .format(self.dim_ppeset, self.dim_array,
-                                  self.dim_lpeset, self.dim_flpeset))
+        assert self.util > 0.5, \
+                ('MapEyeriss: PE array resource utilization < 50%. '
+                 'Physical PE set {}; array size {}; logic PE set {}; '
+                 'folded logic PE set {}. Can\'t we fit more?'
+                 .format(self.dim_ppeset, self.dim_array,
+                         self.dim_lpeset, self.dim_flpeset))
 
     def utilization(self):
         return self.util
