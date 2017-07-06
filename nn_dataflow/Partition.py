@@ -151,12 +151,12 @@ def part_layer_ifmap_range(layer, batch_size, part, pidx):
         h_beg, h_end = h_orng
         # xy_i = xy_o * stride + (0 ... sfil-1)
         h_beg = h_beg * layer.htrd
-        h_end = max(h_beg, (h_end - 1) * layer.htrd + layer.sfil)
+        h_end = max(h_beg, (h_end - 1) * layer.htrd + layer.hfil)
 
         # Fmap width tiling.
         w_beg, w_end = w_orng
         w_beg = w_beg * layer.wtrd
-        w_end = max(w_beg, (w_end - 1) * layer.wtrd + layer.sfil)
+        w_end = max(w_beg, (w_end - 1) * layer.wtrd + layer.wfil)
 
     elif isinstance(layer, LocalRegionLayer):
         # Ifmap channel partition.

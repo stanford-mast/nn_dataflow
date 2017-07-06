@@ -143,17 +143,29 @@ class ConvLayer(Layer):
     nofm (M): # ofmap channels
     hifm, wifm (H): ifmap height/width
     hofm, wofm (E): ofmap height/width
-    sfil (R): weight filter width/height
+    hfil, wfil (R): weight filter width/height
     htrd, wtrd (U): stride height/width
     '''
 
     def __init__(self, nifm, nofm, sofm, sfil, strd=1):
         super(ConvLayer, self).__init__(nofm, sofm, strd=strd)
 
-        self.sfil = sfil
+        if isinstance(sfil, int):
+            hfil = sfil
+            wfil = sfil
+        elif len(sfil) == 2:
+            hfil = sfil[0]
+            wfil = sfil[1]
+        else:
+            raise ValueError('ConvLayer: sfil is invalid ({}), '
+                             'needs to be either one integer or '
+                             'a pair of integers'.format(sfil))
 
-        hifm = self.sfil + (self.hofm - 1) * self.htrd
-        wifm = self.sfil + (self.wofm - 1) * self.wtrd
+        self.hfil = hfil
+        self.wfil = wfil
+
+        hifm = self.hfil + (self.hofm - 1) * self.htrd
+        wifm = self.wfil + (self.wofm - 1) * self.wtrd
         self.inlayer = Layer(nifm, (hifm, wifm))
 
     def input_layer(self):
@@ -161,7 +173,7 @@ class ConvLayer(Layer):
 
     def ops_per_neuron(self):
         # 2D convolution across all ifmap channels.
-        return self.sfil * self.sfil * self.nifm
+        return self.hfil * self.wfil * self.nifm
 
     def filter_size(self, word_size=1):
         '''
@@ -169,7 +181,7 @@ class ConvLayer(Layer):
 
         If `word_size` is set to word byte size, return size in bytes.
         '''
-        return self.sfil * self.sfil * word_size
+        return self.hfil * self.wfil * word_size
 
     def total_filter_size(self, word_size=1):
         '''
@@ -186,7 +198,7 @@ class FCLayer(ConvLayer):
 
     As a special case of CONVLayer.
 
-    hifm = wifm = sfil, strd = 1, hofm = wofm = 1
+    hifm = hfil, wifm = wfil, strd = 1, hofm = wofm = 1
     '''
 
     def __init__(self, nifm, nofm, sfil=1):

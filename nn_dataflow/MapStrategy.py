@@ -72,8 +72,8 @@ class MapStrategyEyeriss(MapStrategy):
         # Logic PE set.
         if isinstance(self.layer, ConvLayer):
             # Conv and FC layers.
-            self.ops_lpe = self.layer.sfil * self.layer.wofm
-            self.dim_lpeset = PhyDim2(self.layer.sfil, self.layer.hofm)
+            self.ops_lpe = self.layer.wfil * self.layer.wofm
+            self.dim_lpeset = PhyDim2(self.layer.hfil, self.layer.hofm)
             cnt_lpeset = self.batch_size * self.layer.nofm * self.layer.nifm
         elif isinstance(self.layer, LocalRegionLayer):
             self.ops_lpe = self.layer.ops_per_neuron()
@@ -195,11 +195,11 @@ class MapStrategyEyeriss(MapStrategy):
         usz_regf = [0] * de.NUM
         # Entire fil row per PE, and only store one folded fil because we
         # access fmaps multiple times.
-        usz_regf[de.FIL] = self.layer.sfil
+        usz_regf[de.FIL] = self.layer.wfil
         # For 1D conv in each PE, ifm and ofm are both accessed in a streaming
-        # fashion (sliding window). Only capture sfil ifm elements and 1 ofm
+        # fashion (sliding window). Only capture wfil ifm elements and 1 ofm
         # element is adequate.
-        usz_regf[de.IFM] = self.layer.sfil
+        usz_regf[de.IFM] = self.layer.wfil
         usz_regf[de.OFM] = 1
         usize_regf = tuple(usz_regf)
 
@@ -208,7 +208,7 @@ class MapStrategyEyeriss(MapStrategy):
         avgsize_all_regfs = [avgpes_per_ppeset * ar
                              for ar in accrnds_per_procpass]
         # Entire fil row per PE, also store all folded fils.
-        avgsize_all_regfs[de.FIL] *= self.layer.sfil * ppesets_per_procpass
+        avgsize_all_regfs[de.FIL] *= self.layer.wfil * ppesets_per_procpass
         # Entire ifm row per PE.
         avgsize_all_regfs[de.IFM] *= self.layer.wifm
         # Entire ofm row per PE.
@@ -357,7 +357,7 @@ class MapStrategyEyeriss(MapStrategy):
         # Average (considering occupation) dims of i/ofmap for one flpeset.
         avgdims_per_flpeset = [(float('nan'), float('nan'))
                                for _ in range(de.NUM)]
-        # No sfil.
+        # No FIL.
         avgdims_per_flpeset[de.FIL] = (0, 0)
         # Reduced by folding factor.
         avgdims_per_flpeset[de.OFM] = (1. * self.dim_lpeset.h / self.fold.h,
@@ -375,7 +375,7 @@ class MapStrategyEyeriss(MapStrategy):
 
         # Unit regf size for one processing pass.
         usz_regf = [0] * de.NUM
-        # No sfil.
+        # No FIL.
         usz_regf[de.FIL] = 0
         # Each ofm element is assigned to one PE, so we can simply flow ifm
         # elements in vertical and horizontal directions.
@@ -386,7 +386,7 @@ class MapStrategyEyeriss(MapStrategy):
         # The total size of accessed data across all PE regfs for one
         # processing pass, including duplication.
         avgsize_all_regfs = [avgpes_per_ppeset] * de.NUM
-        # No sfil.
+        # No FIL.
         avgsize_all_regfs[de.FIL] *= 0
         # Since ifm loop count is always 1, we account for all ifmap accesses.
         # This contains all fmaps, and the regions in each fmap.
@@ -559,7 +559,7 @@ class MapStrategyEyeriss(MapStrategy):
         # Only fil needs to multiply ppesets_per_procpass, because for
         # each ppeset in the processing pass, fil is different (folded
         # parts) while ifm and ofm are the same.
-        usize_gbuf[de.FIL] = (self.layer.sfil
+        usize_gbuf[de.FIL] = (self.layer.wfil
                               * rows_per_flpeset[de.FIL]
                               * (ifms_per_procpass
                                  * ofms_per_procpass
@@ -594,7 +594,7 @@ class MapStrategyEyeriss(MapStrategy):
             ifms_per_procpass = ofms_per_procpass - 1 + self.layer.nreg
 
         usize_gbuf = [0] * de.NUM
-        # No sfil.
+        # No FIL.
         usize_gbuf[de.FIL] = 0
         usize_gbuf[de.IFM] = (Util.prod(dims_per_flpeset[de.IFM])
                               * ifms_per_procpass)

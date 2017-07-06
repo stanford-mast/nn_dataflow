@@ -35,6 +35,8 @@ List of major changes and improvements
 
   - Relax `__len__` of `Network` to work before setting input layer.
 
+  - Allow different height and width for filters in `ConvLayer`.
+
 - Software models:
 
   - Add loop index generator to `LoopBlockingScheme` class.

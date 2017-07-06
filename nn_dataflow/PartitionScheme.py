@@ -110,7 +110,8 @@ class PartitionScheme(StringifyClass, ContentHashClass):
         p_wofm = Util.idivc(layer.wofm, self.pdims[pe.OFMP].w)
 
         if isinstance(layer, ConvLayer):
-            p_layer = ConvLayer(p_nifm, p_nofm, (p_hofm, p_wofm), layer.sfil,
+            p_layer = ConvLayer(p_nifm, p_nofm, (p_hofm, p_wofm),
+                                (layer.hfil, layer.wfil),
                                 strd=(layer.htrd, layer.wtrd))
         elif isinstance(layer, LocalRegionLayer):
             if self.pdims[pe.INPP].size() > 1:

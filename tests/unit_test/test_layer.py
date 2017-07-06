@@ -35,7 +35,8 @@ class TestLayer(unittest.TestCase):
         self.assertEqual(clayer.nofm, 64, 'nofm')
         self.assertEqual(clayer.hofm, 28, 'hofm')
         self.assertEqual(clayer.wofm, 28, 'wofm')
-        self.assertEqual(clayer.sfil, 3, 'sfil')
+        self.assertEqual(clayer.hfil, 3, 'hfil')
+        self.assertEqual(clayer.wfil, 3, 'wfil')
         self.assertEqual(clayer.htrd, 2, 'htrd')
         self.assertEqual(clayer.wtrd, 2, 'wtrd')
 
@@ -208,6 +209,15 @@ class TestConvLayer(unittest.TestCase):
         self.assertEqual(clayer.filter_size(2), 3 * 3 * 2, 'filter_size')
         self.assertEqual(clayer.total_filter_size(2), 3 * 3 * 3 * 64 * 2,
                          'total_filter_size')
+        clayer = ConvLayer(3, 64, [28, 14], [3, 1])
+        self.assertEqual(clayer.filter_size(2), 3 * 1 * 2, 'filter_size')
+        self.assertEqual(clayer.total_filter_size(2), 3 * 1 * 3 * 64 * 2,
+                         'total_filter_size')
+
+    def test_filter_size_invalid(self):
+        ''' Invalid filter size. '''
+        with self.assertRaisesRegexp(ValueError, 'ConvLayer: .*sfil.*'):
+            _ = ConvLayer(3, 64, [28, 14], [3, 3, 3])
 
     def test_fclayer(self):
         ''' FCLayer init. '''
