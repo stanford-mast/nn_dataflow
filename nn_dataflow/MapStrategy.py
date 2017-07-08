@@ -18,8 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-import math
-
 from . import DataCategoryEnum as de
 from . import LoopEnum as le
 from . import MemHierEnum as me
@@ -76,8 +74,8 @@ class MapStrategyEyeriss(MapStrategy):
             self.dim_lpeset = PhyDim2(self.layer.hfil, self.layer.hofm)
             cnt_lpeset = self.batch_size * self.layer.nofm * self.layer.nifm
         elif isinstance(self.layer, LocalRegionLayer):
-            self.ops_lpe = self.layer.ops_per_neuron()
-            self.dim_lpeset = PhyDim2(h=self.layer.hofm, w=self.layer.wofm)
+            self.ops_lpe = self.layer.nreg * self.layer.wreg * self.layer.wofm
+            self.dim_lpeset = PhyDim2(h=self.layer.hreg, w=self.layer.hofm)
             cnt_lpeset = self.batch_size * self.layer.nofm
         else:
             raise TypeError('MapEyeriss: unrecognized layer type {}.'
@@ -107,197 +105,127 @@ class MapStrategyEyeriss(MapStrategy):
         return self.util
 
     def gen_nested_loop_desc(self):
-        # NOTE: not sure if it is worth to merge the two functions, as there is
-        # significant redundancy but also significant difference.
-        if isinstance(self.layer, ConvLayer):
-            for nld in self._gen_nested_loop_desc_conv():
-                yield nld
-        elif isinstance(self.layer, LocalRegionLayer):
-            for nld in self._gen_nested_loop_desc_localregion():
-                yield nld
+        '''
+        Replication and folding:
 
-    def _gen_nested_loop_desc_conv(self):
-        # repl.w can only be used for ofm; repl.h can be shared by ifm and ofm.
-        #
-        # fold.h folds fil, which uses different parts of fil but same ifm and
-        # ofm, so do these ppeset continuously (innermost loop); fold.w folds
-        # ofm (and ifm), which uses different parts of ofm and ifm but same
-        # fil, so merge into batch size.
+        - ConvLayer
+          - repl.w is only used for ofm; repl.h can be shared by ifm and ofm.
+          - fold.h folds fil, which uses different filter parts but same fmaps,
+            so do them continuously (innermost loop); fold.w folds fmaps, which
+            uses different fmap parts but same filters, so merge into batch.
 
-        # Terminologies:
-        #
-        # flpeset: folded lpeset, a fraction of lpeset after folding and before
-        # replication.
-        #
-        # ppeset: physical peset, one physical array pass, replicated flpeset.
-        #
-        # procpass: processing pass, fold.h number of ppesets, i.e., fold.h
-        # physical array passes, which deals with all folded fils, one folded
-        # ifm and one folded ofm. A procpass includes all replication. See
-        # Chen, et al, ISCA'16, end of V.B.
-        #
-        # # ppesets in a procpass = fold.h.
-        # # flpesets in a procpass = fold.h * repl.size().
-        ppesets_per_procpass = self.fold.h
-        # To iterate all folded fils over the fmaps, we have two choices:
-        # a) only store one folded fil in regf and access fmaps multiple times
-        # from gbuf;
-        # b) store all folded fils in regf and only access fmaps once from
-        # gbuf.
-        # To save regf size, we choose a).
-        #
-        # Access rounds: the times each single data element is accessed.
-        accrnds_per_procpass = [float('nan')] * de.NUM
-        accrnds_per_procpass[de.FIL] = 1
-        accrnds_per_procpass[de.IFM] = ppesets_per_procpass
-        accrnds_per_procpass[de.OFM] = ppesets_per_procpass
+        - LocalRegionLayer
+          - repl is only used for ofm, since ofm/ifm relationship is one-to-one
+            rather than all-to-all.
+          - fold.h means each 2D region is too high, and needs multiple ppesets
+            to process, so do them continuously (innermost loop); fold.w
+            divides 2D fmaps into multiple parts that can be processed
+            independently, so merge into batch.
 
-        # Processing pass is the unit for loop blocking, i.e., the innermost
-        # loop processes one procpass. So the unit accesses are also calculated
-        # on procpass.
+        Terminologies:
 
-        # Average (considering occupation) number of PEs for one ppeset.
-        avgpes_per_ppeset = self.dim_array.size() * self.util
+        - flpeset: folded lpeset, a fraction of lpeset after folding and before
+          replication. If a lpeset is divided into separated segments, i.e.,
+          using replication first for folding (see Chen, et al, JSSC'17, IV.A.
+          pp5), flpeset is the original shape without separating segments.
 
-        # Average (considering occupation) number of ops for one procpass.
-        avgops_per_procpass = ppesets_per_procpass * avgpes_per_ppeset \
-                * self.ops_lpe
+        - ppeset: physical peset, one physical array pass, replicated flpeset.
+          It should fit in the physical array shape. We do not use ppeset in
+          mapping.
 
-        # Average (considering occupation) number of rows for one flpeset.
-        # Row size is not affected by folding/replication since a row is within
-        # one PE.
-        avgrows_per_flpeset = [float('nan')] * de.NUM
-        # Reduced by folding factor.
-        avgrows_per_flpeset[de.FIL] = 1. * self.dim_lpeset.h / self.fold.h
-        # Reduced by folding factor.
-        avgrows_per_flpeset[de.OFM] = 1. * self.dim_lpeset.w / self.fold.w
-        # Determined by fil and ofm rows.
-        avgrows_per_flpeset[de.IFM] = avgrows_per_flpeset[de.FIL] \
-                + (avgrows_per_flpeset[de.OFM] - 1) * self.layer.htrd
-        # For ifmap with strides, there may be gaps in ifmap which are not
-        # needed in ofmap. In such case, the actual needed # ifmap rows is
-        # bound by # ofmap rows * # filter rows, since each ofmap row needs
-        # ifmap rows equal to the filter rows.
-        avgrows_per_flpeset[de.IFM] = min(avgrows_per_flpeset[de.IFM],
-                                          avgrows_per_flpeset[de.OFM]
-                                          * avgrows_per_flpeset[de.FIL])
-        assert avgrows_per_flpeset[de.FIL] <= self.dim_flpeset.h + 1e-6
-        assert avgrows_per_flpeset[de.OFM] <= self.dim_flpeset.w + 1e-6
-        # Due to folding, the overlapping ifmaps may need to be re-fetched,
-        # resulting in amplified access for ifmaps. On the other hand, if
-        # the stride results in gaps in ifmaps, some ifmaps are not accessed.
-        # Consider one flpeset, hifm rows are folded by fold.size(), but each
-        # is accessed accrnds_per_procpass times.
-        amp_acc_ifm = 1. * avgrows_per_flpeset[de.IFM] * self.fold.size() \
-                / (self.layer.hifm * accrnds_per_procpass[de.IFM])
+        - unitpass: unit pass, fold.h flpesets before replication, which deals
+          with all folded fils, one folded ifm and one folded ofm. This is one
+          full 2D convolution given that the folded ifms/ofms have been merged
+          into batch.
 
-        # Unit regf size for one processing pass.
-        usz_regf = [0] * de.NUM
-        # Entire fil row per PE, and only store one folded fil because we
-        # access fmaps multiple times.
-        usz_regf[de.FIL] = self.layer.wfil
-        # For 1D conv in each PE, ifm and ofm are both accessed in a streaming
-        # fashion (sliding window). Only capture wfil ifm elements and 1 ofm
-        # element is adequate.
-        usz_regf[de.IFM] = self.layer.wfil
-        usz_regf[de.OFM] = 1
-        usize_regf = tuple(usz_regf)
+          # flpesets in a unitpass = fold.h
 
-        # The total size of accessed data across all PE regfs for one
-        # processing pass, including duplication.
-        avgsize_all_regfs = [avgpes_per_ppeset * ar
-                             for ar in accrnds_per_procpass]
-        # Entire fil row per PE, also store all folded fils.
-        avgsize_all_regfs[de.FIL] *= self.layer.wfil * ppesets_per_procpass
-        # Entire ifm row per PE.
-        avgsize_all_regfs[de.IFM] *= self.layer.wifm
-        # Entire ofm row per PE.
-        avgsize_all_regfs[de.OFM] *= self.layer.wofm
+        - procpass: processing pass, unit pass after replication with
+          repl.size(). A procpass includes all replication. See Chen, et al,
+          ISCA'16, end of V.B.
 
-        # Time.
-        unit_time = ppesets_per_procpass * self.ops_lpe
+          # unitpasses in a procpass = repl.size()
 
-        # Loop body unit time is constant w.r.t. the split of repl.h, so we
-        # pick the smallest total number of loops.
-        min_cnt_loops = float('inf')
+        Processing pass is the unit for loop blocking, i.e., the innermost loop
+        processes one procpass. So the unit ops/time/accesses are calculated on
+        procpass unit.
 
-        for t_repl_h in Util.factorize(self.repl.h, 2):
+        Fragmentation:
 
-            # Determine the numbers of i/ofmaps per processing pass.
-            # repl.w is only used for ofmaps, and repl.h can be used either for
-            # ifmaps or ofmaps.
-            ifms_per_procpass = t_repl_h[0]
-            ofms_per_procpass = t_repl_h[1] * self.repl.w
+        When the layer shape parameters are not multipliers of the physical
+        dimensions, there are fragmentation. We consider two types of
+        fragmentation:
 
-            # Loop trip counts.
-            # fold.w is equivalent to increasing batch size (and fold.h is
-            # within processing pass).
-            lc = [float('nan')] * le.NUM
-            lc[le.IFM] = Util.idivc(self.layer.nifm, ifms_per_procpass)
-            lc[le.OFM] = Util.idivc(self.layer.nofm, ofms_per_procpass)
-            lc[le.BAT] = self.batch_size * self.fold.w
-            lcnt = tuple(lc)
+        - ppeset internal fragmentation: due to lpeset folding. E.g., folding
+          27 rows by 2 results in two 14 rows, and 1 row is not used.
 
-            cnt_loops = Util.prod(lcnt)
-            if cnt_loops < min_cnt_loops:
-                min_cnt_loops = cnt_loops
-            elif cnt_loops > min_cnt_loops:
-                continue
+        - loop occupation: due to partial full loops. E.g., for total of 32
+          ifmaps, if each loop body processes 3 ifmaps, we need 11 ifmap loops,
+          but the last one only has 2 ifmaps rather than 3.
+        '''
 
-            # Loop occupation.
-            # This is due to partial full loops. E.g., for total of 32 ifmaps,
-            # if each loop body processes 3, we need 10 loops, but the last one
-            # only has 2/3 ifmaps.
-            locc_ifm = 1. * self.layer.nifm / ifms_per_procpass / lcnt[le.IFM]
-            locc_ofm = 1. * self.layer.nofm / ofms_per_procpass / lcnt[le.OFM]
-            locc_bat = 1. * self.batch_size * self.fold.w / lcnt[le.BAT]
+        # Folded filters is not allowed in the original Eyeriss, but we extend
+        # to support it with the unit pass concept.
+        ops_unitpass, time_unitpass, access_unitpass, \
+                sz_gbuf_unitpass, sz_regf_unitpass, amp_acc_ifm = \
+                self._calc_unitpass()
 
-            # Unit gbuf size for one processing pass. Ceil the number of rows.
-            usize_gbuf = self._calc_unit_size_gbuf_conv(
-                [int(math.ceil(r) + 1e-6) for r in avgrows_per_flpeset],
-                ifms_per_procpass, ofms_per_procpass, ppesets_per_procpass)
+        # Apply replication.
+        for lcnt, locc, rcnt in self._gen_repl():
 
-            # Loop occupations affect accesses.
-            # Total accesses = avg unit accesses * loop count.
-            # Avg unit accesses = full-loop unit accesses * occupation.
-            #
-            # Loop occupations do not affect size, since size needs to be the
-            # maximum, i.e., full loop case.
-            occ_acc = [0] * de.NUM
-            occ_acc[de.FIL] = locc_ifm * locc_ofm
-            occ_acc[de.IFM] = locc_ifm * locc_bat
-            occ_acc[de.OFM] = locc_ofm * locc_bat
+            # Number of ops.
+            # Replicate to procpass. Also consider loop occupations.
+            unit_ops = ops_unitpass * self.repl.size() * Util.prod(locc)
 
-            # Unit access, i.e., number of data element accesses for one
-            # processing pass. This is the average over all loops, considering
-            # loop occupations.
+            # Time does not change with replication, and is not affected by
+            # loop occupation.
+            unit_time = time_unitpass
+
+            # Buffered data size.
+            # Replication uses the single gbuf.
+            usize_gbuf = tuple(s * n for s, n in zip(sz_gbuf_unitpass, rcnt))
+            # Replication uses different PEs.
+            usize_regf = tuple(sz_regf_unitpass)
+
+            # FIXME: account for all ifmap accesses.
+            if isinstance(self.layer, LocalRegionLayer):
+                rcnt[de.IFM] = self.layer.nifm
+
+            # Unit access, i.e., data accesses for one processing pass.
+            # Replicate to procpass. Also consider loop occupations.
             uaccess = [tuple() for _ in range(me.NUM)]
-            # DRAM access is based on gbuf, need to buffer all data in gbuf.
-            uacc_gbuf = self._calc_unit_size_gbuf_conv(avgrows_per_flpeset,
-                                                       ifms_per_procpass,
-                                                       ofms_per_procpass,
-                                                       ppesets_per_procpass)
-            uaccess[me.DRAM] = tuple(ua * o for ua, o
-                                     in zip(uacc_gbuf, occ_acc))
-            # gbuf access.
-            # Load each element once from gbuf then use itcn.
-            uaccess[me.GBUF] = tuple(ua * ar for ua, ar
-                                     in zip(uaccess[me.DRAM],
-                                            accrnds_per_procpass))
-            # itcn access is total accessed regf size - gbuf access.
-            uaccess[me.ITCN] = tuple(asar - ua for asar, ua
-                                     in zip(avgsize_all_regfs,
-                                            uaccess[me.GBUF]))
-            assert all(ua >= 0 for ua in uaccess[me.ITCN]), \
-                    'MapEyeriss: encounter negative access count to itcn {}' \
-                    .format(uaccess[me.ITCN])
-            # regf access is based on num ops.
-            uaccess[me.REGF] = (avgops_per_procpass,) * de.NUM
+            # Loop occupations affect accesses.
+            aocc = [0] * de.NUM
+            aocc[de.FIL] = locc[le.IFM] * locc[le.OFM]
+            aocc[de.IFM] = locc[le.IFM] * locc[le.BAT]
+            aocc[de.OFM] = locc[le.OFM] * locc[le.BAT]
+            # Replication uses the single DRAM, gbuf, itcn.
+            for mhe in [me.DRAM, me.GBUF, me.ITCN]:
+                uaccess[mhe] = tuple(a * n * o for a, n, o
+                                     in zip(access_unitpass[mhe], rcnt, aocc))
+            # Replication uses different PEs. regf scales with op replication,
+            # i.e., affected by all loop occupations.
+            uaccess[me.REGF] = tuple(a * self.repl.size() * Util.prod(locc)
+                                     for a in access_unitpass[me.REGF])
+            # Finalize.
+            unit_access = tuple(uaccess)
+
+            # Make nested loop desc.
+            nld = NestedLoopDesc(loopcnt=lcnt, unit_access=unit_access,
+                                 usize_gbuf=usize_gbuf, usize_regf=usize_regf,
+                                 unit_ops=unit_ops, unit_time=unit_time)
+
+            # Check num of ops.
+            Util.assert_float_eq_int(
+                nld.unit_ops * Util.prod(lcnt),
+                self.layer.total_ops(self.batch_size),
+                'MapEyeriss: total number of physical ops is incorrect.')
 
             # Check unit access.
             Util.assert_float_eq_int(
                 uaccess[me.DRAM][de.FIL] * lcnt[le.IFM] * lcnt[le.OFM],
-                self.layer.total_filter_size(),
+                self.layer.total_filter_size()
+                if isinstance(self.layer, ConvLayer) else 0,
                 'MapEyeriss: unit access at DRAM for FIL {} is incorrect.'
                 .format(uaccess[me.DRAM][de.FIL]))
             Util.assert_float_eq_int(
@@ -313,189 +241,7 @@ class MapStrategyEyeriss(MapStrategy):
                 'MapEyeriss: unit access at DRAM for OFM {} is incorrect.'
                 .format(uaccess[me.DRAM][de.OFM]))
 
-            # Finalize unit access.
-            unit_access = tuple(uaccess)
-
-            # Num of ops. In addition to procpass utilization, also add the
-            # impact of loop occupations.
-            unit_ops = avgops_per_procpass * locc_ifm * locc_ofm * locc_bat
-
-            # Check num of ops.
-            ops_physical_total = unit_ops * cnt_loops
-
-            Util.assert_float_eq_int(
-                ops_physical_total, self.layer.total_ops(self.batch_size),
-                'MapEyeriss: total number of physical ops is incorrect.')
-
-            yield NestedLoopDesc(loopcnt=lcnt, unit_access=unit_access,
-                                 usize_gbuf=usize_gbuf, usize_regf=usize_regf,
-                                 unit_ops=unit_ops, unit_time=unit_time)
-
-    def _gen_nested_loop_desc_localregion(self):
-        # Terminologies:
-        #
-        # flpeset: folded lpeset, a fraction of lpeset after folding and before
-        # replication.
-        #
-        # ppeset: physical peset, one physical array pass.
-        #
-        # procpass: processing pass, one ppeset, which deals with one folded
-        # ofm. A procpass includes all replication.
-        ppesets_per_procpass = 1
-
-        # Processing pass is the unit for loop blocking, i.e., the innermost
-        # loop processes one procpass. So the unit accesses are also calculated
-        # on procpass.
-
-        # Average (considering occupation) number of PEs for one ppeset.
-        avgpes_per_ppeset = self.dim_array.size() * self.util
-
-        # Average (considering occupation) number of ops for one procpass.
-        avgops_per_procpass = ppesets_per_procpass * avgpes_per_ppeset \
-                * self.ops_lpe
-
-        # Average (considering occupation) dims of i/ofmap for one flpeset.
-        avgdims_per_flpeset = [(float('nan'), float('nan'))
-                               for _ in range(de.NUM)]
-        # No FIL.
-        avgdims_per_flpeset[de.FIL] = (0, 0)
-        # Reduced by folding factor.
-        avgdims_per_flpeset[de.OFM] = (1. * self.dim_lpeset.h / self.fold.h,
-                                       1. * self.dim_lpeset.w / self.fold.w)
-        # Determined by ofm dims and region.
-        avgdims_per_flpeset[de.IFM] = (
-            self.layer.hreg + (avgdims_per_flpeset[de.OFM][0] - 1) \
-                    * self.layer.htrd,
-            self.layer.wreg + (avgdims_per_flpeset[de.OFM][1] - 1) \
-                    * self.layer.wtrd)
-        # Due to folding, the overlapping ifmaps may need to be re-fetched,
-        # resulting in amplified access for ifmaps.
-        amp_acc_ifm = 1. * Util.prod(avgdims_per_flpeset[de.IFM]) \
-                * self.fold.size() / self.layer.ifmap_size()
-
-        # Unit regf size for one processing pass.
-        usz_regf = [0] * de.NUM
-        # No FIL.
-        usz_regf[de.FIL] = 0
-        # Each ofm element is assigned to one PE, so we can simply flow ifm
-        # elements in vertical and horizontal directions.
-        usz_regf[de.IFM] = 1
-        usz_regf[de.OFM] = 1
-        usize_regf = tuple(usz_regf)
-
-        # The total size of accessed data across all PE regfs for one
-        # processing pass, including duplication.
-        avgsize_all_regfs = [avgpes_per_ppeset] * de.NUM
-        # No FIL.
-        avgsize_all_regfs[de.FIL] *= 0
-        # Since ifm loop count is always 1, we account for all ifmap accesses.
-        # This contains all fmaps, and the regions in each fmap.
-        avgsize_all_regfs[de.IFM] *= self.layer.nifm \
-                * self.layer.hreg * self.layer.wreg
-        # Entire ofm.
-        avgsize_all_regfs[de.OFM] *= 1
-
-        # Time.
-        unit_time = ppesets_per_procpass * self.ops_lpe
-
-
-        # We don't have ifm loop, only ofm and bat loops.
-        # We use all repl for ofm loop to exploit ifm reuse on regf level.
-        # Since there is no fil and no fil reuse in batch, repl for bat loop
-        # has no benefits.
-        ofms_per_procpass = self.repl.size()
-
-        # Loop trip counts.
-        # ifm loop count is always 1, i.e., only exists ofm loop.
-        # fold is equivalent to increasing batch size.
-        lc = [float('nan')] * le.NUM
-        lc[le.IFM] = 1
-        lc[le.OFM] = Util.idivc(self.layer.nofm, ofms_per_procpass)
-        lc[le.BAT] = self.batch_size * self.fold.size()
-        lcnt = tuple(lc)
-
-        # Loop occupation.
-        # This is due to partial full loops. E.g., for total of 32 ifmaps,
-        # if each loop body processes 3, we need 10 loops, but the last one
-        # only has 2/3 ifmaps.
-        locc_ifm = 1.
-        locc_ofm = 1. * self.layer.nofm / ofms_per_procpass / lcnt[le.OFM]
-        locc_bat = 1. * self.batch_size * self.fold.size() / lcnt[le.BAT]
-
-        # Unit gbuf size for one processing pass. Ceil the number of rows.
-        usize_gbuf = self._calc_unit_size_gbuf_localregion(
-            avgdims_per_flpeset, ofms_per_procpass)
-
-        # Loop occupations affect accesses.
-        # Total accesses = avg unit accesses * loop count.
-        # Avg unit accesses = full-loop unit accesses * occupation.
-        #
-        # Loop occupations do not affect size, since size needs to be the
-        # maximum, i.e., full loop case.
-        occ_acc = [0] * de.NUM
-        occ_acc[de.FIL] = locc_ifm * locc_ofm
-        occ_acc[de.IFM] = locc_ifm * locc_bat
-        occ_acc[de.OFM] = locc_ofm * locc_bat
-
-        # Unit access, i.e., number of data element accesses for one
-        # processing pass. This is the average over all loops, considering
-        # loop occupations.
-        uaccess = [tuple() for _ in range(me.NUM)]
-        # DRAM access is based on gbuf, need to buffer all data in gbuf.
-        uacc_gbuf = self._calc_unit_size_gbuf_localregion(
-            avgdims_per_flpeset, ofms_per_procpass, is_access=True)
-        uaccess[me.DRAM] = tuple(ua * o for ua, o
-                                 in zip(uacc_gbuf, occ_acc))
-        # gbuf access.
-        # Load each element once from gbuf then use itcn.
-        uaccess[me.GBUF] = tuple(ua for ua in uaccess[me.DRAM])
-        # itcn access is total accessed regf size - gbuf access.
-        uaccess[me.ITCN] = tuple(asar - ua for asar, ua
-                                 in zip(avgsize_all_regfs, uaccess[me.GBUF]))
-        assert all(ua >= 0 for ua in uaccess[me.ITCN]), \
-                'MapEyeriss: encounter negative access count to itcn {}' \
-                .format(uaccess[me.ITCN])
-        # regf access is based on num ops.
-        uaccess[me.REGF] = tuple(0 if dce == de.FIL else avgops_per_procpass
-                                 for dce in range(de.NUM))
-
-        # Check unit access.
-        Util.assert_float_eq_int(
-            uaccess[me.DRAM][de.FIL] * lcnt[le.IFM] * lcnt[le.OFM],
-            0,
-            'MapEyeriss: unit access at DRAM for FIL {} is incorrect.'
-            .format(uaccess[me.DRAM][de.FIL]))
-        Util.assert_float_eq_int(
-            # Need to consider amplified access for IFM.
-            uaccess[me.DRAM][de.IFM] * lcnt[le.IFM] * lcnt[le.BAT]
-            / amp_acc_ifm,
-            self.layer.total_ifmap_size(self.batch_size),
-            'MapEyeriss: unit access at DRAM for IFM {} is incorrect.'
-            .format(uaccess[me.DRAM][de.IFM]))
-        Util.assert_float_eq_int(
-            uaccess[me.DRAM][de.OFM] * lcnt[le.OFM] * lcnt[le.BAT],
-            self.layer.total_ofmap_size(self.batch_size),
-            'MapEyeriss: unit access at DRAM for OFM {} is incorrect.'
-            .format(uaccess[me.DRAM][de.OFM]))
-
-        # Finalize unit access.
-        unit_access = tuple(uaccess)
-
-
-        # Num of ops. In addition to procpass utilization, also add the
-        # impact of loop occupations.
-        unit_ops = avgops_per_procpass * locc_ifm * locc_ofm * locc_bat
-
-        # Check num of ops.
-        ops_physical_total = unit_ops * Util.prod(lcnt)
-
-        Util.assert_float_eq_int(
-            ops_physical_total, self.layer.total_ops(self.batch_size),
-            'MapEyeriss: total number of physical ops is incorrect.')
-
-        yield NestedLoopDesc(loopcnt=lcnt, unit_access=unit_access,
-                             usize_gbuf=usize_gbuf, usize_regf=usize_regf,
-                             unit_ops=unit_ops, unit_time=unit_time)
+            yield nld
 
     def _repl_fold(self):
         '''
@@ -549,56 +295,220 @@ class MapStrategyEyeriss(MapStrategy):
             'MapEyeriss: dim_ppeset {} does not fit in dim_array {}.' \
             .format(self.dim_ppeset, self.dim_array)
 
-    def _calc_unit_size_gbuf_conv(self, rows_per_flpeset, ifms_per_procpass,
-                                  ofms_per_procpass, ppesets_per_procpass):
+    def _calc_unitpass(self):
         '''
-        Calculate the unit gbuf size for one processing pass.
-        '''
-        usize_gbuf = [0] * de.NUM
-        # Size = row size * # rows per flpeset * flpeset count in procpass.
-        # Only fil needs to multiply ppesets_per_procpass, because for
-        # each ppeset in the processing pass, fil is different (folded
-        # parts) while ifm and ofm are the same.
-        usize_gbuf[de.FIL] = (self.layer.wfil
-                              * rows_per_flpeset[de.FIL]
-                              * (ifms_per_procpass
-                                 * ofms_per_procpass
-                                 * ppesets_per_procpass))
-        usize_gbuf[de.IFM] = (self.layer.wifm
-                              * rows_per_flpeset[de.IFM]
-                              * ifms_per_procpass)
-        usize_gbuf[de.OFM] = (self.layer.wofm
-                              * rows_per_flpeset[de.OFM]
-                              * ofms_per_procpass)
-        return tuple(usize_gbuf)
+        Calculate the ops, time, accessed data size, and buffered data size for
+        one unit pass.
 
-    def _calc_unit_size_gbuf_localregion(self, avgdims_per_flpeset,
-                                         ofms_per_procpass, is_access=False):
+        Ops considers ppeset internal fragmentation.
+
+        Time is the maximum value that each unit pass needs.
+
+        Accessed size considers ppeset internal fragmentation.
+
+        Buffered size is the maximum value that buffer needs to support.
+
+        Return ops, time, accessed size for all hierarchies, and buffered size
+        in gbuf and regf. Also return the amplified access ratio for ifmaps.
         '''
-        Calculate the unit gbuf size for one processing pass.
-        '''
-        if is_access:
-            dims_per_flpeset = avgdims_per_flpeset
+        ops = float('nan')
+        time = float('nan')
+        access = [[float('nan')] * de.NUM for _ in range(me.NUM)]
+        sz_gbuf = [float('nan')] * de.NUM
+        sz_regf = [float('nan')] * de.NUM
+
+        flpesets_per_unitpass = self.fold.h
+
+        if isinstance(self.layer, ConvLayer):
+
+            # A unitpass processes all folded fils, and one folded ifm/ofm.
+            # Row size is not affected since a row is within one PE.
+            acclayer = ConvLayer(
+                1, 1,
+                (1. * self.layer.hofm / self.fold.w, self.layer.wofm),
+                (self.layer.hfil, self.layer.wfil),
+                strd=(self.layer.htrd, self.layer.wtrd))
+            buflayer = ConvLayer(
+                1, 1,
+                (Util.idivc(self.layer.hofm, self.fold.w), self.layer.wofm),
+                (self.layer.hfil, self.layer.wfil),
+                strd=(self.layer.htrd, self.layer.wtrd))
+
+            ops = acclayer.total_ops()
+
+            time = flpesets_per_unitpass * self.ops_lpe
+
+            # Data are accessed once from DRAM into gbuf.
+            access[me.DRAM][de.FIL] = acclayer.total_filter_size()
+            access[me.DRAM][de.IFM] = acclayer.total_ifmap_size()
+            access[me.DRAM][de.OFM] = acclayer.total_ofmap_size()
+
+            # To iterate all folded fils over the fmaps, we have two choices
+            # for ConvLayer:
+            # a) only store one folded fil in regf and access fmaps multiple
+            # times from gbuf;
+            # b) store all folded fils in regf and only access fmaps once from
+            # gbuf.
+            # To save regf size, we choose a).
+            access[me.GBUF][de.FIL] = access[me.DRAM][de.FIL]
+            access[me.GBUF][de.IFM] = access[me.DRAM][de.IFM] \
+                    * flpesets_per_unitpass
+            access[me.GBUF][de.OFM] = access[me.DRAM][de.OFM] \
+                    * flpesets_per_unitpass
+
+            # All data from/to gbuf go through itcn.
+            access[me.ITCN] = access[me.GBUF]
+
+            # regf access is based on num of ops.
+            access[me.REGF] = [ops] * de.NUM
+
+            sz_gbuf[de.FIL] = buflayer.total_filter_size()
+            sz_gbuf[de.IFM] = buflayer.total_ifmap_size()
+            sz_gbuf[de.OFM] = buflayer.total_ofmap_size()
+
+            # Entire fil row of one folded fil per PE.
+            sz_regf[de.FIL] = buflayer.wfil
+            # For 1D conv in each PE, ifm and ofm are both accessed in a
+            # streaming fashion (sliding window). Only capturing wfil ifm
+            # elements and 1 ofm element is adequate.
+            sz_regf[de.IFM] = buflayer.wfil
+            sz_regf[de.OFM] = 1
+
         else:
-            # Ceil the number of rows.
-            dims_per_flpeset = [tuple(int(math.ceil(d) + 1e-6) for d in dims)
-                                for dims in avgdims_per_flpeset]
+            assert isinstance(self.layer, LocalRegionLayer)
 
-        # Number of ifmap needed.
-        if is_access:
-            # Since ifm loop count is always 1, we account for all ifmaps
-            # accesses here.
-            ifms_per_procpass = self.layer.nifm
+            # A unitpass processes all folded regions, and one folded ifm/ofm.
+            # Row size is not affected since a row is within one PE.
+            acclayer = LocalRegionLayer(
+                1,
+                (1. * self.layer.hofm / self.fold.w, self.layer.wofm),
+                self.layer.nreg, (self.layer.hreg, self.layer.wreg),
+                strd=(self.layer.htrd, self.layer.wtrd))
+
+            buflayer = LocalRegionLayer(
+                1,
+                (Util.idivc(self.layer.hofm, self.fold.w), self.layer.wofm),
+                self.layer.nreg, (self.layer.hreg, self.layer.wreg),
+                strd=(self.layer.htrd, self.layer.wtrd))
+
+            ops = acclayer.total_ops()
+
+            time = flpesets_per_unitpass * self.ops_lpe
+
+            # Data are accessed once from DRAM into gbuf.
+            access[me.DRAM][de.FIL] = 0
+            access[me.DRAM][de.IFM] = acclayer.total_ifmap_size()
+            access[me.DRAM][de.OFM] = acclayer.total_ofmap_size()
+
+            # For LocalRegionLayer, ofm needs to access multiple times, each
+            # with a different ifm range.
+            access[me.GBUF][de.FIL] = 0
+            access[me.GBUF][de.IFM] = access[me.DRAM][de.IFM]
+            access[me.GBUF][de.OFM] = access[me.DRAM][de.OFM] \
+                    * flpesets_per_unitpass
+
+            # All data from/to gbuf go through itcn.
+            access[me.ITCN] = access[me.GBUF]
+
+            # regf access is based on num of ops.
+            access[me.REGF][de.FIL] = 0
+            access[me.REGF][de.IFM] = ops
+            access[me.REGF][de.OFM] = ops
+
+            sz_gbuf[de.FIL] = 0
+            sz_gbuf[de.IFM] = buflayer.total_ifmap_size()
+            sz_gbuf[de.OFM] = buflayer.total_ofmap_size()
+
+            sz_regf[de.FIL] = 0
+            # In each PE, ifm and ofm are both accessed in a streaming fashion
+            # (sliding window). Only capturing wreg ifm elements and 1 ofm
+            # element is adequate.
+            sz_regf[de.IFM] = buflayer.wreg
+            sz_regf[de.OFM] = 1
+
+        # All utilized PEs run `time` to execute replicated `ops`
+        assert Util.isclose(time * self.dim_array.size() * self.util,
+                            ops * self.repl.size(),
+                            abs_tol=1e-3)
+
+        # Due to folding, the overlapping ifmaps may need to be re-fetched,
+        # resulting in amplified access for ifmaps.
+        # Consider one flpeset, hifm rows are folded by fold.w.
+        amp_acc_ifm = acclayer.hifm * self.fold.w / self.layer.hifm
+
+        return ops, time, access, sz_gbuf, sz_regf, amp_acc_ifm
+
+    def _gen_repl(self):
+        '''
+        Generate all replication with ifmaps/ofmaps, to build procpass from
+        unitpass.
+
+        Return the total loop count tuple, the loop occupation list, and the
+        replicated data counts.
+        '''
+        if isinstance(self.layer, ConvLayer):
+
+            # repl.w is only used for ofmaps, and repl.h can be used either for
+            # ifmaps or ofmaps.
+
+            # Loop body unit time is constant w.r.t. the split of repl.h, so we
+            # pick the smallest total number of loops.
+            min_cnt_loops = float('inf')
+
+            for t_repl_h in Util.factorize(self.repl.h, 2):
+
+                ifms = t_repl_h[0]
+                ofms = t_repl_h[1] * self.repl.w
+
+                # Loop trip counts.
+                lcnt = [float('nan')] * le.NUM
+                lcnt[le.IFM] = Util.idivc(self.layer.nifm, ifms)
+                lcnt[le.OFM] = Util.idivc(self.layer.nofm, ofms)
+                # fold.w is equivalent to increasing batch size.
+                lcnt[le.BAT] = self.batch_size * self.fold.w
+
+                cnt_loops = Util.prod(lcnt)
+                if cnt_loops < min_cnt_loops:
+                    min_cnt_loops = cnt_loops
+                elif cnt_loops > min_cnt_loops:
+                    continue
+
+                # Loop occupation.
+                locc = [1.] * le.NUM
+                locc[le.IFM] = 1. * self.layer.nifm / ifms / lcnt[le.IFM]
+                locc[le.OFM] = 1. * self.layer.nofm / ofms / lcnt[le.OFM]
+
+                # Replicated data counts.
+                repl_cnt = [0] * de.NUM
+                repl_cnt[de.FIL] = ifms * ofms
+                repl_cnt[de.IFM] = ifms
+                repl_cnt[de.OFM] = ofms
+
+                yield tuple(lcnt), locc, repl_cnt
+
         else:
-            # Determined by nreg.
-            ifms_per_procpass = ofms_per_procpass - 1 + self.layer.nreg
+            assert isinstance(self.layer, LocalRegionLayer)
 
-        usize_gbuf = [0] * de.NUM
-        # No FIL.
-        usize_gbuf[de.FIL] = 0
-        usize_gbuf[de.IFM] = (Util.prod(dims_per_flpeset[de.IFM])
-                              * ifms_per_procpass)
-        usize_gbuf[de.OFM] = (Util.prod(dims_per_flpeset[de.OFM])
-                              * ofms_per_procpass)
-        return tuple(usize_gbuf)
+            # repl is only used for ofmaps.
+            ofms = self.repl.size()
+
+            # Loop trip counts.
+            lcnt = [float('nan')] * le.NUM
+            # Loop ifm is corresponding to loop ofm, so always 1.
+            lcnt[le.IFM] = 1
+            lcnt[le.OFM] = Util.idivc(self.layer.nofm, ofms)
+            # fold.w is equivalent to increasing batch size.
+            lcnt[le.BAT] = self.batch_size * self.fold.w
+
+            # Loop occupation.
+            locc = [1.] * le.NUM
+            locc[le.OFM] = 1. * self.layer.nofm / ofms / lcnt[le.OFM]
+
+            # Replicated data counts.
+            repl_cnt = [0] * de.NUM
+            repl_cnt[de.FIL] = 0
+            repl_cnt[de.IFM] = ofms  # ifm and ofm is one-to-one.
+            repl_cnt[de.OFM] = ofms
+
+            yield tuple(lcnt), locc, repl_cnt
 

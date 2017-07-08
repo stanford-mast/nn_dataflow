@@ -60,6 +60,9 @@ List of major changes and improvements
 
   - Refactor loop blocking bypass solvers.
 
+  - Use row-stationary mapping to `LocalRegionLayer`, and merge with that of
+    `ConvLayer`.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.
