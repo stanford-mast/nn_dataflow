@@ -20,6 +20,9 @@ List of major changes and improvements
 
   - Add default filter size to `FCLayer`.
 
+  - Add `DataDimLoops` class to denote loops that are dimensions of a data
+    category.
+
 - Software engineering.
 
   - Add utilities to `LoopBlockingScheme` class.

@@ -25,6 +25,7 @@ from . import MemHierEnum
 from . import ParallelEnum
 from . import Partition
 from .Cost import Cost
+from .DataDimLoops import DataDimLoops
 from .DataLayout import DataLayout
 from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
 from .Layer import Layer, InputLayer, ConvLayer, FCLayer, \
