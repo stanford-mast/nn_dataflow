@@ -81,6 +81,9 @@ class LoopBlockingScheme(object):
         # pylint: disable=invalid-name
         BL = self.BL
 
+        # Loop structure.
+        self.nld = nested_loop_desc
+
         # Check lengths and values.
         assert len(bl_ts) == BL.NUM + 1, \
                 'LoopBlockingScheme: bl_ts has invalid length.'
@@ -97,17 +100,16 @@ class LoopBlockingScheme(object):
         # Check blocking.
         bl_tp = self._bl_tp(slice(None))
         for lpe in range(le.NUM):
-            assert bl_tp[lpe] >= nested_loop_desc.loopcnt[lpe], \
+            assert bl_tp[lpe] >= self.nld.loopcnt[lpe], \
                     'LoopBlockingScheme: invalid blocking LP {}: {} for {}.' \
-                    .format(lpe, self.bl_ts, nested_loop_desc.loopcnt)
+                    .format(lpe, self.bl_ts, self.nld.loopcnt)
 
         self.lcnt = Util.prod(bl_tp)
-        self.total_units = self._t_data_cnt(bl_tp)
 
         # Buffer data size for one unit.
         self.unit_size = [tuple() for _ in range(BL.NUM)]
-        self.unit_size[BL.GBUF] = nested_loop_desc.usize_gbuf
-        self.unit_size[BL.REGF] = nested_loop_desc.usize_regf
+        self.unit_size[BL.GBUF] = self.nld.usize_gbuf
+        self.unit_size[BL.REGF] = self.nld.usize_regf
 
         # Buffer data unit counts.
         self._set_unit_cnt()
@@ -148,11 +150,6 @@ class LoopBlockingScheme(object):
                 or self.data_size(BL.GBUF) > resource.size_gbuf:
             self.valid = False
             return
-
-        # Record unit stats.
-        self.unit_ops = nested_loop_desc.unit_ops
-        self.unit_time = nested_loop_desc.unit_time
-        self.unit_access = nested_loop_desc.unit_access
 
         # Parallel partitioning.
         self.num_nodes = resource.dim_nodes.size()
@@ -407,29 +404,30 @@ class LoopBlockingScheme(object):
         Lazily calculate stats.
         '''
 
-        self.ops = self.unit_ops * self.lcnt * self.num_nodes * self.part_occ
-        self.time = self.unit_time * self.lcnt
+        self.ops = self.nld.unit_ops * self.lcnt * self.num_nodes \
+                * self.part_occ
+        self.time = self.nld.unit_time * self.lcnt
 
         self.access[me.REGF] = [v * self.lcnt * t
                                 * self.num_nodes * self.part_occ for v, t
-                                in zip(self.unit_access[me.REGF],
+                                in zip(self.nld.unit_access[me.REGF],
                                        [1, 1, 2])]
 
-        self.access[me.ITCN] = [v * u * f * self.num_nodes for v, u, f
-                                in zip(self.unit_access[me.ITCN],
-                                       self.total_units,
-                                       self.fetch[self.BL.REGF])]
+        self.access[me.ITCN] = [self.nld.total_access_at_of(me.ITCN, dce)
+                                * self.fetch[self.BL.REGF][dce]
+                                * self.num_nodes
+                                for dce in range(de.NUM)]
 
-        self.access[me.GBUF] = [v * u * f * s * self.num_nodes for v, u, f, s
-                                in zip(self.unit_access[me.GBUF],
-                                       self.total_units,
-                                       self.fetch[self.BL.REGF],
-                                       self.stored_in_gbuf)]
+        self.access[me.GBUF] = [self.nld.total_access_at_of(me.GBUF, dce)
+                                * self.fetch[self.BL.REGF][dce]
+                                * self.stored_in_gbuf[dce]
+                                * self.num_nodes
+                                for dce in range(de.NUM)]
 
-        self.access[me.DRAM] = [v * u * f * self.num_nodes for v, u, f
-                                in zip(self.unit_access[me.DRAM],
-                                       self.total_units,
-                                       self.fetch[self.BL.GBUF])]
+        self.access[me.DRAM] = [self.nld.total_access_at_of(me.DRAM, dce)
+                                * self.fetch[self.BL.GBUF][dce]
+                                * self.num_nodes
+                                for dce in range(de.NUM)]
 
         self.finalized_stats = True
 
@@ -441,18 +439,14 @@ class LoopBlockingScheme(object):
         assert isinstance(bl_lvls, slice)
         return [Util.prod(ts[bl_lvls]) for ts in zip(*self.bl_ts)]
 
-    @staticmethod
-    def _t_data_cnt(bl_t):
+    def _t_data_cnt(self, bl_t):
         '''
         Get the corresponding data unit counts given the loop blocking factors.
 
         `bl_t` are the loop blocking factors, indexed by LoopEnum.
         '''
-        cnt = [0] * de.NUM
-        cnt[de.FIL] = bl_t[le.IFM] * bl_t[le.OFM]
-        cnt[de.IFM] = bl_t[le.IFM] * bl_t[le.BAT]
-        cnt[de.OFM] = bl_t[le.OFM] * bl_t[le.BAT]
-        return cnt
+        return [self.nld.data_loops[dce].data_cnt(bl_t)
+                for dce in range(de.NUM)]
 
     @staticmethod
     def _innermost_nontrivial_loop(bl_t, bl_ord):

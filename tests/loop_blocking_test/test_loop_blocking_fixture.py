@@ -23,6 +23,7 @@ import unittest
 
 from nn_dataflow import ConvLayer, PoolingLayer
 from nn_dataflow import Cost
+from nn_dataflow import DataDimLoops
 from nn_dataflow import DataCategoryEnum as de
 from nn_dataflow import LoopBlockingScheme
 from nn_dataflow import LoopEnum as le
@@ -77,6 +78,12 @@ class TestLoopBlockingFixture(unittest.TestCase):
                                           usize_regf=(3, 0, 1),
                                           unit_access=((9, 0, 800), (9, 0, 800),
                                                        (3, 9, 7), (1, 1, 1)),
+                                          data_loops=(DataDimLoops(le.IFM,
+                                                                   le.OFM),
+                                                      DataDimLoops(le.IFM,
+                                                                   le.BAT),
+                                                      DataDimLoops(le.OFM,
+                                                                   le.BAT)),
                                           unit_ops=1, unit_time=1)
 
         # Options.
@@ -249,7 +256,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
                  (Util.prod(lpts[le.IFM]), Util.prod(lpts[le.BAT])),
                  (Util.prod(lpts[le.OFM]), Util.prod(lpts[le.BAT]))]):
             drams[dce] = self._SimBuffer(buf_cnt_pr,
-                                         lbs.unit_access[me.DRAM][dce],
+                                         lbs.nld.unit_access[me.DRAM][dce],
                                          is_ofm=(dce == de.OFM)
                                         )
         gbufs = [None] * de.NUM
@@ -259,7 +266,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
                  (Util.prod(lpts[le.IFM][1:]), Util.prod(lpts[le.BAT][1:])),
                  (Util.prod(lpts[le.OFM][1:]), Util.prod(lpts[le.BAT][1:]))]):
             gbufs[dce] = self._SimBuffer(buf_cnt_pr,
-                                         lbs.unit_access[me.GBUF][dce],
+                                         lbs.nld.unit_access[me.GBUF][dce],
                                          is_ofm=(dce == de.OFM),
                                          bypass=(not lbs.stored_in_gbuf[dce])
                                         )
@@ -270,7 +277,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
                  (Util.prod(lpts[le.IFM][2:]), Util.prod(lpts[le.BAT][2:])),
                  (Util.prod(lpts[le.OFM][2:]), Util.prod(lpts[le.BAT][2:]))]):
             regfs[dce] = self._SimBuffer(buf_cnt_pr,
-                                         lbs.unit_access[me.REGF][dce],
+                                         lbs.nld.unit_access[me.REGF][dce],
                                          is_ofm=(dce == de.OFM)
                                         )
 

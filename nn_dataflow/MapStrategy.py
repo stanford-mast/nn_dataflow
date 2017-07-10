@@ -19,6 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from . import DataCategoryEnum as de
+from . import DataDimLoops
 from . import LoopEnum as le
 from . import MemHierEnum as me
 from . import Util
@@ -62,6 +63,7 @@ class MapStrategyEyeriss(MapStrategy):
 
     Chen, Emer, and Sze, ISCA'16.
     '''
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, layer, batch_size, dim_array):
 
@@ -100,6 +102,9 @@ class MapStrategyEyeriss(MapStrategy):
                  'folded logic PE set {}. Can\'t we fit more?'
                  .format(self.dim_ppeset, self.dim_array,
                          self.dim_lpeset, self.dim_flpeset))
+
+        # Loops of data.
+        self._calc_data_loops()
 
     def utilization(self):
         return self.util
@@ -187,18 +192,12 @@ class MapStrategyEyeriss(MapStrategy):
             # Replication uses different PEs.
             usize_regf = tuple(sz_regf_unitpass)
 
-            # FIXME: account for all ifmap accesses.
-            if isinstance(self.layer, LocalRegionLayer):
-                rcnt[de.IFM] = self.layer.nifm
-
             # Unit access, i.e., data accesses for one processing pass.
             # Replicate to procpass. Also consider loop occupations.
             uaccess = [tuple() for _ in range(me.NUM)]
             # Loop occupations affect accesses.
-            aocc = [0] * de.NUM
-            aocc[de.FIL] = locc[le.IFM] * locc[le.OFM]
-            aocc[de.IFM] = locc[le.IFM] * locc[le.BAT]
-            aocc[de.OFM] = locc[le.OFM] * locc[le.BAT]
+            aocc = [self.data_loops[dce].data_cnt(locc)
+                    for dce in range(de.NUM)]
             # Replication uses the single DRAM, gbuf, itcn.
             for mhe in [me.DRAM, me.GBUF, me.ITCN]:
                 uaccess[mhe] = tuple(a * n * o for a, n, o
@@ -213,33 +212,48 @@ class MapStrategyEyeriss(MapStrategy):
             # Make nested loop desc.
             nld = NestedLoopDesc(loopcnt=lcnt, unit_access=unit_access,
                                  usize_gbuf=usize_gbuf, usize_regf=usize_regf,
-                                 unit_ops=unit_ops, unit_time=unit_time)
+                                 unit_ops=unit_ops, unit_time=unit_time,
+                                 data_loops=self.data_loops)
 
             # Check num of ops.
             Util.assert_float_eq_int(
-                nld.unit_ops * Util.prod(lcnt),
-                self.layer.total_ops(self.batch_size),
+                nld.total_ops(), self.layer.total_ops(self.batch_size),
                 'MapEyeriss: total number of physical ops is incorrect.')
 
             # Check unit access.
             Util.assert_float_eq_int(
-                uaccess[me.DRAM][de.FIL] * lcnt[le.IFM] * lcnt[le.OFM],
+                nld.total_access_at_of(me.DRAM, de.FIL),
                 self.layer.total_filter_size()
                 if isinstance(self.layer, ConvLayer) else 0,
-                'MapEyeriss: unit access at DRAM for FIL {} is incorrect.'
-                .format(uaccess[me.DRAM][de.FIL]))
+                'MapEyeriss: total access at DRAM for FIL {} is incorrect.'
+                .format(nld.total_access_at_of(me.DRAM, de.FIL)))
             Util.assert_float_eq_int(
                 # Need to consider amplified access for IFM.
-                uaccess[me.DRAM][de.IFM] * lcnt[le.IFM] * lcnt[le.BAT]
-                / amp_acc_ifm,
+                nld.total_access_at_of(me.DRAM, de.IFM) / amp_acc_ifm,
                 self.layer.total_ifmap_size(self.batch_size),
-                'MapEyeriss: unit access at DRAM for IFM {} is incorrect.'
-                .format(uaccess[me.DRAM][de.IFM]))
+                'MapEyeriss: total access at DRAM for IFM {} is incorrect.'
+                .format(nld.total_access_at_of(me.DRAM, de.IFM)))
             Util.assert_float_eq_int(
-                uaccess[me.DRAM][de.OFM] * lcnt[le.OFM] * lcnt[le.BAT],
+                nld.total_access_at_of(me.DRAM, de.OFM),
                 self.layer.total_ofmap_size(self.batch_size),
-                'MapEyeriss: unit access at DRAM for OFM {} is incorrect.'
-                .format(uaccess[me.DRAM][de.OFM]))
+                'MapEyeriss: total access at DRAM for OFM {} is incorrect.'
+                .format(nld.total_access_at_of(me.DRAM, de.OFM)))
+            Util.assert_float_eq_int(
+                nld.unit_access_at_of(me.REGF, de.FIL) * Util.prod(nld.loopcnt),
+                self.layer.total_ops(self.batch_size)
+                if isinstance(self.layer, ConvLayer) else 0,
+                'MapEyeriss: unit access at REGF for FIL {} is incorrect.'
+                .format(nld.unit_access_at_of(me.REGF)))
+            Util.assert_float_eq_int(
+                nld.unit_access_at_of(me.REGF, de.IFM) * Util.prod(nld.loopcnt),
+                self.layer.total_ops(self.batch_size),
+                'MapEyeriss: unit access at REGF for IFM {} is incorrect.'
+                .format(nld.unit_access_at_of(me.REGF)))
+            Util.assert_float_eq_int(
+                nld.unit_access_at_of(me.REGF, de.OFM) * Util.prod(nld.loopcnt),
+                self.layer.total_ops(self.batch_size),
+                'MapEyeriss: unit access at REGF for OFM {} is incorrect.'
+                .format(nld.unit_access_at_of(me.REGF)))
 
             yield nld
 
@@ -294,6 +308,25 @@ class MapStrategyEyeriss(MapStrategy):
                 and self.dim_ppeset.w <= self.dim_array.w), \
             'MapEyeriss: dim_ppeset {} does not fit in dim_array {}.' \
             .format(self.dim_ppeset, self.dim_array)
+
+    def _calc_data_loops(self):
+        '''
+        Calculate the loop of data according to the layer type.
+        '''
+        dls = [None] * de.NUM
+
+        if isinstance(self.layer, ConvLayer):
+            dls[de.FIL] = DataDimLoops(le.IFM, le.OFM)
+            dls[de.IFM] = DataDimLoops(le.IFM, le.BAT)
+            dls[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+        else:
+            assert isinstance(self.layer, LocalRegionLayer)
+            # Both ifmaps and ofmaps use ofm loop.
+            dls[de.FIL] = DataDimLoops()
+            dls[de.IFM] = DataDimLoops(le.OFM, le.BAT)
+            dls[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+
+        self.data_loops = tuple(dls)
 
     def _calc_unitpass(self):
         '''
