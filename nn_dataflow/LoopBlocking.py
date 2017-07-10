@@ -37,10 +37,10 @@ Include loop blocking and reordering.
 For our problem, only deal with nifm, nofm, and batch loops.
 '''
 
-def skip(bl_ts, bl_ords):
+def skip_conv(bl_ts, bl_ords):
     '''
-    Skip the given loop blocking scheme if it has regularized equivalent, or it
-    is suboptimal.
+    Skip the given loop blocking scheme for CONV layer, if it has regularized
+    equivalent, or it is suboptimal.
 
     Equivalence of loop blocking schemes:
 
@@ -134,8 +134,9 @@ def _gen_loopblocking_perprocess(
 
     def _sweep():
         ''' Sweep all. '''
+        is_conv_loops = _is_conv_loops(nested_loop_desc)
         for bl_ts, bl_ords in itertools.product(_gen_bl_ts(), gen_ords):
-            if skip(bl_ts, bl_ords):
+            if is_conv_loops and skip_conv(bl_ts, bl_ords):
                 continue
             lbs = LoopBlockingScheme(
                 nested_loop_desc, bl_ts, bl_ords, resource, part_occ, options)

@@ -59,7 +59,8 @@ List of major changes and improvements
   - Change `LoopBlockingScheme` interface for blocking factors and loop orders.
 
   - Loop blocking exhaustive search introduces regularized schemes and
-    suboptimal schemes, to enable more skips.
+    suboptimal schemes, to enable more skips. Also restrict the skips to CONV
+    layer.
 
   - Refactor loop blocking bypass solvers, and restrict it to CONV layer.
 
