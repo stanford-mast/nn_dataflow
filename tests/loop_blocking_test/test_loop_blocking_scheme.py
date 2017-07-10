@@ -134,7 +134,7 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
             # Model.
             access = lbs.get_access()
             # Sim.
-            dram_access, gbuf_access = self._sim_access(lbs)
+            dram_access, gbuf_access = self._sim_access_conv(lbs)
 
             self.assertListEqual(access[me.DRAM], dram_access,
                                  'test_access: DRAM: '
@@ -163,7 +163,7 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
             # Model.
             access = lbs.get_access()
             # Sim.
-            dram_access, gbuf_access = self._sim_access(lbs)
+            dram_access, gbuf_access = self._sim_access_conv(lbs)
 
             self.assertListEqual(access[me.DRAM], dram_access,
                                  'test_access_bypass: DRAM: '
@@ -179,6 +179,20 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
                                  .format(access[me.GBUF], gbuf_access,
                                          bl_ts, bl_ords,
                                          lbs.stored_in_gbuf))
+
+    def test_access_pool(self):
+        ''' get_access for PoolingLayer. '''
+
+        for bl_ts, bl_ords in self._gen_loopblocking_all(wlkey='POOL'):
+
+            lbs = self._lbs(bl_ts, bl_ords, wlkey='POOL', rsrckey='LG')
+
+            self.assertTrue(lbs.is_valid())
+            self.assertSequenceEqual(bl_ts, lbs.bl_ts)
+            self.assertSequenceEqual(bl_ords, lbs.bl_ords)
+
+            self.assertSequenceEqual(lbs.fetch[0], (1, 1, 1))
+            self.assertSequenceEqual(lbs.fetch[1], (1, 1, 1))
 
     def test_access_invalid(self):
         ''' get_access invalid. '''

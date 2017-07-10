@@ -66,6 +66,8 @@ List of major changes and improvements
   - Use row-stationary mapping to `LocalRegionLayer`, and merge with that of
     `ConvLayer`.
 
+  - Generalize `LoopBlockingScheme` access model for arbitrary data loops.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.

@@ -369,33 +369,36 @@ class LoopBlockingScheme(object):
             # BL corresponds to the BL + 1 element in ti/to/tb. But the outer
             # level is the BL element.
 
-            # If the blocking factors of a data category are all 1's in the
-            # current level, the current level does not change the data, and
-            # the fetch times at this level is the same as the outer level.
-
-            # Every data category has two related loops and one unrelated
-            # loops. Only when the innermost non-trivial loop of the current
-            # level is the unrelated loop, can the data reuse include the
-            # current level blocking factor.
-
-            # The innermost non-trivial loop.
-            # If all loops are trivial, we will use the outer level reuse for
-            # all data, so the loop is not used.
-            innermost_nt_lp = self._innermost_nontrivial_loop(self.bl_ts[bl],
-                                                              self.bl_ords[bl])
-
-            cnt = self._t_data_cnt(self.bl_ts[bl])
+            # A data category has related (dimension) loops and unrelated
+            # loops. The data reuse only includes the current level blocking
+            # factors of the unrelated loops if they are inner than all the
+            # dimension loops, i.e., inner than the innermost non-trivial
+            # dimension loop of the current level. If all the dimension loops
+            # are trivial, i.e., have blocking factor 1, the current level does
+            # not change the data, and the fetch times at this level is the
+            # same as the outer level.
 
             fe = [0] * de.NUM
 
-            for dce, lpe in zip([de.FIL, de.IFM, de.OFM],
-                                [le.BAT, le.OFM, le.IFM]):
-                if cnt[dce] == 1:
+            bl_t = self.bl_ts[bl]
+            bl_ord = self.bl_ords[bl]
+
+            for dce in range(de.NUM):
+
+                inntdim_lp = self._innt_dim_loop(dce, bl_t, bl_ord)
+
+                if inntdim_lp is None:
                     fe[dce] = self.fetch[bl-1][dce] if bl > 0 else 1
-                else:
-                    bl_start = bl + (innermost_nt_lp != lpe)
-                    f = self._bl_tp(slice(bl_start))[lpe]
-                    fe[dce] = 2 * f - 1 if dce == de.OFM else f
+                    continue
+
+                f = 1
+                for lpe in self.nld.data_loops[dce].drop(range(le.NUM)):
+                    # Include the unrelated loop blocking factors outside of
+                    # the innermost non-trivial dimension loop.
+                    bl_start = bl + (bl_ord[lpe] > bl_ord[inntdim_lp])
+                    f *= self._bl_tp(slice(bl_start))[lpe]
+
+                fe[dce] = 2 * f - 1 if dce == de.OFM else f
 
             self.fetch.append(fe)
 
@@ -448,14 +451,14 @@ class LoopBlockingScheme(object):
         return [self.nld.data_loops[dce].data_cnt(bl_t)
                 for dce in range(de.NUM)]
 
-    @staticmethod
-    def _innermost_nontrivial_loop(bl_t, bl_ord):
+    def _innt_dim_loop(self, dce, bl_t, bl_ord):
         '''
-        Get the innermost non-trivial loop at a level. Return None if all loops
-        are trivial.
+        Get the innermost non-trivial loop which is a dimension loop of the
+        given data category. Return None if all dimension loops are trivial.
 
-        The innermost non-trivial loop has a non-one blocking factor, and the
-        smallest order value.
+        The innermost non-trivial dimension loop is one of the data dimension
+        loops of data category `dce`, has a non-one blocking factor, and has
+        the smallest order value.
 
         `bl_t` are the loop blocking factors, indexed by LoopEnum. `bl_ord` is
         the loop order.
@@ -464,7 +467,7 @@ class LoopBlockingScheme(object):
         # The first element picks out the non-trivial loops (False < True). If
         # all loops are trivial, None will be the only left one.
         # The second element compares the order within the non-trivial loops.
-        return min([None] + range(le.NUM),
+        return min((None,) + self.nld.data_loops[dce].loops(),
                    key=lambda lpe: (bl_t[lpe] == 1, bl_ord[lpe]) \
                            if lpe is not None else (False, le.NUM))
 

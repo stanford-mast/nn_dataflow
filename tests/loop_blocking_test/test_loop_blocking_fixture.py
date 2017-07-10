@@ -258,11 +258,12 @@ class TestLoopBlockingFixture(unittest.TestCase):
             self.data = ridx_pr
             return self.buf_cnt_pr
 
-    def _sim_access(self, lbs):
+    def _sim_access_conv(self, lbs):
         '''
-        Get data access by actually simulating and generating loops.
+        Get data access by actually simulating and generating loops for CONV
+        layer.
         '''
-        self.assertTrue(lbs.is_valid(), '_sim_access: invalid lbs.')
+        self.assertTrue(lbs.is_valid(), '_sim_access_conv: invalid lbs.')
 
         lpts = zip(*lbs.bl_ts)
 
