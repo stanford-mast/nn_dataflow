@@ -61,7 +61,7 @@ List of major changes and improvements
   - Loop blocking exhaustive search introduces regularized schemes and
     suboptimal schemes, to enable more skips.
 
-  - Refactor loop blocking bypass solvers.
+  - Refactor loop blocking bypass solvers, and restrict it to CONV layer.
 
   - Use row-stationary mapping to `LocalRegionLayer`, and merge with that of
     `ConvLayer`.

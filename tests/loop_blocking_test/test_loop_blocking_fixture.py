@@ -72,19 +72,36 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.nld['POOL'] = next(MapStrategyEyeriss(self.layer['POOL'],
                                                    self.batch_size, dim_array)
                                 .gen_nested_loop_desc())
+        # Fake nested loop, with zero filter size.
+        self.nld['ZERO_FIL'] = NestedLoopDesc(loopcnt=(12, 10, 4),
+                                              usize_gbuf=(0, 1000, 800),
+                                              usize_regf=(0, 3, 1),
+                                              unit_access=((0, 1000, 800),
+                                                           (0, 1000, 800),
+                                                           (3, 9, 7),
+                                                           (1, 1, 1)),
+                                              data_loops=(DataDimLoops(le.IFM,
+                                                                       le.OFM),
+                                                          DataDimLoops(le.IFM,
+                                                                       le.BAT),
+                                                          DataDimLoops(le.OFM,
+                                                                       le.BAT)),
+                                              unit_ops=1, unit_time=1)
         # Fake nested loop, with zero ifmap size.
-        self.nld['ZERO'] = NestedLoopDesc(loopcnt=(12, 10, 4),
-                                          usize_gbuf=(9, 0, 800),
-                                          usize_regf=(3, 0, 1),
-                                          unit_access=((9, 0, 800), (9, 0, 800),
-                                                       (3, 9, 7), (1, 1, 1)),
-                                          data_loops=(DataDimLoops(le.IFM,
-                                                                   le.OFM),
-                                                      DataDimLoops(le.IFM,
-                                                                   le.BAT),
-                                                      DataDimLoops(le.OFM,
-                                                                   le.BAT)),
-                                          unit_ops=1, unit_time=1)
+        self.nld['ZERO_IFM'] = NestedLoopDesc(loopcnt=(12, 10, 4),
+                                              usize_gbuf=(9, 0, 800),
+                                              usize_regf=(3, 0, 1),
+                                              unit_access=((9, 0, 800),
+                                                           (9, 0, 800),
+                                                           (3, 9, 7),
+                                                           (1, 1, 1)),
+                                              data_loops=(DataDimLoops(le.IFM,
+                                                                       le.OFM),
+                                                          DataDimLoops(le.IFM,
+                                                                       le.BAT),
+                                                          DataDimLoops(le.OFM,
+                                                                       le.BAT)),
+                                              unit_ops=1, unit_time=1)
 
         # Options.
         self.options = {}
