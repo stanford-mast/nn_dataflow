@@ -180,6 +180,37 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
                                          bl_ts, bl_ords,
                                          lbs.stored_in_gbuf))
 
+    def test_access_bypass_lgfil(self):
+        ''' get_access bypass for ConvLayer with large filter size. '''
+
+        for bl_ts, bl_ords in self._gen_loopblocking_all(wlkey='LGFIL'):
+
+            lbs = self._lbs(bl_ts, bl_ords, wlkey='LGFIL', optkey='BYP')
+            if not lbs.is_valid():
+                continue
+            if all(lbs.stored_in_gbuf):
+                continue
+
+            # Model.
+            access = lbs.get_access()
+            # Sim.
+            dram_access, gbuf_access = self._sim_access_conv(lbs)
+
+            self.assertListEqual(access[me.DRAM], dram_access,
+                                 'test_access_bypass_lgfil: DRAM: '
+                                 'model {} vs. sim {}. lbs: {} {}. '
+                                 'stored in gbuf {}.'
+                                 .format(access[me.DRAM], dram_access,
+                                         bl_ts, bl_ords,
+                                         lbs.stored_in_gbuf))
+            self.assertListEqual(access[me.GBUF], gbuf_access,
+                                 'test_access_bypass_lgfil: GBUF: '
+                                 'model {} vs. sim {}. lbs: {} {}. '
+                                 'stored in gbuf {}.'
+                                 .format(access[me.GBUF], gbuf_access,
+                                         bl_ts, bl_ords,
+                                         lbs.stored_in_gbuf))
+
     def test_access_pool(self):
         ''' get_access for PoolingLayer. '''
 

@@ -44,6 +44,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
         # Workload.
         self.layer = {}
         self.layer['BASE'] = ConvLayer(12, 10, 28, 3)
+        self.layer['LGFIL'] = ConvLayer(2, 4, 28, 20)
         self.layer['POOL'] = PoolingLayer(32, 28, 2)
         self.batch_size = 4
 
@@ -69,6 +70,9 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.nld['BASE'] = next(MapStrategyEyeriss(self.layer['BASE'],
                                                    self.batch_size, dim_array)
                                 .gen_nested_loop_desc())
+        self.nld['LGFIL'] = next(MapStrategyEyeriss(self.layer['LGFIL'],
+                                                    self.batch_size, dim_array)
+                                 .gen_nested_loop_desc())
         self.nld['POOL'] = next(MapStrategyEyeriss(self.layer['POOL'],
                                                    self.batch_size, dim_array)
                                 .gen_nested_loop_desc())
@@ -274,7 +278,9 @@ class TestLoopBlockingFixture(unittest.TestCase):
                  (Util.prod(lpts[le.IFM]), Util.prod(lpts[le.BAT])),
                  (Util.prod(lpts[le.OFM]), Util.prod(lpts[le.BAT]))]):
             drams[dce] = self._SimBuffer(buf_cnt_pr,
-                                         lbs.nld.unit_access[me.DRAM][dce],
+                                         lbs.nld.unit_access[me.DRAM][dce]
+                                         if lbs.stored_in_gbuf[dce]
+                                         else lbs.nld.unit_access[me.GBUF][dce],
                                          is_ofm=(dce == de.OFM)
                                         )
         gbufs = [None] * de.NUM

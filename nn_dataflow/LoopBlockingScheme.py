@@ -427,7 +427,9 @@ class LoopBlockingScheme(object):
                                 * self.num_nodes
                                 for dce in range(de.NUM)]
 
-        self.access[me.DRAM] = [self.nld.total_access_at_of(me.DRAM, dce)
+        self.access[me.DRAM] = [(self.nld.total_access_at_of(me.DRAM, dce)
+                                 if self.stored_in_gbuf[dce]
+                                 else self.nld.total_access_at_of(me.GBUF, dce))
                                 * self.fetch[self.BL.GBUF][dce]
                                 * self.num_nodes
                                 for dce in range(de.NUM)]

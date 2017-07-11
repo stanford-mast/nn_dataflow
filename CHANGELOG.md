@@ -90,6 +90,8 @@ List of major changes and improvements
 
 - Multiple bugs fixed in `PartitionScheme`.
 
+- Use GBUF unit access for DRAM when bypassing GBUF.
+
 
 ## [v1.3 -- v1.4] -- 2017-05-18
 
