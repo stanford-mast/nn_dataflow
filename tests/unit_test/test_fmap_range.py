@@ -196,6 +196,15 @@ class TestFmapRange(unittest.TestCase):
         fr2 = FmapRange((1, 2, 3, 4), (5, 7, 11, 13))
         self.assertEqual(hash(fr1), hash(fr2))
 
+    def test_repr(self):
+        ''' __repr__. '''
+        # pylint: disable=eval-used
+        for fr in [FmapRange((0, 0, 0, 0), (3, 5, 7, 11)),
+                   FmapRange((-11, -4, 3, 0), (3, 5, 7, 11)),
+                   FmapRange((-11, -4, 3, 0), (3, 5, 7, 11)),
+                   FmapRange((0, 0, 3, 1), (1, 1, 5, 5))]:
+            self.assertEqual(eval(repr(fr)), fr)
+
 
 class TestFmapRangeMap(unittest.TestCase):
     ''' Tests for FmapRangeMap. '''

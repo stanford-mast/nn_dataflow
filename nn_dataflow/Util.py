@@ -24,19 +24,6 @@ from operator import mul
 Utilities.
 '''
 
-class StringifyClass(object):
-    '''
-    Class with a stringify interface.
-    '''
-    # pylint: disable=too-few-public-methods
-
-    def __str__(self):
-        return '{}({})'.format(
-            self.__class__.__name__,
-            ', '.join(['{}={}'.format(k, str(v)) for k, v
-                       in sorted(self.__dict__.items())]))
-
-
 class ContentHashClass(object):
     '''
     Class using the content instead of the object ID for hash.

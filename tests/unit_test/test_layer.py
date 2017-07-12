@@ -164,6 +164,14 @@ class TestLayer(unittest.TestCase):
         l2 = PoolingLayer(12, 14, 2)
         self.assertEqual(hash(l1), hash(l2))
 
+    def test_repr(self):
+        ''' __repr__. '''
+        # pylint: disable=eval-used
+        for l in [Layer(4, 12), Layer(4, [12, 24]), Layer(4, 12, strd=3),
+                  Layer(4, 12, strd=[3, 1]), Layer(4, [12, 24], strd=[3, 1])]:
+            self.assertIn('Layer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
+
 
 class TestInputLayer(unittest.TestCase):
     ''' Tests for InputLayer. '''
@@ -179,6 +187,15 @@ class TestInputLayer(unittest.TestCase):
         self.assertEqual(ilayer.ops_per_neuron(), 0,
                          'InputLayer: ops_per_neurons')
         self.assertEqual(ilayer.total_ops(), 0, 'InputLayer: total_ops')
+
+    def test_repr(self):
+        ''' __repr__. '''
+        # pylint: disable=eval-used
+        for l in [InputLayer(4, 12), InputLayer(4, [12, 24]),
+                  InputLayer(4, 12, strd=3), InputLayer(4, 12, strd=[3, 1]),
+                  InputLayer(4, [12, 24], strd=[3, 1])]:
+            self.assertIn('InputLayer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
 
 
 class TestConvLayer(unittest.TestCase):
@@ -227,6 +244,21 @@ class TestConvLayer(unittest.TestCase):
         self.assertEqual(flayer.total_filter_size(), 2048 * 4096 * 4,
                          'FCLayer: filter_size')
 
+    def test_repr(self):
+        ''' __repr__. '''
+        # pylint: disable=eval-used
+        for l in [ConvLayer(3, 64, [28, 14], [3, 1]),
+                  ConvLayer(3, 64, [28, 14], 3, strd=[7, 5]),
+                  ConvLayer(3, 64, 28, 3, strd=7), ConvLayer(3, 64, 28, 3)]:
+            self.assertIn('ConvLayer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
+
+        for l in [FCLayer(2048, 4096),
+                  FCLayer(100, 300, 7),
+                  FCLayer(100, 300, [7, 3])]:
+            self.assertIn('FCLayer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
+
 
 class TestLocalRegionLayer(unittest.TestCase):
     ''' Tests for LocalRegionLayer. '''
@@ -263,4 +295,20 @@ class TestLocalRegionLayer(unittest.TestCase):
                          player.total_ofmap_size() * 4)
         player = PoolingLayer(64, 28, 3, strd=2)
         self.assertEqual(player.ops_per_neuron(), 9)
+
+    def test_repr(self):
+        ''' __repr__. '''
+        # pylint: disable=eval-used
+        for l in [LocalRegionLayer(64, 28, 2, 1),
+                  LocalRegionLayer(64, [28, 14], 1, [2, 4]),
+                  LocalRegionLayer(64, [28, 14], 1, [2, 4], 7),
+                  LocalRegionLayer(64, 28, 1, 4, 7)]:
+            self.assertIn('LocalRegionLayer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
+
+        for l in [PoolingLayer(64, 28, 2),
+                  PoolingLayer(64, 28, 3, strd=2),
+                  PoolingLayer(64, [28, 14], [3, 4], strd=[2, 3])]:
+            self.assertIn('PoolingLayer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
 

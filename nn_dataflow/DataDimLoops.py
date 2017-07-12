@@ -20,9 +20,8 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from . import LoopEnum as le
 from . import Util
-from .Util import StringifyClass, ContentHashClass
 
-class DataDimLoops(StringifyClass, ContentHashClass):
+class DataDimLoops(Util.ContentHashClass):
     '''
     A tuple of loops that are the dimensions of the data.
     '''
@@ -60,4 +59,9 @@ class DataDimLoops(StringifyClass, ContentHashClass):
         Get the data unit count from the given loop counts.
         '''
         return Util.prod(self.take(loop_cnt))
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([repr(lpe) for lpe in self.lpe_tuple]))
 

@@ -24,9 +24,8 @@ from . import ParallelEnum as pe
 from . import Util
 from .Layer import ConvLayer, LocalRegionLayer
 from .PhyDim2 import PhyDim2
-from .Util import StringifyClass, ContentHashClass
 
-class PartitionScheme(StringifyClass, ContentHashClass):
+class PartitionScheme(Util.ContentHashClass):
     '''
     A parallel processing partitioning scheme.
     '''
@@ -130,4 +129,11 @@ class PartitionScheme(StringifyClass, ContentHashClass):
         assert p_occ <= 1 + 1e-6
 
         return p_layer, p_batch_size, p_occ
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'order={}'.format(repr(self.order)),
+                'pdims={}'.format(repr(self.pdims))]))
 

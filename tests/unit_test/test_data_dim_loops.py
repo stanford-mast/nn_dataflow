@@ -107,6 +107,13 @@ class TestDataDimLoops(unittest.TestCase):
 
             self.assertEqual(dcnt, dcnt2)
 
+    def test_repr(self):
+        ''' __repr__. '''
+        # pylint: disable=eval-used
+        for loops in self._gen_loop_combs():
+            ddls = DataDimLoops(*loops)
+            self.assertEqual(eval(repr(ddls)), ddls)
+
     @staticmethod
     def _gen_loop_combs():
         ''' Generate all combinations of LoopEnum with all lengths. '''

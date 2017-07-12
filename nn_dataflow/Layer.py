@@ -18,9 +18,9 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from .Util import StringifyClass, ContentHashClass
+from . import Util
 
-class Layer(StringifyClass, ContentHashClass):
+class Layer(Util.ContentHashClass):
     '''
     Base NN layer.
 
@@ -122,6 +122,14 @@ class Layer(StringifyClass, ContentHashClass):
         ''' Get total number of operations. '''
         return self.total_ofmap_size() * self.ops_per_neuron() * batch_size
 
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'nofm={}'.format(repr(self.nofm)),
+                'sofm={}'.format(repr((self.hofm, self.wofm))),
+                'strd={}'.format(repr((self.htrd, self.wtrd)))]))
+
 
 class InputLayer(Layer):
     '''
@@ -191,6 +199,16 @@ class ConvLayer(Layer):
         '''
         return self.nifm * self.nofm * self.filter_size(word_size)
 
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'nifm={}'.format(repr(self.nifm)),
+                'nofm={}'.format(repr(self.nofm)),
+                'sofm={}'.format(repr((self.hofm, self.wofm))),
+                'sfil={}'.format(repr((self.hfil, self.wfil))),
+                'strd={}'.format(repr((self.htrd, self.wtrd)))]))
+
 
 class FCLayer(ConvLayer):
     '''
@@ -204,6 +222,14 @@ class FCLayer(ConvLayer):
     def __init__(self, nifm, nofm, sfil=1):
         super(FCLayer, self).__init__(nifm, nofm, 1, sfil)
         assert self.hofm == 1 and self.wofm == 1
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'nifm={}'.format(repr(self.nifm)),
+                'nofm={}'.format(repr(self.nofm)),
+                'sfil={}'.format(repr((self.hfil, self.wfil)))]))
 
 
 class LocalRegionLayer(Layer):
@@ -253,6 +279,16 @@ class LocalRegionLayer(Layer):
         ''' The size of the local region corresponding to one output point. '''
         return self.nreg * self.hreg * self.wreg
 
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'nofm={}'.format(repr(self.nofm)),
+                'sofm={}'.format(repr((self.hofm, self.wofm))),
+                'nreg={}'.format(repr(self.nreg)),
+                'sreg={}'.format(repr((self.hreg, self.wreg))),
+                'strd={}'.format(repr((self.htrd, self.wtrd)))]))
+
 
 class PoolingLayer(LocalRegionLayer):
     '''
@@ -268,4 +304,13 @@ class PoolingLayer(LocalRegionLayer):
             strd = sreg
         super(PoolingLayer, self).__init__(nofm, sofm, 1, sreg, strd=strd)
         assert self.nreg == 1
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'nofm={}'.format(repr(self.nofm)),
+                'sofm={}'.format(repr((self.hofm, self.wofm))),
+                'sreg={}'.format(repr((self.hreg, self.wreg))),
+                'strd={}'.format(repr((self.htrd, self.wtrd)))]))
 

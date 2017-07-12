@@ -77,6 +77,8 @@ List of major changes and improvements
 
   - Convert `RuntimeError` exceptions to assertions.
 
+  - Define `__repr__` for class stringify, and remove `StringifyClass`.
+
 
 ### Fixed
 
