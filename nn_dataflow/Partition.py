@@ -196,15 +196,13 @@ def part_layer_ifmap_range(layer, batch_size, part, pidx):
 
         # Fmap height tiling.
         h_beg, h_end = h_orng
-        h_beg = max(0, h_beg * layer.htrd - layer.hreg // 2)
-        h_end = min(layer.hifm,
-                    h_end * layer.htrd + layer.hreg - layer.hreg // 2)
+        h_beg = h_beg * layer.htrd
+        h_end = max(h_beg, (h_end - 1) * layer.htrd + layer.hreg)
 
         # Fmap width tiling.
         w_beg, w_end = w_orng
-        w_beg = max(0, w_beg * layer.wtrd - layer.wreg // 2)
-        w_end = min(layer.wifm,
-                    w_end * layer.wtrd + layer.wreg - layer.wreg // 2)
+        w_beg = w_beg * layer.wtrd
+        w_end = max(w_beg, (w_end - 1) * layer.wtrd + layer.wreg)
 
     assert n_end <= layer.nifm and h_end <= layer.hifm and w_end <= layer.wifm
 

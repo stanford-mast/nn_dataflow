@@ -96,6 +96,8 @@ List of major changes and improvements
 
 - Use GBUF unit access for DRAM when bypassing GBUF.
 
+- Partitioned ifmap range for `LocalRegionLayer`.
+
 
 ## [v1.3 -- v1.4] -- 2017-05-18
 
