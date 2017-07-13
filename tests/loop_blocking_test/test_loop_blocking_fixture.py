@@ -33,6 +33,7 @@ from nn_dataflow import NestedLoopDesc
 from nn_dataflow import NodeRegion
 from nn_dataflow import Option
 from nn_dataflow import ParallelEnum as pe
+from nn_dataflow import Partition
 from nn_dataflow import PartitionScheme
 from nn_dataflow import PhyDim2
 from nn_dataflow import Resource
@@ -48,6 +49,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.layer = {}
         self.layer['BASE'] = ConvLayer(12, 10, 28, 3)
         self.layer['POOL'] = PoolingLayer(32, 28, 2)
+        self.layer['PAR'] = ConvLayer(24, 20, 56, 3)
         self.batch_size = 4
 
         # Resource.
@@ -66,6 +68,10 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.resource['SM'] = Resource(
             dim_nodes=PhyDim2(1, 1), dim_array=dim_array,
             mem_regions=mem_regions, size_gbuf=4096, size_regf=16)
+        # Multi-node parallel resource.
+        self.resource['PAR'] = Resource(
+            dim_nodes=PhyDim2(4, 2), dim_array=dim_array,
+            mem_regions=mem_regions, size_gbuf=65535, size_regf=64)
 
         # Nested loop description after mapping.
         self.nld = {}
@@ -119,6 +125,24 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.options['BYPSOL'] = Option(
             sw_gbuf_bypass=(True,) * 3, sw_solve_loopblocking=True,
             hw_access_forwarding=False, hw_gbuf_sharing=False,
+            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
+            ntops=2 ** 30, nprocesses=1, verbose=False)
+        # Access forwarding.
+        self.options['ACCFWD'] = Option(
+            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
+            hw_access_forwarding=True, hw_gbuf_sharing=False,
+            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
+            ntops=2 ** 30, nprocesses=1, verbose=False)
+        # Buffer sharing.
+        self.options['BUFSHR'] = Option(
+            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
+            hw_access_forwarding=False, hw_gbuf_sharing=True,
+            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
+            ntops=2 ** 30, nprocesses=1, verbose=False)
+        # Buffer sharing with bypassing.
+        self.options['BUFSHR-BYP'] = Option(
+            sw_gbuf_bypass=(True,) * 3, sw_solve_loopblocking=False,
+            hw_access_forwarding=False, hw_gbuf_sharing=True,
             partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
             ntops=2 ** 30, nprocesses=1, verbose=False)
 
@@ -191,6 +215,59 @@ class TestLoopBlockingFixture(unittest.TestCase):
         lp_ts[le.OFM] = to
         lp_ts[le.BAT] = tb
         return tuple(zip(*lp_ts))
+
+    def _gen_all_partition(self):
+        '''
+        Generate PartitionScheme, partitioned NestedLoopDesc, and partition
+        occupation.
+        '''
+        options = Option(
+            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
+            hw_access_forwarding=False, hw_gbuf_sharing=False,
+            partition_hybrid=True, partition_batch=True, partition_ifmaps=True,
+            ntops=2 ** 30, nprocesses=1, verbose=False)
+
+        for part in Partition.gen_partition(self.layer['PAR'], self.batch_size,
+                                            self.resource['PAR'].dim_nodes,
+                                            options):
+            p_layer, p_batch_size, p_occ = part.part_layer(self.layer['PAR'],
+                                                           self.batch_size)
+
+            p_nld = next(MapStrategyEyeriss(p_layer, p_batch_size,
+                                            self.resource['PAR'].dim_array)
+                         .gen_nested_loop_desc())
+
+            yield part, p_nld, p_occ
+
+    def _total_part_size(self, part):
+        ''' Get the total partitioned data size. '''
+        layer = self.layer['PAR']
+
+        nifm = Util.idivc(layer.nifm, part.size(pe.INPP)) * part.size(pe.INPP)
+        nofm = Util.idivc(layer.nofm, part.size(pe.OUTP)) * part.size(pe.OUTP)
+        hofm = Util.idivc(layer.hofm, part.dim(pe.OFMP).h) * part.dim(pe.OFMP).h
+        wofm = Util.idivc(layer.wofm, part.dim(pe.OFMP).w) * part.dim(pe.OFMP).w
+        batch_size = Util.idivc(self.batch_size, part.size(pe.BATP)) \
+                * part.size(pe.BATP)
+
+        full_layer = ConvLayer(nifm, nofm, (hofm, wofm),
+                               layer.sfil,
+                               (layer.htrd, layer.wtrd))
+        filter_size = full_layer.total_filter_size()
+        ifmap_size = full_layer.total_ifmap_size(batch_size)
+        ofmap_size = full_layer.total_ofmap_size(batch_size)
+
+        self.assertGreaterEqual(filter_size, layer.total_filter_size())
+        self.assertLess(filter_size, layer.total_filter_size() * 1.2 * 1.2)
+        self.assertGreaterEqual(ofmap_size,
+                                layer.total_ofmap_size(self.batch_size))
+        self.assertLess(ofmap_size,
+                        layer.total_ofmap_size(self.batch_size)
+                        * 1.2 * 1.2 * 1.2)
+        self.assertGreaterEqual(ifmap_size,
+                                layer.total_ifmap_size(self.batch_size))
+
+        return filter_size, ifmap_size, ofmap_size
 
 
     class _SimBuffer(object):
