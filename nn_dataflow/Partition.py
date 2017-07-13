@@ -284,8 +284,12 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
                 nhops[de.OFM] += ofmap_layout.total_transfer_nhops(ofrng, coord)
             else:
                 # Others. Send to the mid node (one way).
+                # The total fetch times (reads and writes) of OFM is f = 2n - 1
+                # (no read for the first time), i.e., n - 1 reads and n writes.
+                # Only writes need to send to the mid node, i.e., (f + 1) / 2
+                # rather than f times, approximately half.
                 dist = coord.hop_dist(coord_list[mid_idx])
-                nhops[de.OFM] += ofrng.size() * dist / 2  # 1/2 because one way.
+                nhops[de.OFM] += ofrng.size() * dist / 2
 
     # Filter access.
     if isinstance(layer, ConvLayer):
