@@ -69,6 +69,8 @@ List of major changes and improvements
 
   - Generalize `LoopBlockingScheme` access model for arbitrary data loops.
 
+  - Skip equivalence when generating `PartitionScheme`.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.

@@ -85,14 +85,44 @@ def gen_partition(layer, batch_size, dim_nodes, options):
                 if pdims[pe.OUTP].size() != 1:
                     continue
 
-        # For different order.
-        for order in itertools.permutations(tuple(range(pe.NUM))):
-            # Size-(1, 1) partition has no effect, so its order is not
-            # relevant. Force them at the beginning.
-            no_part = [v for v in range(pe.NUM) if pdims[v].size() == 1]
-            if not all([order[i] == no_part[i] for i in range(len(no_part))]):
+        # Skip the transpose equivalence. Only partitioning scheme without OFMP
+        # and with only 1-D partitioning could have equivalence, since we
+        # always index in height-major order.
+        if pdims[pe.OFMP].size() == 1 \
+                and all(pd.h == 1 or pd.w == 1 for pd in pdims):
+            pdhs, pdws = zip(*pdims)
+            if pdhs > pdws:
                 continue
 
+        # For different order.
+        for order in itertools.permutations(range(pe.NUM)):
+
+            # Partition with dim-1 has no effect, so its order is not relevant.
+            skip = False
+            for idx in range(pe.NUM - 1):
+                pae1 = order[idx]
+                pae2 = order[idx + 1]
+                pdim1 = pdims[pae1]
+                pdim2 = pdims[pae2]
+
+                # Invalid cases include:
+                # - both are (1, 1) but not in order of ParallelEnum.
+                # - (1, 1) after non-(1, 1).
+                # - (1, non-1) after (non-1, 1) of not BATP.
+                if pdim1.size() == 1 and pdim2.size() == 1 and pae1 > pae2:
+                    skip = True
+                    break
+                if pdim1.size() > 1 and pdim2.size() == 1:
+                    skip = True
+                    break
+                if pae1 != pe.BATP and pdim2.h == 1 and pdim2.w > 1 \
+                        and pdim1.h > 1 and pdim1.w == 1:
+                    skip = True
+                    break
+            if skip:
+                continue
+
+            no_part = [pae for pae in range(pe.NUM) if pdims[pae].size() == 1]
             # Batch parallelism should be at the top.
             if pe.BATP not in no_part and order[len(no_part)] != pe.BATP:
                 continue
