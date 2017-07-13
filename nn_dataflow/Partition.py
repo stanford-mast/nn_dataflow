@@ -314,6 +314,11 @@ def get_ofmap_layout(layer, batch_size, part, output_mem_region):
     The ofmap partitioning is calculated by shrinking or extending the
     computation partitioning, while trying to maintain the same layout shape.
     '''
+    # Only work on the partitioning schemes related to ofmaps.
+    ofmap_paes = [pe.OUTP, pe.OFMP, pe.BATP]
+    part = PartitionScheme(order=part.order,
+                           pdims=[part.dim(pae) if pae in ofmap_paes
+                                  else PhyDim2(1, 1) for pae in range(pe.NUM)])
 
     dim_part = part.dim()
     dim_omr = output_mem_region.dim
@@ -333,13 +338,14 @@ def get_ofmap_layout(layer, batch_size, part, output_mem_region):
             # Ofmap dimension > computation dimension. Extend.
             ext = od // pd
             # Apply the extension to the top level.
-            ofmap_pdims[ofmap_order[0]][di] *= ext
+            top_pae = next(pae for pae in ofmap_order if pae in ofmap_paes)
+            ofmap_pdims[top_pae][di] *= ext
         else:
             # Computation dimension >= ofmap dimension, shrink.
             # Go from bottom to top. Keep bottom (first) levels unchanged, and
             # shrink top (latter) levels.
             for pae in reversed(ofmap_order):
-                if od > ofmap_pdims[pae][di]:
+                if od >= ofmap_pdims[pae][di]:
                     # Remaining size in ofmap dimension is enough for current
                     # level. Use it to keep the current level the same size.
                     od //= ofmap_pdims[pae][di]
@@ -348,13 +354,6 @@ def get_ofmap_layout(layer, batch_size, part, output_mem_region):
                     # current level to be whatever remains.
                     ofmap_pdims[pae][di] = od
                     od = 1
-    # Eliminate the partitioning schemes which do not partition ofmaps (i.e.,
-    # correspond to the same ofmap range). Merge them to BATP.
-    for pae in range(pe.NUM):
-        if pae not in [pe.OUTP, pe.OFMP, pe.BATP]:
-            ofmap_pdims[pe.BATP] = [x * y for x, y in zip(ofmap_pdims[pe.BATP],
-                                                          ofmap_pdims[pae])]
-            ofmap_pdims[pae] = [1, 1]
 
     ofmap_part = PartitionScheme(order=ofmap_order, pdims=ofmap_pdims)
     assert all(od <= omrd for od, omrd in zip(ofmap_part.dim(), dim_omr)), \
@@ -370,6 +369,7 @@ def get_ofmap_layout(layer, batch_size, part, output_mem_region):
 
     ofmap_layout = DataLayout(frmap=ofmap_frmap,
                               origin=output_mem_region.origin)
+    assert ofmap_layout.is_in_region(output_mem_region)
 
     return ofmap_layout
 
