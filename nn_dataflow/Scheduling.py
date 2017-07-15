@@ -69,7 +69,7 @@ class SchedulingResult(namedtuple('SchedulingResult',
             raise TypeError('SchedulingResult: dict_loop and dict_part '
                             'must be OrderedDict instances.')
         if not isinstance(ntp.ofmap_layout, DataLayout):
-            raise TypeError('SchedulingCondition: ofmap_layout must be '
+            raise TypeError('SchedulingResult: ofmap_layout must be '
                             'a DataLayout instance.')
 
         return ntp
