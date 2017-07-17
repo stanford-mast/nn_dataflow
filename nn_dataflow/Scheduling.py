@@ -51,8 +51,7 @@ class SchedulingCondition(namedtuple('SchedulingCondition',
 
 
 class SchedulingResult(namedtuple('SchedulingResult',
-                                  ['total_cost',
-                                   'dict_loop',
+                                  ['dict_loop',
                                    'dict_part',
                                    'ofmap_layout',
                                   ])):
@@ -72,6 +71,33 @@ class SchedulingResult(namedtuple('SchedulingResult',
                             'a DataLayout instance.')
 
         return ntp
+
+    @property
+    def total_cost(self):
+        ''' Get the total cost. '''
+        return self.dict_loop['cost'] + self.dict_part['cost']
+
+    @property
+    def total_time(self):
+        ''' Get the dataflow total time. '''
+        return self.dict_loop['time']
+
+    @property
+    def total_ops(self):
+        ''' Get the total ops. '''
+        # dict_loop stats are over all nodes.
+        return self.dict_loop['ops']
+
+    @property
+    def total_accesses(self):
+        ''' Get the total accesses at all memory hierarchies as a list. '''
+        # dict_loop stats are over all nodes.
+        return [sum(acc) for acc in self.dict_loop['access']]
+
+    @property
+    def total_noc_hops(self):
+        ''' Get the total NoC hops. '''
+        return sum(self.dict_part['total_nhops'])
 
 
 class Scheduling(object):
@@ -229,7 +255,6 @@ class Scheduling(object):
 
         # Loop blocking.
         dict_loop = lbs.get_scheme_dict(self.cost)
-        cost_loop = dict_loop['cost']
 
         # Partitioning.
         total_nhops = [unh * f for unh, f
@@ -241,11 +266,7 @@ class Scheduling(object):
                                  ('part', part.__dict__),
                                  ('unit_nhops', unit_nhops)])
 
-        # Result.
-        total_cost = cost_loop + cost_part
-
-        return SchedulingResult(total_cost=total_cost,
-                                dict_loop=dict_loop,
+        return SchedulingResult(dict_loop=dict_loop,
                                 dict_part=dict_part,
                                 ofmap_layout=ofmap_layout)
 

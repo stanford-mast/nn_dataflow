@@ -23,6 +23,10 @@ List of major changes and improvements
   - Add `DataDimLoops` class to denote loops that are dimensions of a data
     category.
 
+- Software models.
+
+  - Add statistic properties to `SchedulingResult`.
+
 - Software engineering.
 
   - Add utilities to `LoopBlockingScheme` class.
