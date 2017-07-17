@@ -27,6 +27,8 @@ List of major changes and improvements
 
   - Add statistic properties to `SchedulingResult`.
 
+  - Add `NNDataflowScheme` class for overall NN dataflow.
+
 - Software engineering.
 
   - Add utilities to `LoopBlockingScheme` class.

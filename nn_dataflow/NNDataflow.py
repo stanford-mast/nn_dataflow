@@ -19,76 +19,13 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 import sys
-from collections import OrderedDict
 
 from . import Partition
 from .Cost import Cost
 from .Network import Network
+from .NNDataflowScheme import NNDataflowScheme
 from .Resource import Resource
-from .Scheduling import SchedulingCondition, SchedulingResult, Scheduling
-
-class SchedulingResultDict(object):
-    '''
-    Network scheduling result, as a dict of layer scheduling results.
-
-    Include the total cost, and the layer scheduling results as an OrderedDict.
-    '''
-
-    def __init__(self, res_dict=None):
-
-        total_cost = 0
-
-        if res_dict is None:
-            res_dict = OrderedDict()
-        else:
-            for name in res_dict:
-                res = res_dict[name]
-                if isinstance(res, SchedulingResult):
-                    total_cost += res.total_cost
-                else:
-                    raise TypeError('SchedulingResultDict: res_dict value type '
-                                    'must be SchedulingResult.')
-
-        self.total_cost = total_cost
-        self.res_dict = res_dict
-
-    def __len__(self):
-        ''' Get the number of scheduled layers. '''
-        return len(self.res_dict)
-
-    def __getitem__(self, layer_name):
-        ''' Get the layer SchedulingResult. '''
-        return self.res_dict[layer_name]
-
-    def __setitem__(self, layer_name, sched_result):
-        ''' In-place update by adding the result of a new layer. '''
-        if layer_name in self.res_dict:
-            raise KeyError('SchedulingResultDict: layer {} already exists.'
-                           .format(layer_name))
-        if not isinstance(sched_result, SchedulingResult):
-            raise TypeError('SchedulingResultDict: sched_result must be '
-                            'a SchedulingResult instance.')
-        self.total_cost += sched_result.total_cost
-        self.res_dict[layer_name] = sched_result
-
-    def __contains__(self, layer_name):
-        ''' Whether the layer is already scheduled. '''
-        return layer_name in self.res_dict
-
-    def scheduling_total_cost(self):
-        ''' Get the scheduling total cost. '''
-        return self.total_cost
-
-    def scheduling_result_dict(self):
-        ''' Get the scheduling result dict. '''
-        return self.res_dict
-
-    def copy(self):
-        ''' Return a shallow copy. '''
-        # Shallow copy of layer SchedulingResult is sufficient, since they are
-        # read-only.
-        return SchedulingResultDict(self.res_dict.copy())
-
+from .Scheduling import SchedulingCondition, Scheduling
 
 class NNDataflow(object):
     '''
@@ -116,8 +53,8 @@ class NNDataflow(object):
         '''
         Search the optimized dataflows.
         '''
-
-        # Scheduling instance dict.
+        # Scheduling instance dict. Use the same instance for all same layers
+        # in order to exploit its scheduling cache.
         self.layer_sched_dict = {}
         layer2sched = {}
         for layer_name in self.network:
@@ -130,20 +67,18 @@ class NNDataflow(object):
             self.layer_sched_dict[layer_name] = sched
 
         # Initial input layout.
-        sched_res_dict_list = []
+        dfsch_list = []
         for input_layout in self._gen_input_layout(options):
-            srd = SchedulingResultDict()
-            srd[None] = SchedulingResult(
-                total_cost=0, dict_loop=OrderedDict(), dict_part=OrderedDict(),
-                ofmap_layout=input_layout)
-            sched_res_dict_list.append(srd)
+            dfsch = NNDataflowScheme(self.network, input_layout)
+            dfsch_list.append(dfsch)
 
+        # Schedule layers.
         for layer_name in self.network:
             if options.verbose:
                 sys.stderr.write('-> {}\n'.format(layer_name))
                 sys.stderr.flush()
-            sched_res_dict_list = self._layer_schedule_search(
-                layer_name, sched_res_dict_list, options)
+            dfsch_list = self._layer_schedule_search(
+                layer_name, dfsch_list, options)
 
         # Cache stats.
         cache_hits = 0
@@ -153,21 +88,21 @@ class NNDataflow(object):
             cache_hits += h
             cache_misses += m
 
-        return sched_res_dict_list, (cache_hits, cache_misses)
+        return dfsch_list, (cache_hits, cache_misses)
 
-    def _layer_schedule_search(self, layer_name, sched_res_dict_list, options):
+    def _layer_schedule_search(self, layer_name, dfsch_list, options):
         '''
         Schedule the given layer under the previous layer scheduling results.
-        `sched_res_dict_list` contains up to top n SchedulingResultDict for the
-        previous layers.
+        `dfsch_list` contains up to top n NNDataflowScheme for the previous
+        layers.
         '''
 
         layer_sched = self.layer_sched_dict[layer_name]
 
-        new_sched_res_dict_list = []
+        new_dfsch_list = []
 
-        for ifmap_layout, srd_idx in self._gen_layer_ifmap_layout(
-                layer_name, sched_res_dict_list, options):
+        for ifmap_layout, dfsch_idx in self._gen_layer_ifmap_layout(
+                layer_name, dfsch_list, options):
 
             condition = SchedulingCondition(resource=self.resource,
                                             ifmap_layout=ifmap_layout)
@@ -186,21 +121,20 @@ class NNDataflow(object):
             # Append all the current layer top schedules to all the previous top
             # schedules with the matching fmap layout.
             for t in tops:
-                srd = sched_res_dict_list[srd_idx].copy()
-                srd[layer_name] = t
-                new_sched_res_dict_list.append(srd)
+                dfsch = dfsch_list[dfsch_idx].copy()
+                dfsch[layer_name] = t
+                new_dfsch_list.append(dfsch)
 
         # Always pick and keep top n at each layer.
-        return sorted(new_sched_res_dict_list,
-                      key=lambda srd: srd.scheduling_total_cost()
+        return sorted(new_dfsch_list, key=lambda dfsch: dfsch.total_cost
                      )[:options.ntops]
 
-    def _gen_layer_ifmap_layout(self, layer_name, sched_res_dict_list, options):
+    def _gen_layer_ifmap_layout(self, layer_name, dfsch_list, options):
         '''
         Generator to get all the choices of ifmap layout for the layer.
 
-        Return the ifmap layout, and the corresponding SchedulingResultDict
-        index in the list.
+        Return the ifmap layout, and the corresponding NNDataflowScheme index
+        in the list.
         '''
 
         del options
@@ -208,12 +142,16 @@ class NNDataflow(object):
         prev_layer_names, merge_symbol = self.network.prev_layers(layer_name)
         assert prev_layer_names
 
-        for idx, srd in enumerate(sched_res_dict_list):
+        def _ofmap_layout(dfsch, pl_name):
+            return dfsch[pl_name].ofmap_layout if pl_name is not None \
+                    else dfsch.input_layout
+
+        for idx, dfsch in enumerate(dfsch_list):
             # Merge all previous layer ofmap layouts to get the ifmap layout.
-            ifmap_layout = srd[prev_layer_names[0]].ofmap_layout
+            ifmap_layout = _ofmap_layout(dfsch, prev_layer_names[0])
             for pl_name in prev_layer_names[1:]:
                 ifmap_layout = ifmap_layout.merge(merge_symbol,
-                                                  srd[pl_name].ofmap_layout)
+                                                  _ofmap_layout(dfsch, pl_name))
 
             # Remap dst memory to src memory.
             origin_diff = self.resource.mem_region_src().origin \

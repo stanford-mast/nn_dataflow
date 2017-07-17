@@ -23,7 +23,6 @@ import json
 import multiprocessing
 import sys
 from collections import OrderedDict
-import numpy as np
 
 from nn_dataflow import __version__ as VERSION
 from nn_dataflow import NNDataflow
@@ -38,72 +37,43 @@ from nn_dataflow import Resource
 
 from examples import import_network
 
-def stats_dict(sched_res_dict, network, batch_size, resource, cost):
+def stats_dict(dfsch, cost):
     '''
-    Get the stats as an OrderedDict from the SchedulingResultDict.
+    Get the stats as an OrderedDict from the NNDataflowScheme.
     '''
+    stats = OrderedDict()
 
-    del batch_size
+    ## Basic stats.
 
-    num_nodes = resource.dim_nodes.size()
+    stats['total_cost'] = dfsch.total_cost
+    stats['total_time'] = dfsch.total_time
 
-    total_cost = sched_res_dict.scheduling_total_cost()
+    stats['total_ops'] = dfsch.total_ops
+    stats['total_accesses'] = dfsch.total_accesses
+    stats['total_noc_hops'] = dfsch.total_noc_hops
 
-    total_time = 0.
+    ## Cost breakdown.
 
-    total_noc_cost = 0
-
-    total_ops = 0
-    total_accesses = np.zeros((me.NUM,))
-
-    max_dram_bw_per_node = 0
-    max_dram_bw_layer = None
-
-    for name in network:
-        sched = sched_res_dict[name]
-
-        time = float(sched.dict_loop['time'])
-        aggr_accesses_per_node = [sum(alist) for alist
-                                  in sched.dict_loop['access']]
-
-        total_time += time
-
-        total_noc_cost += sched.dict_part['cost']
-
-        total_ops += sched.dict_loop['ops']
-        total_accesses += aggr_accesses_per_node
-
-        dram_bw_per_node = aggr_accesses_per_node[me.DRAM] / time
-        if dram_bw_per_node > max_dram_bw_per_node:
-            max_dram_bw_per_node = dram_bw_per_node
-            max_dram_bw_layer = name
-
-    total_op_cost = total_ops * cost.mac_op
-    total_access_cost = sum(total_accesses * cost.mem_hier)
-    total_static_cost = total_time * cost.unit_static * num_nodes
+    total_op_cost = dfsch.total_ops * cost.mac_op
+    total_access_cost = sum(a * c for a, c
+                            in zip(dfsch.total_accesses, cost.mem_hier))
+    total_noc_cost = dfsch.total_noc_hops * cost.noc_hop
+    total_static_cost = dfsch.total_node_time * cost.unit_static
 
     sum_cost = total_op_cost + total_access_cost + total_noc_cost \
             + total_static_cost
-    assert abs(sum_cost / total_cost - 1) < 0.001
+    assert abs(sum_cost / dfsch.total_cost - 1) < 0.001
 
-    avg_active_pes = total_ops / num_nodes / total_time
-
-    stats = OrderedDict()
-
-    stats['total_time'] = total_time
-
-    stats['total_cost'] = total_cost
     stats['total_op_cost'] = total_op_cost
     stats['total_access_cost'] = total_access_cost
     stats['total_noc_cost'] = total_noc_cost
     stats['total_static_cost'] = total_static_cost
 
-    stats['avg_active_pes'] = avg_active_pes
-    stats['total_accesses'] = tuple(total_accesses)
-    stats['max_dram_bw_per_node'] = max_dram_bw_per_node
-    stats['max_dram_bw_layer'] = max_dram_bw_layer
+    ## Other stats.
 
-    stats['mappings'] = sched_res_dict.scheduling_result_dict()
+    stats['active_node_pes'] = dfsch.perlayer_stats('active_node_pes')
+    stats['total_dram_bandwidth'] = dfsch.perlayer_stats('total_dram_bandwidth')
+    stats['schedules'] = dfsch.res_dict
 
     return stats
 
@@ -177,12 +147,10 @@ def do_scheduling(args):
     tops, cache_stats = nnd.schedule_search(MapStrategyEyeriss, options)
 
     if not tops:
-        sys.stderr.write('No valid dataflow found.')
+        sys.stderr.write('No valid dataflow found.\n')
         return None
 
     top = tops[0]
-
-    stats = stats_dict(top, network, batch_size, resource, cost)
 
     ## Write results.
 
@@ -199,6 +167,7 @@ def do_scheduling(args):
 
     res_map['cache_stats'] = cache_stats
 
+    stats = stats_dict(top, cost)
     for key, val in stats.items():
         res_map[key] = val
 
