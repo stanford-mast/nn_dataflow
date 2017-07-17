@@ -128,6 +128,35 @@ class TestLayer(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             _ = layer.ops_per_neuron()
 
+    def test_is_valid_padding_sifm(self):
+        ''' is_valid_padding_sifm. '''
+        clayer = ConvLayer(3, 64, [28, 14], [3, 1], [2, 4])
+        self.assertTrue(clayer.is_valid_padding_sifm([28 * 2, 14 * 4]))
+        self.assertTrue(clayer.is_valid_padding_sifm([27 * 2 + 3, 13 * 4 + 1]))
+        self.assertFalse(clayer.is_valid_padding_sifm([28, 14]))
+        self.assertFalse(clayer.is_valid_padding_sifm([28 * 2, 14]))
+        self.assertTrue(clayer.is_valid_padding_sifm([27 * 2 + 3, 13 * 4 + 3]))
+
+        flayer = FCLayer(2048, 4096, sfil=2)
+        self.assertTrue(flayer.is_valid_padding_sifm(2))
+        self.assertTrue(flayer.is_valid_padding_sifm(1))
+        self.assertTrue(flayer.is_valid_padding_sifm([1, 2]))
+
+        llayer = LocalRegionLayer(64, 28, 2, 1)
+        self.assertTrue(llayer.is_valid_padding_sifm(28))
+        self.assertFalse(llayer.is_valid_padding_sifm(28 - 1))
+        self.assertFalse(llayer.is_valid_padding_sifm(28 + 1))
+
+        player = PoolingLayer(64, 28, [2, 3], strd=[3, 2])
+        self.assertTrue(player.is_valid_padding_sifm([28 * 3, 28 * 2]))
+        self.assertTrue(player.is_valid_padding_sifm([27 * 3 + 2, 27 * 2 + 3]))
+
+    def test_is_valid_padding_sifm_inv(self):
+        ''' Invalid argument for is_valid_padding_sifm. '''
+        clayer = ConvLayer(3, 64, 28, 3, strd=2)
+        with self.assertRaisesRegexp(ValueError, 'Layer: .*sifm.*'):
+            _ = clayer.is_valid_padding_sifm([3])
+
     def test_eq(self):
         ''' Whether eq. '''
         l1 = Layer(2, 12)

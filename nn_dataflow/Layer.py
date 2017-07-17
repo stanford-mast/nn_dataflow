@@ -122,6 +122,24 @@ class Layer(Util.ContentHashClass):
         ''' Get total number of operations. '''
         return self.total_ofmap_size() * self.ops_per_neuron() * batch_size
 
+    def is_valid_padding_sifm(self, sifm):
+        ''' Whether the given `sifm` is valid when allowing padding. '''
+        if isinstance(sifm, int):
+            hifm = sifm
+            wifm = sifm
+        elif len(sifm) == 2:
+            hifm = sifm[0]
+            wifm = sifm[1]
+        else:
+            raise ValueError('Layer: sifm is invalid ({}), '
+                             'needs to be either one integer or '
+                             'a pair of integers'.format(sifm))
+
+        h_padding_rng = sorted((self.hofm * self.htrd, self.hifm))
+        w_padding_rng = sorted((self.wofm * self.wtrd, self.wifm))
+        return (h_padding_rng[0] <= hifm <= h_padding_rng[1]
+                and w_padding_rng[0] <= wifm <= w_padding_rng[1])
+
     def __repr__(self):
         return '{}({})'.format(
             self.__class__.__name__,
