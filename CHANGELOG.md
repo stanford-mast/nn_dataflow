@@ -71,6 +71,10 @@ List of major changes and improvements
 
   - Skip equivalence when generating `PartitionScheme`.
 
+  - Check ifmap layout against layer parameters in `Scheduling`.
+
+  - Add number of nodes to scheduling result.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.

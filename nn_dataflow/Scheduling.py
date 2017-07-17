@@ -18,7 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-import math
 from collections import OrderedDict, namedtuple
 
 from . import LoopBlocking
@@ -116,6 +115,13 @@ class Scheduling(object):
         if not ifmap_layout.is_in_region(mem_region_src):
             raise ValueError('Scheduling: ifmap layout contains invalid '
                              'source memory nodes.')
+        cifrng = ifmap_layout.frmap.complete_fmap_range()
+        if cifrng.size('b') != self.batch_size \
+                or cifrng.size('n') != self.layer.nifm \
+                or not self.layer.is_valid_padding_sifm([cifrng.size('h'),
+                                                         cifrng.size('w')]):
+            raise ValueError('Scheduling: ifmap layout does not match '
+                             'input layer.')
 
         # Filter nodes. All memory nodes can store filters. Deduplicate.
         filter_node_coord_list = [c for c in mem_region_src.node_iter()] \
@@ -134,8 +140,6 @@ class Scheduling(object):
             unit_nhops = Partition.part_layer_unit_nhops(
                 self.layer, self.batch_size, part, filter_node_coord_list,
                 ifmap_layout, ofmap_layout, options)
-            if math.isinf(sum(unit_nhops)):
-                continue
 
             # Explore single-node schedules.
             for lbs in self.schedule_search_per_node(
@@ -158,11 +162,10 @@ class Scheduling(object):
         # Check ofmap layout matches the layer.
         for t in tops:
             cofrng = t.ofmap_layout.frmap.complete_fmap_range()
-            b_rng, n_rng, h_rng, w_rng = cofrng.beg_end()
-            assert b_rng[1] - b_rng[0] == self.batch_size \
-                    and n_rng[1] - n_rng[0] == self.layer.nofm \
-                    and h_rng[1] - h_rng[0] == self.layer.hofm \
-                    and w_rng[1] - w_rng[0] == self.layer.wofm
+            assert cofrng.size('b') == self.batch_size \
+                    and cofrng.size('n') == self.layer.nofm \
+                    and cofrng.size('h') == self.layer.hofm \
+                    and cofrng.size('w') == self.layer.wofm
 
         return list(tops)
 
@@ -233,6 +236,7 @@ class Scheduling(object):
                        in zip(unit_nhops, lbs.get_top_level_fetch())]
         cost_part = self.cost.noc_hop * sum(total_nhops)
         dict_part = OrderedDict([('cost', cost_part),
+                                 ('num_nodes', part.size()),
                                  ('total_nhops', total_nhops),
                                  ('part', part.__dict__),
                                  ('unit_nhops', unit_nhops)])
