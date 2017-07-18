@@ -389,8 +389,13 @@ class MapStrategyEyeriss(MapStrategy):
             access[me.GBUF][de.OFM] = access[me.DRAM][de.OFM] \
                     * flpesets_per_unitpass
 
-            # All data from/to gbuf go through itcn.
-            access[me.ITCN] = access[me.GBUF]
+            # All data from/to regf go through itcn.
+            access[me.ITCN][de.FIL] = acclayer.wfil * self.dim_lpeset.size() \
+                    * flpesets_per_unitpass
+            access[me.ITCN][de.IFM] = acclayer.wifm * self.dim_lpeset.size() \
+                    * flpesets_per_unitpass
+            access[me.ITCN][de.OFM] = acclayer.wofm * self.dim_lpeset.size() \
+                    * flpesets_per_unitpass
 
             # regf access is based on num of ops.
             access[me.REGF] = [ops] * de.NUM
@@ -440,8 +445,11 @@ class MapStrategyEyeriss(MapStrategy):
             access[me.GBUF][de.OFM] = access[me.DRAM][de.OFM] \
                     * flpesets_per_unitpass
 
-            # All data from/to gbuf go through itcn.
-            access[me.ITCN] = access[me.GBUF]
+            # All data from/to regf go through itcn.
+            access[me.ITCN][de.FIL] = 0
+            access[me.ITCN][de.IFM] = acclayer.wifm * self.dim_lpeset.size()
+            access[me.ITCN][de.OFM] = acclayer.wofm * self.dim_lpeset.size() \
+                    * flpesets_per_unitpass
 
             # regf access is based on num of ops.
             access[me.REGF][de.FIL] = 0

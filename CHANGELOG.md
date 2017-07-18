@@ -108,6 +108,8 @@ List of major changes and improvements
 
 - Partitioned ifmap range for `LocalRegionLayer`.
 
+- Clarify ITCN accesses to be number of individual transfers to each REGF.
+
 
 ## [v1.3 -- v1.4] -- 2017-05-18
 
