@@ -22,6 +22,7 @@ import sys
 
 from . import Partition
 from .Cost import Cost
+from .MapStrategy import MapStrategy
 from .Network import Network
 from .NNDataflowScheme import NNDataflowScheme
 from .Resource import Resource
@@ -33,23 +34,27 @@ class NNDataflow(object):
     '''
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, network, batch_size, resource, cost):
+    def __init__(self, network, batch_size, resource, cost, map_strategy):
         if not isinstance(network, Network):
             raise TypeError('NNDataflow: network must be a Network instance.')
         if not isinstance(resource, Resource):
             raise TypeError('NNDataflow: resource must be a Resource instance.')
         if not isinstance(cost, Cost):
             raise TypeError('NNDataflow: cost must be a Cost instance.')
+        if not issubclass(map_strategy, MapStrategy):
+            raise TypeError('NNDataflow: map_strategy must be a subclass of '
+                            'MapStrategy.')
 
         self.network = network
         self.batch_size = batch_size
         self.resource = resource
         self.cost = cost
+        self.map_strategy = map_strategy
 
         # Dict of layer Scheduling instances.
         self.layer_sched_dict = {}
 
-    def schedule_search(self, map_strategy_class, options):
+    def schedule_search(self, options):
         '''
         Search the optimized dataflows.
         '''
@@ -62,7 +67,7 @@ class NNDataflow(object):
             sched = layer2sched.get(layer, None)
             if sched is None:
                 sched = Scheduling(layer, self.batch_size, self.cost,
-                                   map_strategy_class)
+                                   self.map_strategy)
                 layer2sched[layer] = sched
             self.layer_sched_dict[layer_name] = sched
 

@@ -91,6 +91,8 @@ List of major changes and improvements
 
   - Define `__repr__` for class stringify, and remove `StringifyClass`.
 
+  - Move map strategy class into `NNDataflow` constructor.
+
 
 ### Fixed
 
