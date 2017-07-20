@@ -55,6 +55,8 @@ class TestPartitionFixture(unittest.TestCase):
         # Irrelevant options.
         optdict = {'sw_gbuf_bypass': (False,) * 3,
                    'sw_solve_loopblocking': False,
+                   'hw_access_forwarding': False,
+                   'hw_gbuf_sharing': False,
                    'ntops': 10000, 'nprocesses': 1, 'verbose': False}
         self.options['BASE'] = Option(partition_hybrid=True,
                                       partition_batch=True,

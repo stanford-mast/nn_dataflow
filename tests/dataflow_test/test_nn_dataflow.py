@@ -57,6 +57,8 @@ class TestNNDataflow(unittest.TestCase):
 
         self.options = Option(sw_gbuf_bypass=(False, False, False),
                               sw_solve_loopblocking=False,
+                              hw_access_forwarding=False,
+                              hw_gbuf_sharing=False,
                               partition_hybrid=False,
                               partition_batch=False,
                               partition_ifmaps=False,
@@ -101,6 +103,8 @@ class TestNNDataflow(unittest.TestCase):
 
         options = Option(sw_gbuf_bypass=(True, True, True),
                          sw_solve_loopblocking=True,
+                         hw_access_forwarding=False,
+                         hw_gbuf_sharing=False,
                          partition_hybrid=False,
                          partition_batch=False,
                          partition_ifmaps=False,
@@ -365,6 +369,8 @@ class TestNNDataflow(unittest.TestCase):
 
         options = Option(sw_gbuf_bypass=(True, True, True),
                          sw_solve_loopblocking=True,
+                         hw_access_forwarding=False,
+                         hw_gbuf_sharing=False,
                          partition_hybrid=True,
                          partition_batch=False,
                          partition_ifmaps=False,

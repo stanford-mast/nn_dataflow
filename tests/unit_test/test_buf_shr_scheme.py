@@ -204,3 +204,9 @@ class TestBufShrScheme(unittest.TestCase):
                 self.bufshr3.size(de.FIL) / 2,
                 self.bufshr3.size(de.FIL) / 2 + 1)
 
+    def test_repr(self):
+        ''' __repr__. '''
+        self.assertIn(repr(self.ps1), repr(self.bufshr1))
+        self.assertIn(repr(self.ps2), repr(self.bufshr2))
+        self.assertIn(repr(self.ps3), repr(self.bufshr3))
+

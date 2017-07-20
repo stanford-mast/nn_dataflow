@@ -279,7 +279,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
                 * part.size(pe.BATP)
 
         full_layer = ConvLayer(nifm, nofm, (hofm, wofm),
-                               layer.sfil,
+                               (layer.hfil, layer.wfil),
                                (layer.htrd, layer.wtrd))
         filter_size = full_layer.total_filter_size()
         ifmap_size = full_layer.total_ifmap_size(batch_size)

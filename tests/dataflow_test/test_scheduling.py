@@ -55,6 +55,7 @@ class TestScheduling(unittest.TestCase):
 
         self.options = Option(
             sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
+            hw_access_forwarding=False, hw_gbuf_sharing=False,
             partition_hybrid=True, partition_batch=True, partition_ifmaps=True,
             ntops=10, nprocesses=1, verbose=False)
 
