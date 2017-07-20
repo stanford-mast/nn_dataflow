@@ -21,6 +21,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 from . import DataCategoryEnum
 from . import LoopBlocking
 from . import LoopBlockingSolver
+from . import LoopEnum
 from . import MemHierEnum
 from . import ParallelEnum
 from . import Partition
