@@ -21,8 +21,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import unittest
 
 from nn_dataflow import NestedLoopDesc
+from nn_dataflow import DataDimLoops
 from nn_dataflow import DataCategoryEnum as de
 from nn_dataflow import MemHierEnum as me
+from nn_dataflow import LoopEnum as le
 
 class TestNestedLoopDesc(unittest.TestCase):
     ''' Tests for NestedLoopDesc. '''
@@ -36,6 +38,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                           (18, 28, 8),
                                           (35, 45, 15),
                                           (1, 1, 2)),
+                             data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                         DataDimLoops(le.IFM, le.BAT),
+                                         DataDimLoops(le.OFM, le.BAT)),
                              unit_ops=7,
                              unit_time=7
                             )
@@ -46,6 +51,12 @@ class TestNestedLoopDesc(unittest.TestCase):
                                            (18, 28, 8),
                                            (35, 45, 15),
                                            (1, 1, 2)), 'unit_access')
+        self.assertEqual(nld.data_loops[de.FIL], DataDimLoops(le.IFM, le.OFM),
+                         'data_loops: FIL')
+        self.assertEqual(nld.data_loops[de.IFM], DataDimLoops(le.IFM, le.BAT),
+                         'data_loops: IFM')
+        self.assertEqual(nld.data_loops[de.OFM], DataDimLoops(le.OFM, le.BAT),
+                         'data_loops: OFM')
         self.assertEqual(nld.unit_ops, 7, 'unit_ops')
         self.assertEqual(nld.unit_time, 7, 'unit_time')
 
@@ -60,6 +71,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                             (18, 28, 8),
                                             (35, 45, 15),
                                             (1, 1, 2)),
+                               data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                           DataDimLoops(le.IFM, le.BAT),
+                                           DataDimLoops(le.OFM, le.BAT)),
                                unit_ops=7,
                                unit_time=7
                               )
@@ -75,6 +89,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                             (18, 28, 8),
                                             (35, 45, 15),
                                             (1, 1, 2)),
+                               data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                           DataDimLoops(le.IFM, le.BAT),
+                                           DataDimLoops(le.OFM, le.BAT)),
                                unit_ops=7,
                                unit_time=7
                               )
@@ -90,6 +107,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                             (18, 28, 8),
                                             (35, 45, 15),
                                             (1, 1, 2)),
+                               data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                           DataDimLoops(le.IFM, le.BAT),
+                                           DataDimLoops(le.OFM, le.BAT)),
                                unit_ops=7,
                                unit_time=7
                               )
@@ -105,6 +125,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                             (18, 28, 8),
                                             (35, 45, 15),
                                             (1, 1, 2)),
+                               data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                           DataDimLoops(le.IFM, le.BAT),
+                                           DataDimLoops(le.OFM, le.BAT)),
                                unit_ops=7,
                                unit_time=7
                               )
@@ -120,6 +143,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                             (18, 28, 8),
                                             (35, 45, 15),
                                             (1, 1, 2)),
+                               data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                           DataDimLoops(le.IFM, le.BAT),
+                                           DataDimLoops(le.OFM, le.BAT)),
                                unit_ops=7,
                                unit_time=7
                               )
@@ -135,6 +161,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                             (18, 28, 8),
                                             (35, 45, 15),
                                             (1, 1, 2)),
+                               data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                           DataDimLoops(le.IFM, le.BAT),
+                                           DataDimLoops(le.OFM, le.BAT)),
                                unit_ops=7,
                                unit_time=7
                               )
@@ -150,6 +179,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                             (18, 28, 8),
                                             (35, 45, 15),
                                             (1, 1, 2)],
+                               data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                           DataDimLoops(le.IFM, le.BAT),
+                                           DataDimLoops(le.OFM, le.BAT)),
                                unit_ops=7,
                                unit_time=7
                               )
@@ -162,6 +194,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                             (18, 28, 8),
                                             [35, 45, 15],
                                             (1, 1, 2)),
+                               data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                           DataDimLoops(le.IFM, le.BAT),
+                                           DataDimLoops(le.OFM, le.BAT)),
                                unit_ops=7,
                                unit_time=7
                               )
@@ -176,6 +211,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                unit_access=((19, 29, 9),
                                             (35, 45, 15),
                                             (1, 1, 2)),
+                               data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                           DataDimLoops(le.IFM, le.BAT),
+                                           DataDimLoops(le.OFM, le.BAT)),
                                unit_ops=7,
                                unit_time=7
                               )
@@ -188,6 +226,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                             (18, 28),
                                             (35, 45, 15),
                                             (1, 1, 2)),
+                               data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                           DataDimLoops(le.IFM, le.BAT),
+                                           DataDimLoops(le.OFM, le.BAT)),
                                unit_ops=7,
                                unit_time=7
                               )
@@ -201,6 +242,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                           (18, 28, 8),
                                           (35, 45, 15),
                                           (1, 1, 2)),
+                             data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                         DataDimLoops(le.IFM, le.BAT),
+                                         DataDimLoops(le.OFM, le.BAT)),
                              unit_ops=7,
                              unit_time=7
                             )
@@ -217,6 +261,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                           (18, 28, 8),
                                           (35, 45, 15),
                                           (1, 1, 2)),
+                             data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                         DataDimLoops(le.IFM, le.BAT),
+                                         DataDimLoops(le.OFM, le.BAT)),
                              unit_ops=7,
                              unit_time=7
                             )
@@ -233,6 +280,9 @@ class TestNestedLoopDesc(unittest.TestCase):
                                           (18, 28, 8),
                                           (35, 45, 15),
                                           (1, 1, 2)),
+                             data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                         DataDimLoops(le.IFM, le.BAT),
+                                         DataDimLoops(le.OFM, le.BAT)),
                              unit_ops=7,
                              unit_time=7
                             )
@@ -244,4 +294,131 @@ class TestNestedLoopDesc(unittest.TestCase):
                          'unit_access: GBUF, OFM')
         self.assertEqual(nld.unit_access_at_of(me.REGF, de.FIL), 1,
                          'unit_access: REGF, FIL')
+
+    def test_invalid_data_loops_type(self):
+        ''' Invalid data_loops type. '''
+        with self.assertRaisesRegexp(TypeError,
+                                     'NestedLoopDesc: .*data_loops.*'):
+            _ = NestedLoopDesc(loopcnt=(3, 8, 4),
+                               usize_gbuf=(20, 30, 9),
+                               usize_regf=(3, 3, 1),
+                               unit_access=((19, 29, 9),
+                                            (18, 28, 8),
+                                            (35, 45, 15),
+                                            (1, 1, 2)),
+                               data_loops=[DataDimLoops(le.IFM, le.OFM),
+                                           DataDimLoops(le.IFM, le.BAT),
+                                           DataDimLoops(le.OFM, le.BAT)],
+                               unit_ops=7,
+                               unit_time=7
+                              )
+        with self.assertRaisesRegexp(TypeError,
+                                     'NestedLoopDesc: .*data_loops.*'):
+            _ = NestedLoopDesc(loopcnt=(3, 8, 4),
+                               usize_gbuf=(20, 30, 9),
+                               usize_regf=(3, 3, 1),
+                               unit_access=((19, 29, 9),
+                                            (18, 28, 8),
+                                            (35, 45, 15),
+                                            (1, 1, 2)),
+                               data_loops=((le.IFM, le.OFM),
+                                           (le.IFM, le.BAT),
+                                           (le.OFM, le.BAT)),
+                               unit_ops=7,
+                               unit_time=7
+                              )
+
+    def test_invalid_data_loops_len(self):
+        ''' Invalid data_loops len. '''
+        with self.assertRaisesRegexp(ValueError,
+                                     'NestedLoopDesc: .*data_loops.*'):
+            _ = NestedLoopDesc(loopcnt=(3, 8, 4),
+                               usize_gbuf=(20, 30, 9),
+                               usize_regf=(3, 3, 1),
+                               unit_access=((19, 29, 9),
+                                            (18, 28, 8),
+                                            (35, 45, 15),
+                                            (1, 1, 2)),
+                               data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                           DataDimLoops(le.IFM, le.BAT)),
+                               unit_ops=7,
+                               unit_time=7
+                              )
+
+    def test_total_ops(self):
+        ''' Get total_ops. '''
+        nld = NestedLoopDesc(loopcnt=(3, 8, 4),
+                             usize_gbuf=(20, 30, 9),
+                             usize_regf=(3, 3, 1),
+                             unit_access=((19, 29, 9),
+                                          (18, 28, 8),
+                                          (35, 45, 15),
+                                          (1, 1, 2)),
+                             data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                         DataDimLoops(le.IFM, le.BAT),
+                                         DataDimLoops(le.OFM, le.BAT)),
+                             unit_ops=7,
+                             unit_time=7
+                            )
+        self.assertEqual(nld.total_ops(), 7 * 3 * 8 * 4)
+
+    def test_total_access_of_at(self):
+        ''' Get total_access_of_at. '''
+        nld = NestedLoopDesc(loopcnt=(3, 8, 4),
+                             usize_gbuf=(20, 30, 9),
+                             usize_regf=(3, 3, 1),
+                             unit_access=((19, 29, 9),
+                                          (18, 28, 8),
+                                          (35, 45, 15),
+                                          (1, 1, 2)),
+                             data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                         DataDimLoops(le.IFM, le.BAT),
+                                         DataDimLoops(le.OFM, le.BAT)),
+                             unit_ops=7,
+                             unit_time=7
+                            )
+
+        self.assertEqual(nld.total_access_at_of(me.DRAM, de.FIL), 19 * 3 * 8)
+        self.assertEqual(nld.total_access_at_of(me.DRAM, de.IFM), 29 * 3 * 4)
+        self.assertEqual(nld.total_access_at_of(me.DRAM, de.OFM), 9 * 8 * 4)
+
+        self.assertEqual(nld.total_access_at_of(me.GBUF, de.FIL), 18 * 3 * 8)
+        self.assertEqual(nld.total_access_at_of(me.GBUF, de.IFM), 28 * 3 * 4)
+        self.assertEqual(nld.total_access_at_of(me.GBUF, de.OFM), 8 * 8 * 4)
+
+        self.assertEqual(nld.total_access_at_of(me.ITCN, de.FIL), 35 * 3 * 8)
+        self.assertEqual(nld.total_access_at_of(me.ITCN, de.IFM), 45 * 3 * 4)
+        self.assertEqual(nld.total_access_at_of(me.ITCN, de.OFM), 15 * 8 * 4)
+
+        self.assertEqual(nld.total_access_at_of(me.REGF, de.FIL), 1 * 3 * 8)
+        self.assertEqual(nld.total_access_at_of(me.REGF, de.IFM), 1 * 3 * 4)
+        self.assertEqual(nld.total_access_at_of(me.REGF, de.OFM), 2 * 8 * 4)
+
+    def test_total_access_of_at_sum(self):
+        ''' Get total_access_of_at sum. '''
+        nld = NestedLoopDesc(loopcnt=(3, 8, 4),
+                             usize_gbuf=(20, 30, 9),
+                             usize_regf=(3, 3, 1),
+                             unit_access=((19, 29, 9),
+                                          (18, 28, 8),
+                                          (35, 45, 15),
+                                          (1, 1, 2)),
+                             data_loops=(DataDimLoops(le.IFM, le.OFM),
+                                         DataDimLoops(le.IFM, le.BAT),
+                                         DataDimLoops(le.OFM, le.BAT)),
+                             unit_ops=7,
+                             unit_time=7
+                            )
+
+        self.assertEqual(nld.total_access_at_of(me.DRAM),
+                         19 * 3 * 8 + 29 * 3 * 4 + 9 * 8 * 4)
+
+        self.assertEqual(nld.total_access_at_of(me.GBUF),
+                         18 * 3 * 8 + 28 * 3 * 4 + 8 * 8 * 4)
+
+        self.assertEqual(nld.total_access_at_of(me.ITCN),
+                         35 * 3 * 8 + 45 * 3 * 4 + 15 * 8 * 4)
+
+        self.assertEqual(nld.total_access_at_of(me.REGF),
+                         1 * 3 * 8 + 1 * 3 * 4 + 2 * 8 * 4)
 

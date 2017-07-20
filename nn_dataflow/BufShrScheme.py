@@ -22,9 +22,8 @@ from . import DataCategoryEnum as de
 from . import ParallelEnum as pe
 from . import Util
 from .PhyDim2 import PhyDim2
-from .Util import StringifyClass
 
-class BufShrScheme(StringifyClass):
+class BufShrScheme(object):
     '''
     The buffer sharing scheme.
     '''
@@ -73,6 +72,8 @@ class BufShrScheme(StringifyClass):
         # Ofmaps in gbuf can be shared by nodes with INNP.
         self.dims[de.OFM] = part.dim(pe.INPP)
         self.nbr_dists[de.OFM] = part.part_neighbor_dist(pe.INPP)
+
+        self.part = part
 
     def dim(self, dce):
         ''' Get the buffer sharing node group dimensions. '''
@@ -254,4 +255,10 @@ class BufShrScheme(StringifyClass):
         coord = PhyDim2(coord_pr, coord_npr) if idx_pr == 0 \
                 else PhyDim2(coord_npr, coord_pr)
         return coord
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'part={}'.format(repr(self.part))]))
 

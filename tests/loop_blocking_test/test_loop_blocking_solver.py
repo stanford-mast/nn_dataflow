@@ -137,10 +137,16 @@ class TestLoopBlockingSolver(TestLoopBlockingFixture):
 
             self.test_reside_sol_opt(rsrckey=rsrckey)
 
+    def test_reside_sol_opt_pool(self):
+        ''' Data reside solution optimal with PoolingLayer. '''
+
+        with self.assertRaisesRegexp(ValueError, 'LoopBlockingSolver: .*'):
+            self.test_reside_sol_opt(wlkey='POOL')
+
     def test_reside_sol_opt_zero(self):
         ''' Data reside solution optimal with zero size. '''
 
-        for wlkey in ['POOL', 'ZERO']:
+        for wlkey in ['ZERO_FIL', 'ZERO_IFM']:
 
             self.test_reside_sol_opt(wlkey=wlkey)
 

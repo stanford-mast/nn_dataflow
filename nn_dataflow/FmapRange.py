@@ -22,7 +22,6 @@ from collections import namedtuple, Counter
 import itertools
 
 from . import Util
-from .Util import StringifyClass, ContentHashClass
 
 _FMAP_POSITION_ATTRS = ['b', 'n', 'h', 'w']
 
@@ -32,7 +31,7 @@ A position in a batched fmap.
 FmapPosition = namedtuple('FmapPosition', _FMAP_POSITION_ATTRS)
 
 
-class FmapRange(StringifyClass, ContentHashClass):
+class FmapRange(Util.ContentHashClass):
     '''
     A range of a batched fmap.
     '''
@@ -150,6 +149,13 @@ class FmapRange(StringifyClass, ContentHashClass):
             return 1
         assert self.fp_beg < other.fp_beg
         return -1
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'fp_beg={}'.format(repr(self.fp_beg)),
+                'fp_end={}'.format(repr(self.fp_end))]))
 
 
 class FmapRangeMap(object):

@@ -84,6 +84,9 @@ class LoopBlockingScheme(object):
         # pylint: disable=invalid-name
         BL = self.BL
 
+        # Loop structure.
+        self.nld = nested_loop_desc
+
         # Check lengths and values.
         assert len(bl_ts) == BL.NUM + 1, \
                 'LoopBlockingScheme: bl_ts has invalid length.'
@@ -100,20 +103,19 @@ class LoopBlockingScheme(object):
         # Check blocking.
         bl_tp = self._bl_tp(slice(None))
         for lpe in range(le.NUM):
-            assert bl_tp[lpe] >= nested_loop_desc.loopcnt[lpe], \
+            assert bl_tp[lpe] >= self.nld.loopcnt[lpe], \
                     'LoopBlockingScheme: invalid blocking LP {}: {} for {}.' \
-                    .format(lpe, self.bl_ts, nested_loop_desc.loopcnt)
+                    .format(lpe, self.bl_ts, self.nld.loopcnt)
 
         self.lcnt = Util.prod(bl_tp)
-        self.total_units = self._t_data_cnt(bl_tp)
 
         # Buffer sharing initialization.
         self._init_bufshr(bufshr, options)
 
         # Buffer data size for one unit.
         self.unit_size = [tuple() for _ in range(BL.NUM)]
-        self.unit_size[BL.GBUF] = nested_loop_desc.usize_gbuf
-        self.unit_size[BL.REGF] = nested_loop_desc.usize_regf
+        self.unit_size[BL.GBUF] = self.nld.usize_gbuf
+        self.unit_size[BL.REGF] = self.nld.usize_regf
 
         # Buffer data unit counts.
         self._set_unit_cnt()
@@ -154,11 +156,6 @@ class LoopBlockingScheme(object):
                 or self.data_size(BL.GBUF) > resource.size_gbuf:
             self.valid = False
             return
-
-        # Record unit stats.
-        self.unit_ops = nested_loop_desc.unit_ops
-        self.unit_time = nested_loop_desc.unit_time
-        self.unit_access = nested_loop_desc.unit_access
 
         # Parallel partitioning.
         self.num_nodes = resource.dim_nodes.size()
@@ -412,33 +409,36 @@ class LoopBlockingScheme(object):
             # BL corresponds to the BL + 1 element in ti/to/tb. But the outer
             # level is the BL element.
 
-            # If the blocking factors of a data category are all 1's in the
-            # current level, the current level does not change the data, and
-            # the fetch times at this level is the same as the outer level.
-
-            # Every data category has two related loops and one unrelated
-            # loops. Only when the innermost non-trivial loop of the current
-            # level is the unrelated loop, can the data reuse include the
-            # current level blocking factor.
-
-            # The innermost non-trivial loop.
-            # If all loops are trivial, we will use the outer level reuse for
-            # all data, so the loop is not used.
-            innermost_nt_lp = self._innermost_nontrivial_loop(self.bl_ts[bl],
-                                                              self.bl_ords[bl])
-
-            cnt = self._t_data_cnt(self.bl_ts[bl])
+            # A data category has related (dimension) loops and unrelated
+            # loops. The data reuse only includes the current level blocking
+            # factors of the unrelated loops if they are inner than all the
+            # dimension loops, i.e., inner than the innermost non-trivial
+            # dimension loop of the current level. If all the dimension loops
+            # are trivial, i.e., have blocking factor 1, the current level does
+            # not change the data, and the fetch times at this level is the
+            # same as the outer level.
 
             fe = [0] * de.NUM
 
-            for dce, lpe in zip([de.FIL, de.IFM, de.OFM],
-                                [le.BAT, le.OFM, le.IFM]):
-                if cnt[dce] == 1:
+            bl_t = self.bl_ts[bl]
+            bl_ord = self.bl_ords[bl]
+
+            for dce in range(de.NUM):
+
+                inntdim_lp = self._innt_dim_loop(dce, bl_t, bl_ord)
+
+                if inntdim_lp is None:
                     fe[dce] = self.fetch[bl-1][dce] if bl > 0 else 1
-                else:
-                    bl_start = bl + (innermost_nt_lp != lpe)
-                    f = self._bl_tp(slice(bl_start))[lpe]
-                    fe[dce] = 2 * f - 1 if dce == de.OFM else f
+                    continue
+
+                f = 1
+                for lpe in self.nld.data_loops[dce].drop(range(le.NUM)):
+                    # Include the unrelated loop blocking factors outside of
+                    # the innermost non-trivial dimension loop.
+                    bl_start = bl + (bl_ord[lpe] > bl_ord[inntdim_lp])
+                    f *= self._bl_tp(slice(bl_start))[lpe]
+
+                fe[dce] = 2 * f - 1 if dce == de.OFM else f
 
             self.fetch.append(fe)
 
@@ -447,30 +447,33 @@ class LoopBlockingScheme(object):
         Lazily calculate stats.
         '''
 
-        self.ops = self.unit_ops * self.lcnt * self.num_nodes * self.part_occ
-        self.time = self.unit_time * self.lcnt
+        self.ops = self.nld.unit_ops * self.lcnt * self.num_nodes \
+                * self.part_occ
+        self.time = self.nld.unit_time * self.lcnt
 
         self.access[me.REGF] = [v * self.lcnt * t
                                 * self.num_nodes * self.part_occ for v, t
-                                in zip(self.unit_access[me.REGF],
+                                in zip(self.nld.unit_access[me.REGF],
                                        [1, 1, 2])]
 
-        self.access[me.ITCN] = [v * u * f * self.num_nodes for v, u, f
-                                in zip(self.unit_access[me.ITCN],
-                                       self.total_units,
-                                       self.fetch[self.BL.REGF])]
+        self.access[me.ITCN] = [self.nld.total_access_at_of(me.ITCN, dce)
+                                * self.fetch[self.BL.REGF][dce]
+                                * self.num_nodes
+                                for dce in range(de.NUM)]
 
-        self.access[me.GBUF] = [v * u * f * s * self.num_nodes for v, u, f, s
-                                in zip(self.unit_access[me.GBUF],
-                                       self.total_units,
-                                       self.fetch[self.BL.REGF],
-                                       self.stored_in_gbuf)]
+        self.access[me.GBUF] = [self.nld.total_access_at_of(me.GBUF, dce)
+                                * self.fetch[self.BL.REGF][dce]
+                                * self.stored_in_gbuf[dce]
+                                * self.num_nodes
+                                for dce in range(de.NUM)]
 
-        self.access[me.DRAM] = [v * u * f / r * self.num_nodes for v, u, f, r
-                                in zip(self.unit_access[me.DRAM],
-                                       self.total_units,
-                                       self.fetch[self.BL.GBUF],
-                                       self.accfwd_reduction)]
+        self.access[me.DRAM] = [(self.nld.total_access_at_of(me.DRAM, dce)
+                                 if self.stored_in_gbuf[dce]
+                                 else self.nld.total_access_at_of(me.GBUF, dce))
+                                * self.fetch[self.BL.GBUF][dce]
+                                * self.num_nodes
+                                / self.accfwd_reduction[dce]
+                                for dce in range(de.NUM)]
 
         # NoC access.
         bufshr_rot_access = self._calc_bufshr_rotation_access(
@@ -490,27 +493,23 @@ class LoopBlockingScheme(object):
         assert isinstance(bl_lvls, slice)
         return [Util.prod(ts[bl_lvls]) for ts in zip(*self.bl_ts)]
 
-    @staticmethod
-    def _t_data_cnt(bl_t):
+    def _t_data_cnt(self, bl_t):
         '''
         Get the corresponding data unit counts given the loop blocking factors.
 
         `bl_t` are the loop blocking factors, indexed by LoopEnum.
         '''
-        cnt = [0] * de.NUM
-        cnt[de.FIL] = bl_t[le.IFM] * bl_t[le.OFM]
-        cnt[de.IFM] = bl_t[le.IFM] * bl_t[le.BAT]
-        cnt[de.OFM] = bl_t[le.OFM] * bl_t[le.BAT]
-        return cnt
+        return [self.nld.data_loops[dce].data_cnt(bl_t)
+                for dce in range(de.NUM)]
 
-    @staticmethod
-    def _innermost_nontrivial_loop(bl_t, bl_ord):
+    def _innt_dim_loop(self, dce, bl_t, bl_ord):
         '''
-        Get the innermost non-trivial loop at a level. Return None if all loops
-        are trivial.
+        Get the innermost non-trivial loop which is a dimension loop of the
+        given data category. Return None if all dimension loops are trivial.
 
-        The innermost non-trivial loop has a non-one blocking factor, and the
-        smallest order value.
+        The innermost non-trivial dimension loop is one of the data dimension
+        loops of data category `dce`, has a non-one blocking factor, and has
+        the smallest order value.
 
         `bl_t` are the loop blocking factors, indexed by LoopEnum. `bl_ord` is
         the loop order.
@@ -519,7 +518,7 @@ class LoopBlockingScheme(object):
         # The first element picks out the non-trivial loops (False < True). If
         # all loops are trivial, None will be the only left one.
         # The second element compares the order within the non-trivial loops.
-        return min([None] + range(le.NUM),
+        return min((None,) + self.nld.data_loops[dce].loops(),
                    key=lambda lpe: (bl_t[lpe] == 1, bl_ord[lpe]) \
                            if lpe is not None else (False, le.NUM))
 
@@ -677,7 +676,8 @@ class LoopBlockingScheme(object):
 
         # Non-trivial loops.
         nt_loops_bs = set(lpe for lpe in range(le.NUM) if t_bs[lpe] > 1)
-        inlp_bs = self._innermost_nontrivial_loop(t_bs, ord_bs)
+        inlp_bs = min(nt_loops_bs, key=lambda lpe: ord_bs[lpe]) \
+                if nt_loops_bs else None
 
         def _min_subgrp_size(*dce_list):
             '''
@@ -815,13 +815,13 @@ class LoopBlockingScheme(object):
 
     def _calc_bufshr_rotation_access(self, bufshr_rot_fetch):
         ''' Calculate the BS rotation NoC accesses, over all nodes. '''
-        return [v * u * f for v, u, f
-                in zip(self.unit_access[me.GBUF], self.total_units,
-                       bufshr_rot_fetch)]
+        return [self.nld.total_access_at_of(me.GBUF, dce)
+                * bufshr_rot_fetch[dce]
+                for dce in range(de.NUM)]
 
     def _calc_bufshr_widefetch_access(self, bufshr_wide_fetch):
         ''' Calculate the BS wide fetch NoC accesses, over all nodes. '''
-        return [v * u * f for v, u, f
-                in zip(self.unit_access[me.GBUF], self.total_units,
-                       bufshr_wide_fetch)]
+        return [self.nld.total_access_at_of(me.GBUF, dce)
+                * bufshr_wide_fetch[dce]
+                for dce in range(de.NUM)]
 

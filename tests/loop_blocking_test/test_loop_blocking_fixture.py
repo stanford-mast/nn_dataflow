@@ -24,6 +24,7 @@ import unittest
 from nn_dataflow import BufShrScheme
 from nn_dataflow import ConvLayer, PoolingLayer
 from nn_dataflow import Cost
+from nn_dataflow import DataDimLoops
 from nn_dataflow import DataCategoryEnum as de
 from nn_dataflow import LoopBlockingScheme
 from nn_dataflow import LoopEnum as le
@@ -48,6 +49,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
         # Workload.
         self.layer = {}
         self.layer['BASE'] = ConvLayer(12, 10, 28, 3)
+        self.layer['LGFIL'] = ConvLayer(2, 4, 28, 20)
         self.layer['POOL'] = PoolingLayer(32, 28, 2)
         self.layer['PAR'] = ConvLayer(24, 20, 56, 3)
         self.batch_size = 4
@@ -78,16 +80,42 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.nld['BASE'] = next(MapStrategyEyeriss(self.layer['BASE'],
                                                    self.batch_size, dim_array)
                                 .gen_nested_loop_desc())
+        self.nld['LGFIL'] = next(MapStrategyEyeriss(self.layer['LGFIL'],
+                                                    self.batch_size, dim_array)
+                                 .gen_nested_loop_desc())
         self.nld['POOL'] = next(MapStrategyEyeriss(self.layer['POOL'],
                                                    self.batch_size, dim_array)
                                 .gen_nested_loop_desc())
+        # Fake nested loop, with zero filter size.
+        self.nld['ZERO_FIL'] = NestedLoopDesc(loopcnt=(12, 10, 4),
+                                              usize_gbuf=(0, 1000, 800),
+                                              usize_regf=(0, 3, 1),
+                                              unit_access=((0, 1000, 800),
+                                                           (0, 1000, 800),
+                                                           (3, 9, 7),
+                                                           (1, 1, 1)),
+                                              data_loops=(DataDimLoops(le.IFM,
+                                                                       le.OFM),
+                                                          DataDimLoops(le.IFM,
+                                                                       le.BAT),
+                                                          DataDimLoops(le.OFM,
+                                                                       le.BAT)),
+                                              unit_ops=1, unit_time=1)
         # Fake nested loop, with zero ifmap size.
-        self.nld['ZERO'] = NestedLoopDesc(loopcnt=(12, 10, 4),
-                                          usize_gbuf=(9, 0, 800),
-                                          usize_regf=(3, 0, 1),
-                                          unit_access=((9, 0, 800), (9, 0, 800),
-                                                       (3, 9, 7), (1, 1, 1)),
-                                          unit_ops=1, unit_time=1)
+        self.nld['ZERO_IFM'] = NestedLoopDesc(loopcnt=(12, 10, 4),
+                                              usize_gbuf=(9, 0, 800),
+                                              usize_regf=(3, 0, 1),
+                                              unit_access=((9, 0, 800),
+                                                           (9, 0, 800),
+                                                           (3, 9, 7),
+                                                           (1, 1, 1)),
+                                              data_loops=(DataDimLoops(le.IFM,
+                                                                       le.OFM),
+                                                          DataDimLoops(le.IFM,
+                                                                       le.BAT),
+                                                          DataDimLoops(le.OFM,
+                                                                       le.BAT)),
+                                              unit_ops=1, unit_time=1)
 
         # Fake partition scheme.
         self.part = PartitionScheme(range(pe.NUM), ((1, 1),) * pe.NUM)
@@ -326,11 +354,12 @@ class TestLoopBlockingFixture(unittest.TestCase):
             self.data = ridx_pr
             return self.buf_cnt_pr
 
-    def _sim_access(self, lbs):
+    def _sim_access_conv(self, lbs):
         '''
-        Get data access by actually simulating and generating loops.
+        Get data access by actually simulating and generating loops for CONV
+        layer.
         '''
-        self.assertTrue(lbs.is_valid(), '_sim_access: invalid lbs.')
+        self.assertTrue(lbs.is_valid(), '_sim_access_conv: invalid lbs.')
 
         lpts = zip(*lbs.bl_ts)
 
@@ -341,7 +370,9 @@ class TestLoopBlockingFixture(unittest.TestCase):
                  (Util.prod(lpts[le.IFM]), Util.prod(lpts[le.BAT])),
                  (Util.prod(lpts[le.OFM]), Util.prod(lpts[le.BAT]))]):
             drams[dce] = self._SimBuffer(buf_cnt_pr,
-                                         lbs.unit_access[me.DRAM][dce],
+                                         lbs.nld.unit_access[me.DRAM][dce]
+                                         if lbs.stored_in_gbuf[dce]
+                                         else lbs.nld.unit_access[me.GBUF][dce],
                                          is_ofm=(dce == de.OFM)
                                         )
         gbufs = [None] * de.NUM
@@ -351,7 +382,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
                  (Util.prod(lpts[le.IFM][1:]), Util.prod(lpts[le.BAT][1:])),
                  (Util.prod(lpts[le.OFM][1:]), Util.prod(lpts[le.BAT][1:]))]):
             gbufs[dce] = self._SimBuffer(buf_cnt_pr,
-                                         lbs.unit_access[me.GBUF][dce],
+                                         lbs.nld.unit_access[me.GBUF][dce],
                                          is_ofm=(dce == de.OFM),
                                          bypass=(not lbs.stored_in_gbuf[dce])
                                         )
@@ -362,7 +393,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
                  (Util.prod(lpts[le.IFM][2:]), Util.prod(lpts[le.BAT][2:])),
                  (Util.prod(lpts[le.OFM][2:]), Util.prod(lpts[le.BAT][2:]))]):
             regfs[dce] = self._SimBuffer(buf_cnt_pr,
-                                         lbs.unit_access[me.REGF][dce],
+                                         lbs.nld.unit_access[me.REGF][dce],
                                          is_ofm=(dce == de.OFM)
                                         )
 

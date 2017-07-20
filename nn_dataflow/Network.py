@@ -185,12 +185,12 @@ class Network(object):
             pl = self.layer_dict[pln]
 
             # Ensure fmap sizes match. Allow padding.
-            try:
-                self.check_padded_fmap(pl, layer)
-            except ValueError as e:
+            if not layer.is_valid_padding_sifm((pl.hofm, pl.wofm)):
                 raise ValueError('Network: {}, a previous layer of {}, '
-                                 'has mismatch fmap size: {}'
-                                 .format(pln, layer_name, str(e)))
+                                 'has mismatch fmap size: {} vs. {}.'
+                                 .format(pln, layer_name,
+                                         (pl.hofm, pl.wofm),
+                                         (layer.hofm, layer.wofm)))
 
             sum_nfmaps += pl.nofm
             same_nfmaps = same_nfmaps and pl.nofm == layer.nifm
@@ -210,20 +210,6 @@ class Network(object):
 
         self._merge_symbol_cache[layer_name] = symbol
         return symbol
-
-    @staticmethod
-    def check_padded_fmap(layer1, layer2):
-        '''
-        Check whether the fmap heights and widths match between the two layers
-        when considering padding. If not, raise ValueError.
-        '''
-        h_padding_rng = sorted((layer2.hofm * layer2.htrd, layer2.hifm))
-        w_padding_rng = sorted((layer2.wofm * layer2.wtrd, layer2.wifm))
-        if (not h_padding_rng[0] <= layer1.hofm <= h_padding_rng[1]
-                or not w_padding_rng[0] <= layer1.wofm <= w_padding_rng[1]):
-            raise ValueError('({}, {}) vs. ({}, {}).'
-                             .format(layer1.hofm, layer1.wofm,
-                                     h_padding_rng, w_padding_rng))
 
     def __contains__(self, layer_name):
         ''' Whether the network contains a layer. '''

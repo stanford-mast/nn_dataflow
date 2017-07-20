@@ -30,7 +30,7 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         for sch in self._gen_loopblocking_all():
 
-            skip = LoopBlocking.skip(*sch)
+            skip = LoopBlocking.skip_conv(*sch)
             reg_sch = self._regularized_scheme(*sch)
 
             if not skip:
@@ -43,7 +43,7 @@ class TestLoopBlocking(TestLoopBlockingFixture):
             lbs = self._lbs(*sch, rsrckey='LG')
             reg_lbs = self._lbs(*reg_sch, rsrckey='LG')
 
-            self.assertFalse(LoopBlocking.skip(*reg_sch),
+            self.assertFalse(LoopBlocking.skip_conv(*reg_sch),
                              'test_skip_not_reg: regularized {} is skipped.'
                              .format(reg_sch))
             self.assertAlmostEqual(lbs.get_cost(self.cost),
@@ -70,7 +70,7 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         for bl_ts, bl_ords in self._gen_loopblocking_all():
 
-            skip = LoopBlocking.skip(bl_ts, bl_ords)
+            skip = LoopBlocking.skip_conv(bl_ts, bl_ords)
             cnts[skip] += 1
 
         skip_ratio = 1. * cnts[True] / sum(cnts)
@@ -83,7 +83,7 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         exp_cnt = 0
         for bl_ts, bl_ords in self._gen_loopblocking_all():
-            exp_cnt += 1 if not LoopBlocking.skip(bl_ts, bl_ords) else 0
+            exp_cnt += 1 if not LoopBlocking.skip_conv(bl_ts, bl_ords) else 0
 
         cnt = 0
         for _ in LoopBlocking.gen_loopblocking(

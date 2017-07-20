@@ -18,5 +18,3 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from .test_loop_blocking_fixture import TestLoopBlockingFixture
-

@@ -22,10 +22,12 @@ import heapq
 import itertools
 from multiprocessing import Pool
 
+from . import DataCategoryEnum as de
 from . import LoopBlockingSolver
 from . import LoopEnum as le
 from . import Util
 from .BufShrScheme import BufShrScheme
+from .DataDimLoops import DataDimLoops
 from .LoopBlockingScheme import LoopBlockingScheme
 
 '''
@@ -36,10 +38,10 @@ Include loop blocking and reordering.
 For our problem, only deal with nifm, nofm, and batch loops.
 '''
 
-def skip(bl_ts, bl_ords):
+def skip_conv(bl_ts, bl_ords):
     '''
-    Skip the given loop blocking scheme if it has regularized equivalent, or it
-    is suboptimal.
+    Skip the given loop blocking scheme for CONV layer, if it has regularized
+    equivalent, or it is suboptimal.
 
     Equivalence of loop blocking schemes:
 
@@ -105,6 +107,14 @@ def skip(bl_ts, bl_ords):
     return False
 
 
+def _is_conv_loops(nested_loop_desc):
+    return (nested_loop_desc.data_loops[de.FIL] == DataDimLoops(le.IFM, le.OFM)
+            and nested_loop_desc.data_loops[de.IFM] \
+                    == DataDimLoops(le.IFM, le.BAT)
+            and nested_loop_desc.data_loops[de.OFM] \
+                    == DataDimLoops(le.OFM, le.BAT))
+
+
 def _gen_loopblocking_perprocess(
         nested_loop_desc, resource, bufshr, cost, part_occ, options,
         gen_tifm, gen_tofm, gen_tbat, gen_ords):
@@ -125,8 +135,9 @@ def _gen_loopblocking_perprocess(
 
     def _sweep():
         ''' Sweep all. '''
+        is_conv_loops = _is_conv_loops(nested_loop_desc)
         for bl_ts, bl_ords in itertools.product(_gen_bl_ts(), gen_ords):
-            if skip(bl_ts, bl_ords):
+            if is_conv_loops and skip_conv(bl_ts, bl_ords):
                 continue
             lbs = LoopBlockingScheme(
                 nested_loop_desc, bl_ts, bl_ords, resource, bufshr, part_occ,
@@ -145,7 +156,8 @@ def gen_loopblocking(nested_loop_desc, resource, part, cost, part_occ, options):
     # Buffer sharing scheme.
     bufshr = BufShrScheme(part)
 
-    if options.sw_solve_loopblocking:
+    # Solver only works for CONV layer.
+    if options.sw_solve_loopblocking and _is_conv_loops(nested_loop_desc):
         gen = LoopBlockingSolver.gen_loopblocking_gbuf_reside
 
         for bl_ts, bl_ords in gen(nested_loop_desc, resource, options):

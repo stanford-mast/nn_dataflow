@@ -35,7 +35,8 @@ class TestLayer(unittest.TestCase):
         self.assertEqual(clayer.nofm, 64, 'nofm')
         self.assertEqual(clayer.hofm, 28, 'hofm')
         self.assertEqual(clayer.wofm, 28, 'wofm')
-        self.assertEqual(clayer.sfil, 3, 'sfil')
+        self.assertEqual(clayer.hfil, 3, 'hfil')
+        self.assertEqual(clayer.wfil, 3, 'wfil')
         self.assertEqual(clayer.htrd, 2, 'htrd')
         self.assertEqual(clayer.wtrd, 2, 'wtrd')
 
@@ -127,6 +128,35 @@ class TestLayer(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             _ = layer.ops_per_neuron()
 
+    def test_is_valid_padding_sifm(self):
+        ''' is_valid_padding_sifm. '''
+        clayer = ConvLayer(3, 64, [28, 14], [3, 1], [2, 4])
+        self.assertTrue(clayer.is_valid_padding_sifm([28 * 2, 14 * 4]))
+        self.assertTrue(clayer.is_valid_padding_sifm([27 * 2 + 3, 13 * 4 + 1]))
+        self.assertFalse(clayer.is_valid_padding_sifm([28, 14]))
+        self.assertFalse(clayer.is_valid_padding_sifm([28 * 2, 14]))
+        self.assertTrue(clayer.is_valid_padding_sifm([27 * 2 + 3, 13 * 4 + 3]))
+
+        flayer = FCLayer(2048, 4096, sfil=2)
+        self.assertTrue(flayer.is_valid_padding_sifm(2))
+        self.assertTrue(flayer.is_valid_padding_sifm(1))
+        self.assertTrue(flayer.is_valid_padding_sifm([1, 2]))
+
+        llayer = LocalRegionLayer(64, 28, 2, 1)
+        self.assertTrue(llayer.is_valid_padding_sifm(28))
+        self.assertFalse(llayer.is_valid_padding_sifm(28 - 1))
+        self.assertFalse(llayer.is_valid_padding_sifm(28 + 1))
+
+        player = PoolingLayer(64, 28, [2, 3], strd=[3, 2])
+        self.assertTrue(player.is_valid_padding_sifm([28 * 3, 28 * 2]))
+        self.assertTrue(player.is_valid_padding_sifm([27 * 3 + 2, 27 * 2 + 3]))
+
+    def test_is_valid_padding_sifm_inv(self):
+        ''' Invalid argument for is_valid_padding_sifm. '''
+        clayer = ConvLayer(3, 64, 28, 3, strd=2)
+        with self.assertRaisesRegexp(ValueError, 'Layer: .*sifm.*'):
+            _ = clayer.is_valid_padding_sifm([3])
+
     def test_eq(self):
         ''' Whether eq. '''
         l1 = Layer(2, 12)
@@ -163,6 +193,14 @@ class TestLayer(unittest.TestCase):
         l2 = PoolingLayer(12, 14, 2)
         self.assertEqual(hash(l1), hash(l2))
 
+    def test_repr(self):
+        ''' __repr__. '''
+        # pylint: disable=eval-used
+        for l in [Layer(4, 12), Layer(4, [12, 24]), Layer(4, 12, strd=3),
+                  Layer(4, 12, strd=[3, 1]), Layer(4, [12, 24], strd=[3, 1])]:
+            self.assertIn('Layer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
+
 
 class TestInputLayer(unittest.TestCase):
     ''' Tests for InputLayer. '''
@@ -178,6 +216,15 @@ class TestInputLayer(unittest.TestCase):
         self.assertEqual(ilayer.ops_per_neuron(), 0,
                          'InputLayer: ops_per_neurons')
         self.assertEqual(ilayer.total_ops(), 0, 'InputLayer: total_ops')
+
+    def test_repr(self):
+        ''' __repr__. '''
+        # pylint: disable=eval-used
+        for l in [InputLayer(4, 12), InputLayer(4, [12, 24]),
+                  InputLayer(4, 12, strd=3), InputLayer(4, 12, strd=[3, 1]),
+                  InputLayer(4, [12, 24], strd=[3, 1])]:
+            self.assertIn('InputLayer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
 
 
 class TestConvLayer(unittest.TestCase):
@@ -208,6 +255,15 @@ class TestConvLayer(unittest.TestCase):
         self.assertEqual(clayer.filter_size(2), 3 * 3 * 2, 'filter_size')
         self.assertEqual(clayer.total_filter_size(2), 3 * 3 * 3 * 64 * 2,
                          'total_filter_size')
+        clayer = ConvLayer(3, 64, [28, 14], [3, 1])
+        self.assertEqual(clayer.filter_size(2), 3 * 1 * 2, 'filter_size')
+        self.assertEqual(clayer.total_filter_size(2), 3 * 1 * 3 * 64 * 2,
+                         'total_filter_size')
+
+    def test_filter_size_invalid(self):
+        ''' Invalid filter size. '''
+        with self.assertRaisesRegexp(ValueError, 'ConvLayer: .*sfil.*'):
+            _ = ConvLayer(3, 64, [28, 14], [3, 3, 3])
 
     def test_fclayer(self):
         ''' FCLayer init. '''
@@ -216,6 +272,21 @@ class TestConvLayer(unittest.TestCase):
         self.assertEqual(flayer.filter_size(), 4, 'FCLayer: filter_size')
         self.assertEqual(flayer.total_filter_size(), 2048 * 4096 * 4,
                          'FCLayer: filter_size')
+
+    def test_repr(self):
+        ''' __repr__. '''
+        # pylint: disable=eval-used
+        for l in [ConvLayer(3, 64, [28, 14], [3, 1]),
+                  ConvLayer(3, 64, [28, 14], 3, strd=[7, 5]),
+                  ConvLayer(3, 64, 28, 3, strd=7), ConvLayer(3, 64, 28, 3)]:
+            self.assertIn('ConvLayer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
+
+        for l in [FCLayer(2048, 4096),
+                  FCLayer(100, 300, 7),
+                  FCLayer(100, 300, [7, 3])]:
+            self.assertIn('FCLayer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
 
 
 class TestLocalRegionLayer(unittest.TestCase):
@@ -253,4 +324,20 @@ class TestLocalRegionLayer(unittest.TestCase):
                          player.total_ofmap_size() * 4)
         player = PoolingLayer(64, 28, 3, strd=2)
         self.assertEqual(player.ops_per_neuron(), 9)
+
+    def test_repr(self):
+        ''' __repr__. '''
+        # pylint: disable=eval-used
+        for l in [LocalRegionLayer(64, 28, 2, 1),
+                  LocalRegionLayer(64, [28, 14], 1, [2, 4]),
+                  LocalRegionLayer(64, [28, 14], 1, [2, 4], 7),
+                  LocalRegionLayer(64, 28, 1, 4, 7)]:
+            self.assertIn('LocalRegionLayer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
+
+        for l in [PoolingLayer(64, 28, 2),
+                  PoolingLayer(64, 28, 3, strd=2),
+                  PoolingLayer(64, [28, 14], [3, 4], strd=[2, 3])]:
+            self.assertIn('PoolingLayer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
 

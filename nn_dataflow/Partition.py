@@ -85,14 +85,44 @@ def gen_partition(layer, batch_size, dim_nodes, options):
                 if pdims[pe.OUTP].size() != 1:
                     continue
 
-        # For different order.
-        for order in itertools.permutations(tuple(range(pe.NUM))):
-            # Size-(1, 1) partition has no effect, so its order is not
-            # relevant. Force them at the beginning.
-            no_part = [v for v in range(pe.NUM) if pdims[v].size() == 1]
-            if not all([order[i] == no_part[i] for i in range(len(no_part))]):
+        # Skip the transpose equivalence. Only partitioning scheme without OFMP
+        # and with only 1-D partitioning could have equivalence, since we
+        # always index in height-major order.
+        if pdims[pe.OFMP].size() == 1 \
+                and all(pd.h == 1 or pd.w == 1 for pd in pdims):
+            pdhs, pdws = zip(*pdims)
+            if pdhs > pdws:
                 continue
 
+        # For different order.
+        for order in itertools.permutations(range(pe.NUM)):
+
+            # Partition with dim-1 has no effect, so its order is not relevant.
+            skip = False
+            for idx in range(pe.NUM - 1):
+                pae1 = order[idx]
+                pae2 = order[idx + 1]
+                pdim1 = pdims[pae1]
+                pdim2 = pdims[pae2]
+
+                # Invalid cases include:
+                # - both are (1, 1) but not in order of ParallelEnum.
+                # - (1, 1) after non-(1, 1).
+                # - (1, non-1) after (non-1, 1) of not BATP.
+                if pdim1.size() == 1 and pdim2.size() == 1 and pae1 > pae2:
+                    skip = True
+                    break
+                if pdim1.size() > 1 and pdim2.size() == 1:
+                    skip = True
+                    break
+                if pae1 != pe.BATP and pdim2.h == 1 and pdim2.w > 1 \
+                        and pdim1.h > 1 and pdim1.w == 1:
+                    skip = True
+                    break
+            if skip:
+                continue
+
+            no_part = [pae for pae in range(pe.NUM) if pdims[pae].size() == 1]
             # Batch parallelism should be at the top.
             if pe.BATP not in no_part and order[len(no_part)] != pe.BATP:
                 continue
@@ -151,12 +181,12 @@ def part_layer_ifmap_range(layer, batch_size, part, pidx):
         h_beg, h_end = h_orng
         # xy_i = xy_o * stride + (0 ... sfil-1)
         h_beg = h_beg * layer.htrd
-        h_end = max(h_beg, (h_end - 1) * layer.htrd + layer.sfil)
+        h_end = max(h_beg, (h_end - 1) * layer.htrd + layer.hfil)
 
         # Fmap width tiling.
         w_beg, w_end = w_orng
         w_beg = w_beg * layer.wtrd
-        w_end = max(w_beg, (w_end - 1) * layer.wtrd + layer.sfil)
+        w_end = max(w_beg, (w_end - 1) * layer.wtrd + layer.wfil)
 
     elif isinstance(layer, LocalRegionLayer):
         # Ifmap channel partition.
@@ -166,15 +196,13 @@ def part_layer_ifmap_range(layer, batch_size, part, pidx):
 
         # Fmap height tiling.
         h_beg, h_end = h_orng
-        h_beg = max(0, h_beg * layer.htrd - layer.hreg // 2)
-        h_end = min(layer.hifm,
-                    h_end * layer.htrd + layer.hreg - layer.hreg // 2)
+        h_beg = h_beg * layer.htrd
+        h_end = max(h_beg, (h_end - 1) * layer.htrd + layer.hreg)
 
         # Fmap width tiling.
         w_beg, w_end = w_orng
-        w_beg = max(0, w_beg * layer.wtrd - layer.wreg // 2)
-        w_end = min(layer.wifm,
-                    w_end * layer.wtrd + layer.wreg - layer.wreg // 2)
+        w_beg = w_beg * layer.wtrd
+        w_end = max(w_beg, (w_end - 1) * layer.wtrd + layer.wreg)
 
     assert n_end <= layer.nifm and h_end <= layer.hifm and w_end <= layer.wifm
 
@@ -273,8 +301,12 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
                 nhops[de.OFM] += ofmap_layout.total_transfer_nhops(ofrng, coord)
             else:
                 # Others. Send to the mid node (one way).
+                # The total fetch times (reads and writes) of OFM is f = 2n - 1
+                # (no read for the first time), i.e., n - 1 reads and n writes.
+                # Only writes need to send to the mid node, i.e., (f + 1) / 2
+                # rather than f times, approximately half.
                 dist = coord.hop_dist(coord_list[mid_idx])
-                nhops[de.OFM] += ofrng.size() * dist / 2  # 1/2 because one way.
+                nhops[de.OFM] += ofrng.size() * dist / 2
 
     # Filter access.
     if isinstance(layer, ConvLayer):
@@ -318,6 +350,11 @@ def get_ofmap_layout(layer, batch_size, part, output_mem_region):
     The ofmap partitioning is calculated by shrinking or extending the
     computation partitioning, while trying to maintain the same layout shape.
     '''
+    # Only work on the partitioning schemes related to ofmaps.
+    ofmap_paes = [pe.OUTP, pe.OFMP, pe.BATP]
+    part = PartitionScheme(order=part.order,
+                           pdims=[part.dim(pae) if pae in ofmap_paes
+                                  else PhyDim2(1, 1) for pae in range(pe.NUM)])
 
     dim_part = part.dim()
     dim_omr = output_mem_region.dim
@@ -337,13 +374,14 @@ def get_ofmap_layout(layer, batch_size, part, output_mem_region):
             # Ofmap dimension > computation dimension. Extend.
             ext = od // pd
             # Apply the extension to the top level.
-            ofmap_pdims[ofmap_order[0]][di] *= ext
+            top_pae = next(pae for pae in ofmap_order if pae in ofmap_paes)
+            ofmap_pdims[top_pae][di] *= ext
         else:
             # Computation dimension >= ofmap dimension, shrink.
             # Go from bottom to top. Keep bottom (first) levels unchanged, and
             # shrink top (latter) levels.
             for pae in reversed(ofmap_order):
-                if od > ofmap_pdims[pae][di]:
+                if od >= ofmap_pdims[pae][di]:
                     # Remaining size in ofmap dimension is enough for current
                     # level. Use it to keep the current level the same size.
                     od //= ofmap_pdims[pae][di]
@@ -352,13 +390,6 @@ def get_ofmap_layout(layer, batch_size, part, output_mem_region):
                     # current level to be whatever remains.
                     ofmap_pdims[pae][di] = od
                     od = 1
-    # Eliminate the partitioning schemes which do not partition ofmaps (i.e.,
-    # correspond to the same ofmap range). Merge them to BATP.
-    for pae in range(pe.NUM):
-        if pae not in [pe.OUTP, pe.OFMP, pe.BATP]:
-            ofmap_pdims[pe.BATP] = [x * y for x, y in zip(ofmap_pdims[pe.BATP],
-                                                          ofmap_pdims[pae])]
-            ofmap_pdims[pae] = [1, 1]
 
     ofmap_part = PartitionScheme(order=ofmap_order, pdims=ofmap_pdims)
     assert all(od <= omrd for od, omrd in zip(ofmap_part.dim(), dim_omr)), \
@@ -374,6 +405,7 @@ def get_ofmap_layout(layer, batch_size, part, output_mem_region):
 
     ofmap_layout = DataLayout(frmap=ofmap_frmap,
                               origin=output_mem_region.origin)
+    assert ofmap_layout.is_in_region(output_mem_region)
 
     return ofmap_layout
 

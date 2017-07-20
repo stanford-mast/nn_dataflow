@@ -23,6 +23,7 @@ import math
 from . import DataCategoryEnum as de
 from . import LoopEnum as le
 from . import Util
+from .DataDimLoops import DataDimLoops
 
 '''
 Analytical solvers for loop blocking.
@@ -218,6 +219,14 @@ def gen_loopblocking_gbuf_reside(nested_loop_desc, resource, options):
     Generator for loop blocking schemes that are solved from gbuf reside
     analytical models.
     '''
+    if (nested_loop_desc.data_loops[de.FIL] != DataDimLoops(le.IFM, le.OFM)
+            or nested_loop_desc.data_loops[de.IFM] \
+                    != DataDimLoops(le.IFM, le.BAT)
+            or nested_loop_desc.data_loops[de.OFM] \
+                    != DataDimLoops(le.OFM, le.BAT)):
+        raise ValueError('LoopBlockingSolver: solver only applies to '
+                         'CONV layer nested loops')
+
     reside_dce_list = []
     # reside_dce_list is a list of DataCategoryEnum, each element is a config
     # with only that data category in gbuf, i.e., the others are all bypassed.

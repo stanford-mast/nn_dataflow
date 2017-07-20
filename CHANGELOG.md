@@ -12,7 +12,7 @@ List of major changes and improvements
   - Buffer sharing scheme.
 
 
-## [v1.4 -- v1.5] -- 2017-06-30
+## [v1.4 -- v1.5] -- 2017-07-20
 
 ### Added
 
@@ -28,6 +28,15 @@ List of major changes and improvements
 
   - Add default filter size to `FCLayer`.
 
+  - Add `DataDimLoops` class to denote loops that are dimensions of a data
+    category.
+
+- Software models.
+
+  - Add statistic properties to `SchedulingResult`.
+
+  - Add `NNDataflowScheme` class for overall NN dataflow.
+
 - Software engineering.
 
   - Add utilities to `LoopBlockingScheme` class.
@@ -42,6 +51,8 @@ List of major changes and improvements
 - Workload models.
 
   - Relax `__len__` of `Network` to work before setting input layer.
+
+  - Allow different height and width for filters in `ConvLayer`.
 
 - Software models:
 
@@ -62,9 +73,21 @@ List of major changes and improvements
   - Change `LoopBlockingScheme` interface for blocking factors and loop orders.
 
   - Loop blocking exhaustive search introduces regularized schemes and
-    suboptimal schemes, to enable more skips.
+    suboptimal schemes, to enable more skips. Also restrict the skips to CONV
+    layer.
 
-  - Refactor loop blocking bypass solvers.
+  - Refactor loop blocking bypass solvers, and restrict it to CONV layer.
+
+  - Use row-stationary mapping to `LocalRegionLayer`, and merge with that of
+    `ConvLayer`.
+
+  - Generalize `LoopBlockingScheme` access model for arbitrary data loops.
+
+  - Skip equivalence when generating `PartitionScheme`.
+
+  - Check ifmap layout against layer parameters in `Scheduling`.
+
+  - Add number of nodes to scheduling result.
 
 - Software engineering.
 
@@ -73,6 +96,10 @@ List of major changes and improvements
   - Use rich comparison instead of `__cmp__`.
 
   - Convert `RuntimeError` exceptions to assertions.
+
+  - Define `__repr__` for class stringify, and remove `StringifyClass`.
+
+  - Move map strategy class into `NNDataflow` constructor.
 
 
 ### Fixed
@@ -86,6 +113,12 @@ List of major changes and improvements
 - Multiple bugs fixed in `Util`.
 
 - Multiple bugs fixed in `PartitionScheme`.
+
+- Use GBUF unit access for DRAM when bypassing GBUF.
+
+- Partitioned ifmap range for `LocalRegionLayer`.
+
+- Clarify ITCN accesses to be number of individual transfers to each REGF.
 
 
 ## [v1.3 -- v1.4] -- 2017-05-18

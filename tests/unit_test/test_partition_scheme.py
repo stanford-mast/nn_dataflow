@@ -222,3 +222,9 @@ class TestPartitionScheme(unittest.TestCase):
                                            self.ps1.size(pe.OFMP)),
                                     self.ps1.size(pe.BATP))
 
+    def test_repr(self):
+        ''' __repr__. '''
+        # pylint: disable=eval-used
+        self.assertEqual(eval(repr(self.ps1)), self.ps1)
+        self.assertEqual(eval(repr(self.ps2)), self.ps2)
+
