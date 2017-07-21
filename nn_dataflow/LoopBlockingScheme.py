@@ -168,13 +168,13 @@ class LoopBlockingScheme(object):
         self.ops = float('nan')
         self.time = float('nan')
         self.access = [[float('nan')] * de.NUM for _ in range(me.NUM)]
-        # NoC access due to buffer sharing and access forwarding.
-        self.noc_access = [0] * de.NUM
+        # NoC access due to buffer sharing.
+        self.noc_access = [0.] * de.NUM
+        self.bufshr_rotation_access = [0.] * de.NUM
+        self.bufshr_wide_fetch_access = [0.] * de.NUM
 
         # Buffer sharing.
         self._set_bufshr(resource, bufshr, options)
-        if not self.is_valid():
-            return
 
         # Access forwarding.
         self._set_accfwd(bufshr, options)
@@ -292,6 +292,8 @@ class LoopBlockingScheme(object):
                             ('accfwd_reduction', self.accfwd_reduction),
                             ('bufshr_grp_size', self.bufshr_grp_size),
                             ('bufshr_subgrp_size', self.bufshr_subgrp_size),
+                            ('bufshr_bs_t', self.bufshr_bs_t),
+                            ('bufshr_bs_ord', self.bufshr_bs_ord),
                             ('bufshr_rot_fetch', self.bufshr_rot_fetch),
                             ('bufshr_rot_round_cnt', self.bufshr_rot_round_cnt),
                             ('bufshr_rot_unit_cnt', self.bufshr_rot_unit_cnt),
@@ -476,12 +478,13 @@ class LoopBlockingScheme(object):
                                 for dce in range(de.NUM)]
 
         # NoC access.
-        bufshr_rot_access = self._calc_bufshr_rotation_access(
+        self.bufshr_rotation_access = self._calc_bufshr_rotation_access(
             self.bufshr_rot_fetch)
-        bufshr_wf_access = self._calc_bufshr_widefetch_access(
+        self.bufshr_wide_fetch_access = self._calc_bufshr_widefetch_access(
             self.bufshr_wide_fetch)
         self.noc_access = [a1 + a2 for a1, a2
-                           in zip(bufshr_rot_access, bufshr_wf_access)]
+                           in zip(self.bufshr_rotation_access,
+                                  self.bufshr_wide_fetch_access)]
 
         self.finalized_stats = True
 
@@ -573,6 +576,10 @@ class LoopBlockingScheme(object):
         # They can be decreased later, but never increased.
         self.bufshr_subgrp_size = self.bufshr_grp_size
 
+        # Additional BS level between DRAM and GBUF, split out from GBUF level.
+        self.bufshr_bs_t = (1,) * le.NUM
+        self.bufshr_bs_ord = tuple(range(le.NUM))
+
         # NoC fetch due to rotation.
         # The fetch times means the number of hops along which each data
         # (considered all replica) traverals over the entire nested loops.
@@ -595,35 +602,43 @@ class LoopBlockingScheme(object):
 
         The GBUF level loops, i.e., ti/to/tb[1], decide the order and ranges of
         the access to data buffered in GBUF, which could spread across multiple
-        nodes. Depending on the loop structure, at most one data category,
-        whose two related loops are not adjacent and split by the other loop,
-        has a non-perfect-sequential access pattern, as the inner dimension
-        will be accessed multiple times (due to the middle unrelated loop)
-        before switching to the next outer dimension. We call it non-seq-acc
-        data category. If there are < 3 non-trivial loops, there is no non-seq
-        data category. E.g., OFM is non-seq-acc with the following loop
+        nodes.
+
+        - Seq-acc and non-seq-acc data category.
+
+        Depending on the loop structure, some data categories, whose related
+        loops are not adjacent and split by the other unrelated loops, has a
+        non-perfect-sequential access pattern, as the inner dimensions will be
+        accessed multiple times (due to the middle unrelated loops) before
+        switching to the next outer dimension. We call it non-seq-acc data
+        category.
+
+        E.g., with CONV layer, OFM is non-seq-acc with the following loop
         structure:
 
         for o
           for i
             for b
 
-        - Rotation round.
-
-        The blocking factors and loop order decide the number of rotation
-        rounds. For seq-acc data categories, the rotation rounds equal to the
-        fetch times to GBUF. E.g., with above loops, IFM (i, b) rotates `to`
-        rounds, and FIL (i, o) rotates once. For non-seq-acc data category, we
-        only rotate after all the multiple accesses to the inner dimension are
-        done. So its rotation rounds needs to be reduced by this fetch times.
-        E.g., OFM (o, b) rotates only once.
+        If there are < 3 non-trivial loops, there is no non-seq data category.
 
         - Rotation unit.
 
         Rotation unit for each data category is defined as the shifting size
         for each rotation step. For seq-acc data categories, the rotation unit
-        is 1 REGF unit. For non-seq-acc data category, the rotation unit is 1
-        REGF unit * inner dimension size.
+        is single REGF unit. For non-seq-acc data category, the rotation unit
+        is the product of all inner dimension sizes that are not adjacent to
+        the outermost dimension, i.e., we only rotate after all the multiple
+        accesses to the inner dimensions are done.
+
+        - Rotation round.
+
+        Given the definition of rotation unit above, the number of rotation
+        rounds is the product of all unrelated loop blocking factors above the
+        outermost dimension loop of this data category.
+
+        E.g., with above loops, IFM (i, b) rotates `to` rounds, FIL (i, o)
+        rotates once, and OFM (o, b) rotates only once.
 
         - Wide fetch.
 
@@ -631,15 +646,20 @@ class LoopBlockingScheme(object):
         but there may be remote accesses without rotation, called wide fetch,
         if the rotation unit does not fit in a single node GBUF.
 
-        - Rotation round optimization.
+        - BS schemes.
 
-        Only the data with the inner two loops are rotated multiple times per
-        DRAM access (GBUF filling) and can be optimized. We do not touch the
-        innermost loop, to keep GBUF fetch times unchanged. Therefore we only
-        try to split the middle loop into two: across-node and within-node, and
-        bring the across-node loop outside.
+        When exploring the BS schemes, we keep the total accesses to DRAM,
+        GBUF, and REGF unchanged, i.e., previously calculated fetch times are
+        still valid. This is guaranteed by fixing some innermost loops in the
+        GBUF level.
 
-        With above loop structure example, it will be
+        The other un-fixed loops (we call them flexible loops) can be reordered
+        or further blocked into an additional BS level between GBUF and DRAM
+        levels. This additional level can help reduce NoC accesses by splitting
+        the data accesses into across-node and within-node, and use up the data
+        within a node before switching to the next node.
+
+        E.g., the above loop structure can become:
 
         for i-across-node
           for o
@@ -650,168 +670,293 @@ class LoopBlockingScheme(object):
         and increases OFM (o, b) rotation rounds from 1 to `i-across-node`,
         i.e., subgroup size of IFM; it does not change FIL (i, o) rotation
         rounds.
-
-        This optimization does not change the wide fetch times. FIL (i, o) is
-        still seq-acc once but with a different order; OFM (o, b) is still
-        non-seq-acc; IFM (i, b) becomes non-seq-acc, but if we ensure the inner
-        i loop is within a node, no wide fetch is needed.
         '''
         assert self.is_valid() and not self.finalized_stats
 
         if not options.hw_gbuf_sharing:
+            assert all(gs == 1 for gs in self.bufshr_grp_size)
             return
 
         bl = self.BL.GBUF
         blp1 = bl + 1
 
-        # If bypass gbuf, set subgroup size to 1.
-        self.bufshr_subgrp_size = tuple(sgs if self.stored_in_gbuf[dce]
-                                        and self.unit_size[bl][dce] > 0 else 1
+        # If bypass GBUF, set subgroup size to 1.
+        self.bufshr_subgrp_size = tuple(sgs if self.data_size(bl, dce) else 1
                                         for dce, sgs
                                         in enumerate(self.bufshr_subgrp_size))
 
+        if all(sgs == 1 for sgs in self.bufshr_subgrp_size):
+            return
+
+        ## Loop structure.
+
         # The blocking factors and loop order that are related to BS.
-        t_bs = self.bl_ts[blp1]
-        ord_bs = self.bl_ords[blp1]
+        t_x = self.bl_ts[blp1]
+        ord_x = self.bl_ords[blp1]
 
         # Non-trivial loops.
-        nt_loops_bs = set(lpe for lpe in range(le.NUM) if t_bs[lpe] > 1)
-        inlp_bs = min(nt_loops_bs, key=lambda lpe: ord_bs[lpe]) \
-                if nt_loops_bs else None
+        nt_loops = set(lpe for lpe in range(le.NUM) if t_x[lpe] > 1)
+
+        # To keep fetch times to all hierarchies unchanged, we fix some loops
+        # without further blocking them in BS. See _set_fetch(), the
+        # (unrelated) loops inside the innermost non-trivial dim loop does not
+        # contribute to the fetch times, so we fix these loops for all data
+        # categories.
+        o_inntdim_loop = max(
+            (self._innt_dim_loop(dce, t_x, ord_x) for dce in range(de.NUM)),
+            key=lambda lpe: (ord_x[lpe] if lpe is not None else -1))
+        # A tuple in the order of outer to inner, i.e., sort by inverse order.
+        fixed_loops = tuple(sorted(
+            (lpe for lpe in nt_loops if ord_x[lpe] < ord_x[o_inntdim_loop]),
+            key=lambda lpe: ord_x[lpe],
+            reverse=True))
+
+        # The loops that can be further blocked without affecting the fetch
+        # times to all hierarchies.
+        flex_loops = nt_loops.difference(fixed_loops)
+
+        ## Subgroup size candidates.
 
         def _min_subgrp_size(*dce_list):
             '''
-            Get the minimum BS subgroup size. Minimize in the order of the
-            given `dce_list`.
+            Get the minimum BS subgroup size, but not changing the current
+            subgroup size. Minimize in the order of the given `dce_list`.
             '''
-            cur_sgs = list(self.bufshr_subgrp_size)
-            min_sgs = list(self.bufshr_subgrp_size)
+            # No duplication.
+            assert len(dce_list) == len(set(dce_list))
+
+            # Free capacity in each node's GBUF.
             free_cap = resource.size_gbuf - self.data_size(bl)
+
+            sgs_list = list(self.bufshr_subgrp_size)
+
             for dce in dce_list:
-                dce_size = self.data_size(bl, dce)
-                assert dce_size > 0
-                dce_tot_size = dce_size * cur_sgs[dce]
-                # dce_tot_size / sgs - dce_size <= free_cap
-                min_sgs[dce] = Util.idivc(dce_tot_size, free_cap + dce_size)
-                free_cap -= dce_tot_size / min_sgs[dce] - dce_size
+                # Skip no sharing case.
+                if sgs_list[dce] <= 1:
+                    continue
+
+                cur_dsz = self.data_size(bl, dce)
+                tot_dsz = cur_dsz * self.bufshr_subgrp_size[dce]
+                assert cur_dsz > 0 and tot_dsz > 0
+
+                # min. sgs
+                # s.t. tot_dsz / sgs <= free_cap + cur_dsz.
+                for sgs in range(sgs_list[dce], 0, -1):
+                    if self.bufshr_grp_size[dce] % sgs != 0:
+                        # Require subgroup size to be a factor of the group
+                        # size.
+                        continue
+                    if Util.idivc(tot_dsz, sgs) <= free_cap + cur_dsz:
+                        sgs_list[dce] = sgs
+                    else:
+                        break
+
+                # Reduce free capacity.
+                free_cap -= Util.idivc(tot_dsz, sgs_list[dce]) - cur_dsz
                 assert free_cap >= 0
-            return tuple(min_sgs)
 
-        def _rotation(ord_loops):
+            return tuple(sgs_list)
+
+        # Original subgroup size.
+        subgrp_size_cands = [self.bufshr_subgrp_size]
+        # Reduce subgroup size if data can fit in fewer nodes. Consider all
+        # orders about which data first shrink.
+        subgrp_size_cands += set(_min_subgrp_size(*dce_list) for dce_list
+                                 in itertools.permutations(range(de.NUM)))
+
+        ## Sweep all BS schemes.
+
+        def _sweep_bufshr():
+            for subgrp_size in subgrp_size_cands:
+
+                # `flex_loops` can be further blocked in BS, while others
+                # cannot (set to 1).
+                t_bs_tot = [t_x[lpe] if lpe in flex_loops else 1
+                            for lpe in range(le.NUM)]
+
+                for loops_bs, loops_bot in itertools.product(
+                        itertools.permutations(flex_loops),
+                        itertools.permutations(flex_loops)):
+
+                    for t_bs_frac in itertools.product(
+                            *[Util.factorize(t, 2) for t in t_bs_tot]):
+                        t_bs = tuple(t[0] for t in t_bs_frac)
+
+                        yield subgrp_size, t_bs, loops_bs, loops_bot
+
+        ## BS NoC fetch times.
+
+        dim_loops = [self.nld.data_loops[dce].loops() for dce in range(de.NUM)]
+
+        def _is_dim_loop(lpe, dce, _dim_loops=dim_loops):
+            return lpe in _dim_loops[dce]
+
+        def _calc_bufshr_fetch(subgrp_size, t_bs, loops_bs, loops_bot):
             '''
-            Get the rotation information.
+            Calculate the BS scheme NoC fetch times. Return rotation fetch,
+            wide fetch, and other statistics.
 
-            Return the number of rotation rounds and the number of rotation
-            units for each data category.
+            `subgrp_size` is the BS subgroup size for each data category.
+
+            `t_bs` is the blocking factors indexed by LoopEnum for the
+            additional BS level between DRAM and GBUF, i.e., above `blp1`. They
+            are fractorized from `t_x`. Only those in `flex_loops` can have
+            non-1 values.
+
+            `loops_bs` and `loops_bot` are ordered tuples of `flex_loops` from
+            outer to inner, for the additional BS level and the original GBUF
+            level (at the bottom) respectively.
             '''
-            rotrnd_cnt = list(self.fetch[blp1])
-            rotunit_cnt = self._t_data_cnt(t_bs)
+            assert set(loops_bs) == set(loops_bot) == flex_loops
+            assert all(b <= x for b, x in zip(t_bs, t_x))
+            assert all(t_bs[lpe] == 1 or lpe in flex_loops
+                       for lpe in range(le.NUM))
 
-            # The non-seq-acc data category with nonadjacent loops.
-            nseq_dce = None
-            if len(ord_loops) == 3:
-                nseq_dce = (de.FIL if ord_loops[1] == le.BAT
-                            else (de.IFM if ord_loops[1] == le.OFM
-                                  else de.OFM))
-                # Update rotation unit to be the whole inner dim.
-                rotunit_cnt[nseq_dce] //= t_bs[ord_loops[2]]
-                # Reduce rotation rounds by the fetch times to the inner dim.
-                rotrnd_cnt[nseq_dce] //= t_bs[ord_loops[1]]
+            # Make a list of tuples (LoopEnum, blocking factor)`, each
+            # corresponds to a non-trivial loop in the additional BS level and
+            # the original GBUF level, ordered from outer to inner.
+            lp_t_list = []
+            # Additional BS level.
+            lp_t_list += [(lpe, t_bs[lpe])
+                          for lpe in loops_bs if t_bs[lpe] > 1]
+            # GBUF level flex loops.
+            lp_t_list += [(lpe, Util.idivc(t_x[lpe], t_bs[lpe]))
+                          for lpe in loops_bot if t_x[lpe] > t_bs[lpe]]
+            # GBUF level fixed loops.
+            lp_t_list += [(lpe, t_x[lpe]) for lpe in fixed_loops]
+            # Check.
+            assert all(tpl[1] > 1 for tpl in lp_t_list)
 
-            return rotrnd_cnt, rotunit_cnt, nseq_dce
+            # Total rotation rounds (over all GBUF filling).
+            rot_rnd_cnts = []
+            # Number of rotation units.
+            rot_unit_cnts = []
+            # Wide fetch widths.
+            wide_fetch_widths = []
 
-        def _sweep_rotation():
-            '''
-            Generate all potential rotation schemes.
+            # Rotation NoC fetch times.
+            rot_fetch = []
+            # Wide fetch NoC fetch times.
+            wide_fetch = []
 
-            Yield the resulting NoC rotation fetch times, and the rotation
-            scheme.
-            '''
-            for non_inlp in itertools.permutations([lpe for lpe in nt_loops_bs
-                                                    if lpe != inlp_bs]):
-                # Ordered loops, from outermost to innermost.
-                ord_loops = non_inlp + (inlp_bs,)
+            for dce in range(de.NUM):
 
-                rotrnd_cnt, rotunit_cnt, nseq_dce = _rotation(ord_loops)
+                buf_fetch = self.fetch[blp1][dce]
+                mem_fetch = self.fetch[blp1-1][dce]
 
-                # Reduce subgroup size if data can fit in fewer nodes. Need to
-                # decide an order about which data first shrink.
-                dce_list = [dce for dce in range(de.NUM)
-                            if self.bufshr_subgrp_size[dce] > 1]
-                for dce_order in itertools.permutations(dce_list):
-                    subgrp_size = _min_subgrp_size(*dce_order)
+                # Index of the outermost dim loop in `lp_t_list`. None if all
+                # dim loops are trivial.
+                idx_odlp = next((i for i, tpl in enumerate(lp_t_list)
+                                 if _is_dim_loop(tpl[0], dce)),
+                                None)
 
-                    # Wide fetch.
-                    wf_width = [1. * s / c for s, c
-                                in zip(subgrp_size, rotunit_cnt)]
-                    fetch_per_bufacc = [
-                        bufshr.nhops_wide_fetch_once(dce, subgrp_size[dce],
-                                                     wf_width[dce])
-                        for dce in range(de.NUM)]
-                    # Wide fetch counts, equal to GBUF access (REGF filling).
-                    bufacc_cnt = self.fetch[blp1]
-                    # The last wide fetch can be combined with the rotation.
-                    wide_fetch = [nh * (r - f) for nh, r, f
-                                  in zip(fetch_per_bufacc, bufacc_cnt,
-                                         rotrnd_cnt)]
-                    assert all(wf >= 0 - 1e-4 for wf in wide_fetch)
+                # Rotation rounds.
+                rotrnds = 1
+                if idx_odlp is None or subgrp_size[dce] == 1:
+                    # No rotation, one round per mem fetch.
+                    # One rotation can support both read and write access.
+                    rotrnds *= (mem_fetch + 1) // 2 if dce == de.OFM \
+                            else mem_fetch
+                elif idx_odlp is not None:
+                    # All unrelated loop factors above the outermost dim loop.
+                    # At DRAM level.
+                    rotrnds *= Util.prod(self.nld.data_loops[dce]
+                                         .drop(self._bl_tp(slice(blp1))))
+                    # At GBUF level.
+                    rotrnds *= Util.prod(tpl[1] for tpl
+                                         in itertools.islice(lp_t_list,
+                                                             idx_odlp))
+                # Over all GBUF filling (DRAM fetch).
+                assert ((buf_fetch + 1) // 2 if dce == de.OFM
+                        else buf_fetch) % rotrnds == 0
+                assert rotrnds % ((mem_fetch + 1) // 2 if dce == de.OFM
+                                  else mem_fetch) == 0
+                rot_rnd_cnts.append(rotrnds)
 
-                    # Rotation.
-                    fetch_per_rot = [
-                        bufshr.nhops_rotate_all(dce, subgrp_size[dce])
-                        for dce in range(de.NUM)]
-                    # The first rotation can be combined with the initial
-                    # broadcast.
-                    # After fetching from DRAM, data will be broadcast to all
-                    # nodes regardless of who stores it (see Partition). So
-                    # initially each node receives all data. This saves one
-                    # rotation. Afterwards each node only stores partial data
-                    # and relies on rotation to see all the data.
-                    rot_fetch = [nh * (r - f) for nh, r, f
-                                 in zip(fetch_per_rot, rotrnd_cnt,
-                                        self.fetch[bl])]
-                    assert all(rf >= 0 - 1e-4 for rf in rot_fetch)
+                # Number of rotation units.
+                rotunits = 1
+                # All dimension sizes of the outermost adjacent dim loops.
+                if idx_odlp is not None:
+                    rotunits = Util.prod(tpl[1] for tpl
+                                         in itertools.takewhile(
+                                             lambda tpl, dce_=dce:
+                                             _is_dim_loop(tpl[0], dce_),
+                                             itertools.islice(lp_t_list,
+                                                              idx_odlp, None)))
+                rot_unit_cnts.append(rotunits)
 
-                    yield rot_fetch, wide_fetch, subgrp_size, \
-                            rotrnd_cnt, rotunit_cnt, wf_width
+                # Wide fetch width.
+                wf_width = 1. * subgrp_size[dce] / rotunits
+                wide_fetch_widths.append(wf_width)
 
-                    if len(ord_loops) == 3:
-                        # Optimize rotation rounds.
-                        rotrnd_cnt_opt = list(rotrnd_cnt)
-                        # The target data category is the one with the inner
-                        # two loops.
-                        dce_to_opt = (de.FIL if ord_loops[0] == le.BAT
-                                      else (de.IFM if ord_loops[0] == le.OFM
-                                            else de.OFM))
-                        rotrnd_cnt_opt[dce_to_opt] //= t_bs[ord_loops[0]]
-                        # And the non-seq-acc data rotation rounds increase.
-                        rotrnd_cnt_opt[nseq_dce] *= subgrp_size[dce_to_opt]
+                # Wide fetch times.
+                wf_per_bufacc = bufshr.nhops_wide_fetch_once(
+                    dce, subgrp_size[dce], wf_width)
+                # Use REGF filling (GBUF fetch).
+                # The last wide fetch can be combined with the rotation.
+                wf = wf_per_bufacc * (buf_fetch - rotrnds)
+                assert wf > -1e-4
+                wide_fetch.append(wf)
 
-                        rot_fetch_opt = [nh * (r - f) for nh, r, f
-                                         in zip(fetch_per_rot, rotrnd_cnt_opt,
-                                                self.fetch[bl])]
-                        assert all(rf >= 0 - 1e-4 for rf in rot_fetch_opt)
+                # Rotation fetch times.
+                rf_per_rot = bufshr.nhops_rotate_all(dce, subgrp_size[dce])
+                # The first rotation can be combined with the initial
+                # broadcast of each GBUF filling (DRAM fetch).
+                # After fetching from DRAM, data will be broadcast to all nodes
+                # regardless of who stores it (see Partition). So initially
+                # each node receives all data. This saves one rotation.
+                # Afterwards each node only stores partial data and relies on
+                # rotation to see all the data.
+                rf = rf_per_rot * (rotrnds - mem_fetch)
+                assert rf > -1e-4
+                rot_fetch.append(rf)
 
-                        yield rot_fetch_opt, wide_fetch, subgrp_size, \
-                                rotrnd_cnt_opt, rotunit_cnt, wf_width
+            return rot_fetch, wide_fetch, \
+                    rot_rnd_cnts, rot_unit_cnts, wide_fetch_widths
 
-        try:
-            def _key_func(tuple_):
-                return sum(self._calc_bufshr_rotation_access(tuple_[0])) \
-                        + sum(self._calc_bufshr_widefetch_access(tuple_[1]))
-            rot_fetch, wide_fetch, subgrp_size, \
-                    rotrnd_cnt, rotunit_cnt, wf_width \
-                    = min(_sweep_rotation(), key=_key_func)
-        except ValueError:
-            self.valid = False
-            return
+        ## Search for the best BS scheme.
 
-        self.bufshr_rot_fetch = rot_fetch
-        self.bufshr_rot_round_cnt = rotrnd_cnt
-        self.bufshr_rot_unit_cnt = rotunit_cnt
-        self.bufshr_wide_fetch = wide_fetch
-        self.bufshr_widefetch_width = wf_width
+        def _key_func(tuple_):
+            rot_fetch, wide_fetch = _calc_bufshr_fetch(*tuple_)[:2]
+            return sum(self._calc_bufshr_rotation_access(rot_fetch)) \
+                    + sum(self._calc_bufshr_widefetch_access(wide_fetch))
+        subgrp_size, t_bs, loops_bs, loops_bot = \
+                min(_sweep_bufshr(), key=_key_func)
+
+        # Subgroup size.
         self.bufshr_subgrp_size = subgrp_size
+
+        # Loop blocking factors and order.
+        new_ord = [-1] * le.NUM
+        ord_idx = 0
+        for lpe in reversed(loops_bot + fixed_loops):
+            new_ord[lpe] = ord_idx
+            ord_idx += 1
+        for lpe in range(le.NUM):
+            if new_ord[lpe] < 0:
+                new_ord[lpe] = ord_idx
+                ord_idx += 1
+        self.bl_ords[blp1] = tuple(new_ord)
+
+        # Additional BS level.
+        new_ord_bs = [-1] * le.NUM
+        ord_idx = 0
+        for lpe in reversed(loops_bs):
+            if t_bs[lpe] > 1:
+                new_ord_bs[lpe] = ord_idx
+                ord_idx += 1
+        for lpe in range(le.NUM):
+            if new_ord_bs[lpe] < 0:
+                new_ord_bs[lpe] = ord_idx
+                ord_idx += 1
+        self.bufshr_bs_t = tuple(t_bs)
+        self.bufshr_bs_ord = tuple(new_ord_bs)
+
+        # Set stats.
+        self.bufshr_rot_fetch, self.bufshr_wide_fetch, \
+                self.bufshr_rot_round_cnt, self.bufshr_rot_unit_cnt, \
+                self.bufshr_wide_fetch_width = \
+                _calc_bufshr_fetch(subgrp_size, t_bs, loops_bs, loops_bot)
 
     def _calc_bufshr_rotation_access(self, bufshr_rot_fetch):
         ''' Calculate the BS rotation NoC accesses, over all nodes. '''
