@@ -327,8 +327,18 @@ class LoopBlockingScheme(object):
         bl_idxgen_list.append(self._gen_index_single_level(t_x, order_x))
         bl_cnt_list.append(cnt_x)
 
+        # Buffer sharing.
+        t_x = self.bufshr_bs_t
+        order_x = self.bufshr_bs_ord
+        cnt_x = [x // b for x, b
+                 in zip(self._bl_tp(slice(bl_gbuf + 1, None)),
+                        self.bufshr_bs_t)]
+        bl_idxgen_list.append(self._gen_index_single_level(t_x, order_x))
+        bl_cnt_list.append(cnt_x)
+
         # Between GBUF and REGF.
-        t_x = self.bl_ts[bl_regf]
+        t_x = [x // b for x, b
+               in zip(self.bl_ts[bl_regf], self.bufshr_bs_t)]
         order_x = self.bl_ords[bl_regf]
         cnt_x = self._bl_tp(slice(bl_regf + 1, None))
         bl_idxgen_list.append(self._gen_index_single_level(t_x, order_x))
