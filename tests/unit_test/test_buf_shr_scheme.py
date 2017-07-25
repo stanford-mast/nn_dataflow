@@ -198,20 +198,20 @@ class TestBufShrScheme(unittest.TestCase):
 
         # Three nodes fetch one hop of 3, and the last node fetches one hop of
         # 9 (looping back).
-        self.assertAlmostEqual(bufshr.nhops_wide_fetch_once(dce, 4, 2),
+        self.assertAlmostEqual(bufshr.nhops_wide_fetch_once(dce, 4, 2) * 2,
                                (3 * 3 + 9) / 4. * 2)
         # Two nodes fetch one hop of 3, and the 3rd node fetches one hop of 6
         # (looping back). The last node fetches one hop of 3 from the 3rd.
-        self.assertAlmostEqual(bufshr.nhops_wide_fetch_once(dce, 3, 2),
+        self.assertAlmostEqual(bufshr.nhops_wide_fetch_once(dce, 3, 2) * 2,
                                (3 * 2 + 6 + 3) / 3. * 2)
         # All nodes do one hop of 3.
-        self.assertAlmostEqual(bufshr.nhops_wide_fetch_once(dce, 2, 2),
+        self.assertAlmostEqual(bufshr.nhops_wide_fetch_once(dce, 2, 2) * 2,
                                (3 + 3) / 2. * 4)
 
         for subgrp_size in range(2, bufshr.size(dce)):
             self.assertAlmostEqual(
-                bufshr.nhops_wide_fetch_once(dce, subgrp_size, 1.5),
-                bufshr.nhops_wide_fetch_once(dce, subgrp_size, 2) / 2.)
+                bufshr.nhops_wide_fetch_once(dce, subgrp_size, 1.5) * 1.5,
+                bufshr.nhops_wide_fetch_once(dce, subgrp_size, 2) * 2. / 2.)
 
     def test_nhops_wide_fetch_once_inv(self):
         ''' Get nhops_wide_fetch_once with invalid args. '''

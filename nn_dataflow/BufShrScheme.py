@@ -18,6 +18,8 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+import math
+
 from . import DataCategoryEnum as de
 from . import ParallelEnum as pe
 from . import Util
@@ -200,8 +202,10 @@ class BufShrScheme(object):
         (senders) of the rotation chain to this node.
 
         The returned number of hops is the sum across all nodes in the group.
-        The number of hops for all nodes to get data from their (W - 1)
-        upstream nodes is equal to the number of hops for (W - 1) rotation
+        Since it is relative to the total unique data size, and not relative to
+        the fetch data size (fetch width), it is normalized by the fetch width.
+        The number of hops for all nodes to get (W - 1) / W data from their (W
+        - 1) upstream nodes is equal to the number of hops for (W - 1) rotation
         steps.
         '''
         if fetch_width <= 1:
@@ -213,7 +217,13 @@ class BufShrScheme(object):
 
         nhops_rot_perstep = self.nhops_rotate_all(dce, subgrp_size) \
                 / (subgrp_size - 1)
-        return nhops_rot_perstep * max(0, fetch_width - 1)
+
+        ceil_width = math.ceil(fetch_width - 1e-6)
+        # Total steps = 0 + 1 + 2 + ... + (cw - 1) - (cw - 1) * (cw - w)
+        total_steps = (ceil_width - 1) * ceil_width / 2 \
+                - (ceil_width - 1) * (ceil_width - fetch_width)
+
+        return nhops_rot_perstep * total_steps / fetch_width
 
     def _subgrp_dim(self, dce, subgrp_size):
         '''
