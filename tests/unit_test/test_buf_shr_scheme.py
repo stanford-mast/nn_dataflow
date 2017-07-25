@@ -162,6 +162,27 @@ class TestBufShrScheme(unittest.TestCase):
             _ = self.bufshr3.nhops_rotate_all(
                 de.FIL, self.bufshr3.size(de.FIL) + 1)
 
+    def test_nhops_rotate_all_rot_unit(self):
+        ''' Get nhops_rotate_all with rotation unit count. '''
+
+        bufshr = self.bufshr3
+        dce = de.FIL
+        self.assertTupleEqual(bufshr.dim(dce), (4, 2))
+
+        for subgrp_size in range(1, bufshr.size(dce)):
+
+            nhops = bufshr.nhops_rotate_all(dce, subgrp_size)
+
+            for rotation_unit_cnt in range(subgrp_size, 32):
+                self.assertEqual(bufshr.nhops_rotate_all(dce, subgrp_size,
+                                                         rotation_unit_cnt),
+                                 nhops)
+
+            for rotation_unit_cnt in range(1, subgrp_size):
+                self.assertLess(bufshr.nhops_rotate_all(dce, subgrp_size,
+                                                        rotation_unit_cnt),
+                                nhops)
+
     def test_nhops_wide_fetch_once(self):
         ''' Get nhops_wide_fetch_once. '''
         # With `self.bufshr3` and FIL, the dimension is 4 by 2, with neighbor

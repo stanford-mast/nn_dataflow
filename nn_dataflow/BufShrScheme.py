@@ -83,7 +83,7 @@ class BufShrScheme(object):
         ''' Get the buffer sharing node group size. '''
         return self.dims[dce].size()
 
-    def nhops_rotate_all(self, dce, subgrp_size):
+    def nhops_rotate_all(self, dce, subgrp_size, rotation_unit_cnt=None):
         '''
         Number of hops for rotation operation of an entire round.
 
@@ -135,9 +135,23 @@ class BufShrScheme(object):
         (missing one step). Even in the case of multiple rotation rounds, this
         is OK, as the node does not care about which piece of shared data it
         starts with, as long as each node sees all data at the end.
+
+        Typically rotation ends after rotating M - 1 node buffers, i.e.,
+        skipping 1 step. When a rotation unit occupies more than one node
+        buffer, i.e., rotation unit count is less than M, the rotation ends
+        earlier, when the last rotation unit hits the beginning of the first
+        node buffer. E.g., for M = 4 and unit count is 3, the last unit
+        initially starts at 2/3 of the 3rd node, so we only rotate 2 + 2/3 =
+        8/3 node buffers, i.e., skipping 4 - 8/3 = 4/3 steps.
+
+        If rotation unit count is not given (None), assuming it is not less
+        than M, i.e., equal to M.
         '''
 
         subgrp_dim, idx_pr = self._subgrp_dim(dce, subgrp_size)
+
+        if rotation_unit_cnt is None:
+            rotation_unit_cnt = subgrp_size
 
         # 1. Send to right neighbor.
         # If H < W, rotate along H dimension, i.e., go along H to the end, then
@@ -155,9 +169,12 @@ class BufShrScheme(object):
         # Per-step nhops = distance back to the 0-th node.
         nhops_lpbk = sum(coord * self.nbr_dists[dce])
 
+        skipped_steps = max(1, 1. * subgrp_size / rotation_unit_cnt)
+        assert 1 <= skipped_steps <= subgrp_size
+
         # All steps; normalize; all subgroups.
         nhops = (nhops_nbr + nhops_lpbk) \
-                * (subgrp_size - 1) \
+                * (subgrp_size - skipped_steps) \
                 * (1. / subgrp_size) \
                 * (self.size(dce) // subgrp_size)
 

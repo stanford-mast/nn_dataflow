@@ -909,7 +909,8 @@ class LoopBlockingScheme(object):
                 wide_fetch.append(wf)
 
                 # Rotation fetch times.
-                rf_per_rot = bufshr.nhops_rotate_all(dce, subgrp_size[dce])
+                rf_per_rot = bufshr.nhops_rotate_all(
+                    dce, subgrp_size[dce], rotunits)
                 # The first rotation can be combined with the initial
                 # broadcast of each GBUF filling (DRAM fetch).
                 # After fetching from DRAM, data will be broadcast to all nodes
