@@ -51,7 +51,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.layer['BASE'] = ConvLayer(12, 10, 28, 3)
         self.layer['LGFIL'] = ConvLayer(2, 4, 28, 20)
         self.layer['POOL'] = PoolingLayer(32, 28, 2)
-        self.layer['PAR'] = ConvLayer(24, 20, 56, 3)
+        self.layer['PAR'] = ConvLayer(24, 36, 56, 3)
         self.batch_size = 4
 
         # Resource.
@@ -73,7 +73,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
         # Multi-node parallel resource.
         self.resource['PAR'] = Resource(
             dim_nodes=PhyDim2(4, 2), dim_array=dim_array,
-            mem_regions=mem_regions, size_gbuf=65535, size_regf=64)
+            mem_regions=mem_regions, size_gbuf=25000, size_regf=64)
 
         # Nested loop description after mapping.
         self.nld = {}
@@ -244,10 +244,18 @@ class TestLoopBlockingFixture(unittest.TestCase):
         lp_ts[le.BAT] = tb
         return tuple(zip(*lp_ts))
 
+    def _part_nld(self, part):
+        ''' Make a partitioned NestedLoopDesc and its partition occupation. '''
+        p_layer, p_batch_size, p_occ = part.part_layer(self.layer['PAR'],
+                                                       self.batch_size)
+        p_nld = next(MapStrategyEyeriss(p_layer, p_batch_size,
+                                        self.resource['PAR'].dim_array)
+                     .gen_nested_loop_desc())
+        return p_nld, p_occ
+
     def _gen_all_partition(self):
         '''
-        Generate PartitionScheme, partitioned NestedLoopDesc, and partition
-        occupation.
+        Generate PartitionScheme.
         '''
         options = Option(
             sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
@@ -258,14 +266,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
         for part in Partition.gen_partition(self.layer['PAR'], self.batch_size,
                                             self.resource['PAR'].dim_nodes,
                                             options):
-            p_layer, p_batch_size, p_occ = part.part_layer(self.layer['PAR'],
-                                                           self.batch_size)
-
-            p_nld = next(MapStrategyEyeriss(p_layer, p_batch_size,
-                                            self.resource['PAR'].dim_array)
-                         .gen_nested_loop_desc())
-
-            yield part, p_nld, p_occ
+            yield part
 
     def _total_part_size(self, part):
         ''' Get the total partitioned data size. '''
@@ -297,6 +298,41 @@ class TestLoopBlockingFixture(unittest.TestCase):
 
         return filter_size, ifmap_size, ofmap_size
 
+    def _bufshr_params(self, lbs):
+        '''
+        Get buffer sharing parameters.
+
+        Return subgroup sizes, rotation unit counts.
+
+        Finally, a list of ordered loops as a tuple of LoopEnum and blocking
+        factor ordered from outermost to innermost excluding trivial loops.
+        '''
+        # GBUF level.
+        blp1 = lbs.BL.GBUF + 1
+        t_x = lbs.bl_ts[blp1]
+        ord_x = lbs.bl_ords[blp1]
+        # BS level.
+        t_bs = lbs.bufshr_bs_t
+        ord_bs = lbs.bufshr_bs_ord
+
+        self.assertTrue(all(x % b == 0 for x, b in zip(t_x, t_bs)))
+
+        subgrp_size = lbs.bufshr_subgrp_size
+        rot_unit_cnt = lbs.bufshr_rot_unit_cnt
+
+        # Loops as a tuple of LoopEnum and blocking factor, ordered from
+        # outermost to innermost, excluding trivial loops.
+        lp_t_list = sorted([(lpe, t_bs[lpe])
+                            for lpe in range(le.NUM) if t_bs[lpe] > 1],
+                           key=lambda tpl: ord_bs[tpl[0]],
+                           reverse=True) \
+                  + sorted([(lpe, t_x[lpe] / t_bs[lpe])
+                            for lpe in range(le.NUM) if t_x[lpe] > t_bs[lpe]],
+                           key=lambda tpl: ord_x[tpl[0]],
+                           reverse=True)
+
+        return subgrp_size, rot_unit_cnt, lp_t_list
+
 
     class _SimBuffer(object):
         ''' A data buffer model for simulation. '''
@@ -323,6 +359,9 @@ class TestLoopBlockingFixture(unittest.TestCase):
             # E.g., (c0, c1).
             self.buf_cnt_pr = buf_cnt_pr
 
+            # Range index cache.
+            self.ridx_pr_cache = {}
+
         def access_size(self):
             ''' Get access size. '''
             return self.access * self.unit_size
@@ -340,8 +379,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
                 return cnt_pr
 
             # Range index.
-            ridx_pr = tuple(idx // buf_cnt for idx, buf_cnt
-                            in zip(idx_pr, self.buf_cnt_pr))
+            ridx_pr = self._range_idx_pr(idx_pr)
 
             # Access.
             self.access += Util.prod(cnt_pr) * (read + write)
@@ -354,14 +392,267 @@ class TestLoopBlockingFixture(unittest.TestCase):
             self.data = ridx_pr
             return self.buf_cnt_pr
 
-    def _sim_access_conv(self, lbs):
+        def _range_idx_pr(self, idx_pr):
+            ''' Get the range index of all dimensions. '''
+            ridx_pr = self.ridx_pr_cache.get(idx_pr, None)
+            if ridx_pr is None:
+                ridx_pr = tuple(idx // buf_cnt for idx, buf_cnt
+                                in zip(idx_pr, self.buf_cnt_pr))
+                self.ridx_pr_cache[idx_pr] = ridx_pr
+            return ridx_pr
+
+    class _SimBufferSharing(_SimBuffer):
+        ''' A data buffer model with buffer sharing. '''
+
+        def __init__(self, buf_cnt_pr, unit_size, is_ofm,
+                     subgrp_size, rot_unit_cnt, lp_t_list, dim_loops,
+                     bypass=False):
+
+            # pylint: disable=protected-access
+            self.base = super(TestLoopBlockingFixture._SimBufferSharing, self)
+
+            self.base.__init__(buf_cnt_pr, unit_size, is_ofm, bypass=bypass)
+
+            # Number of rotation steps, of each range.
+            self.rot_step_cnt = {}
+            # Rotation accesses, in unit counts (* unit size).
+            self.rot_access = 0
+            # Wide fetch accesses, in unit counts (* unit size).
+            self.wf_access = 0
+
+            if self.bypass:
+                return
+
+            # Subrange.
+            # A list in the accessing order of subrange indexes, i.e., the
+            # ranges of the next level; and the unit counts in one subrange.
+            self.subrng_list, self.subrng_cnt_pr = \
+                    self._init_sub_range(lp_t_list, dim_loops)
+            # Subrange index to the position in the list.
+            self.subrng_idx_dict = \
+                    dict((sr, i) for i, sr in enumerate(self.subrng_list))
+            # Number of subranges.
+            self.subrng_num = len(self.subrng_list)
+
+            # Local buffer.
+            self.buf_num = subgrp_size
+            # Number of subranges in each buffer.
+            self.buf_subrng_num = 1. * self.subrng_num / self.buf_num
+
+            # The location centroid of each subrange, i.e., buffer index
+            # weighted by fraction.
+            self.buf_subrng_centroid = []
+            cur_buf_cap = self.buf_subrng_num
+            cur_buf_idx = 0
+            for _ in range(self.subrng_num):
+                centroid = 0
+                rem_frac = 1.
+                while rem_frac > 0.:
+                    if cur_buf_cap >= rem_frac:
+                        # Fits in the current buffer.
+                        centroid += cur_buf_idx * rem_frac
+                        cur_buf_cap -= rem_frac
+                        rem_frac = 0.
+                        break
+                    else:
+                        # Partially fits.
+                        centroid += cur_buf_idx * cur_buf_cap
+                        rem_frac -= cur_buf_cap
+                        cur_buf_cap = self.buf_subrng_num
+                        cur_buf_idx += 1
+                self.buf_subrng_centroid.append(centroid)
+
+            # Rotation unit.
+            # Rotation step happens when moving to the new rotation unit.
+            assert self.subrng_num % rot_unit_cnt == 0
+            self.rot_unit_size = self.subrng_num // rot_unit_cnt
+
+            # The rotation unit currently worked on.
+            self.cur_rot_unit = 0
+
+            # Subrange index cache.
+            self.sridx_pr_cache = {}
+
+        def rotation_rounds(self):
+            ''' Get number of rotation rounds. '''
+
+            # Ensure all ranges have the same rotation steps.
+            steps_list = self.rot_step_cnt.values()
+            if not steps_list:
+                return 0
+            assert all(s == steps_list[0] for s in steps_list)
+            steps = steps_list[0]
+            if steps == 0:
+                return 0
+
+            # Get steps per rotation round.
+            steps_per_round = 1
+            while (steps_per_round * self.rot_unit_size + self.buf_subrng_num
+                   < self.subrng_num
+                   and (steps_per_round + 1) * self.rot_unit_size
+                   < self.subrng_num):
+                steps_per_round += 1
+
+            assert steps % steps_per_round == 0
+
+            return steps // steps_per_round
+
+        def rotation_access_size(self):
+            ''' Get total rotation access size. '''
+            return self.rot_access * self.unit_size
+
+        def wide_fetch_access_size(self):
+            ''' Get total wide fetch access size. '''
+            return self.wf_access * self.unit_size
+
+        def do_access(self, idx_pr, cnt_pr, read=1, write=0):
+
+            ret = self.base.do_access(idx_pr, cnt_pr, read=read, write=write)
+
+            if self.bypass:
+                # Bypass, skip buffer sharing.
+                return ret
+
+            # Range index.
+            ridx_pr = self._range_idx_pr(idx_pr)
+
+            if any(ret):
+                # Miss in the shared buffer and load new range. Reset.
+                self.cur_rot_unit = 0
+                self.rot_step_cnt.setdefault(ridx_pr, 0)
+
+            assert all(cnt <= subrng_cnt for cnt, subrng_cnt
+                       in zip(cnt_pr, self.subrng_cnt_pr))
+
+            # Subrange index.
+            sridx_pr = self._subrange_idx_pr(idx_pr)
+
+            # Rotation unit index.
+            ru_idx = self._subrng_rot_unit_idx(sridx_pr)
+
+            if ru_idx != self.cur_rot_unit:
+                # Move to next rotation unit.
+
+                if (self.cur_rot_unit + 1) * self.rot_unit_size \
+                        >= self.subrng_num:
+                    # The current rotation unit is the last one. Start a new
+                    # rotation round.
+                    # Do not rotate back to the initial state. Instead start
+                    # from the current state.
+                    self.cur_rot_unit = 0
+
+                elif self.cur_rot_unit * self.rot_unit_size \
+                        + self.buf_subrng_num >= self.subrng_num:
+                    # The last rotation unit is already local. No more rotation.
+                    self.cur_rot_unit += 1
+
+                else:
+                    # Rotate by one rotation unit, but not exceeding the end.
+                    offset = min(self.rot_unit_size,
+                                 self.subrng_num
+                                 - self.cur_rot_unit * self.rot_unit_size
+                                 - self.buf_subrng_num)
+                    assert offset > 0
+
+                    # All subranges shift by the above offset.
+                    acc_ = (1. * offset / self.buf_subrng_num) * self.subrng_num
+                    self.rot_access += Util.prod(self.subrng_cnt_pr) * acc_
+                    self.cur_rot_unit += 1
+
+                    # One rotation step.
+                    self.rot_step_cnt[ridx_pr] += 1
+
+                assert ru_idx == self.cur_rot_unit
+
+            # Buffer index of which has this subrange.
+            buf_idx = self._subrng_buf_idx(sridx_pr)
+
+            # Wide fetch from possibly remote buffer.
+            self.wf_access += Util.prod(cnt_pr) * (read + write) * buf_idx
+
+            return ret
+
+        def _subrange_idx_pr(self, idx_pr):
+            ''' Get the subrange index of all dimensions. '''
+            sridx_pr = self.sridx_pr_cache.get(idx_pr, None)
+            if sridx_pr is None:
+                sridx_pr = tuple((idx % buf_cnt) // subrng_cnt
+                                 for idx, buf_cnt, subrng_cnt
+                                 in zip(idx_pr, self.buf_cnt_pr,
+                                        self.subrng_cnt_pr))
+                self.sridx_pr_cache[idx_pr] = sridx_pr
+            return sridx_pr
+
+        def _subrng_rot_unit_idx(self, sridx_pr):
+            ''' Get the rotation unit index of the subrange. '''
+            return self.subrng_idx_dict[sridx_pr] // self.rot_unit_size
+
+        def _subrng_buf_idx(self, sridx_pr):
+            ''' Get the buffer index of which currently has the subrange. '''
+            subrng_idx = self.subrng_idx_dict[sridx_pr]
+
+            # Start from the current rotation unit.
+            subrng_idx -= self.cur_rot_unit * self.rot_unit_size
+            subrng_idx %= self.subrng_num
+
+            return self.buf_subrng_centroid[subrng_idx]
+
+        def _init_sub_range(self, lp_t_list, dim_loops):
+
+            assert len(dim_loops) == 2
+
+            subrng_list = [(0, 0)]
+            subrng_sz_pr = [1, 1]
+
+            # From inner to outer.
+            for lpe, t in reversed(lp_t_list):
+                # The data dimension index of this loop.
+                try:
+                    d = dim_loops.index(lpe)
+                except ValueError:
+                    # This loop is not related to the data, skip.
+                    assert lpe not in dim_loops
+                    continue
+
+                # Size of this dimension of current loop body, i.e., all inner
+                # loops.
+                s = subrng_sz_pr[d]
+
+                # Make the new subrange list, by looping over the current loop
+                # body with the current loop factor, and updating this
+                # dimension.
+                new_subrng_list = []
+                for i in range(t):
+                    new_subrng_list += [tuple(i_ + i * s if d_ == d else i_
+                                              for d_, i_ in enumerate(sr))
+                                        for sr in subrng_list]
+                subrng_list = new_subrng_list
+
+                # Update size of this dimension.
+                subrng_sz_pr[d] *= t
+
+                # Check.
+                assert len(set(subrng_list)) == len(subrng_list)
+                assert len(subrng_list) == Util.prod(subrng_sz_pr)
+
+            subrng_cnt_pr = tuple(buf_cnt // subrng_sz for buf_cnt, subrng_sz
+                                  in zip(self.buf_cnt_pr, subrng_sz_pr))
+
+            return subrng_list, subrng_cnt_pr
+
+    def _sim_access_conv(self, lbs, get_bufshr=False):
         '''
         Get data access by actually simulating and generating loops for CONV
         layer.
+
+        If `get_bufshr` is True, also return bufshr stats.
         '''
         self.assertTrue(lbs.is_valid(), '_sim_access_conv: invalid lbs.')
 
         lpts = zip(*lbs.bl_ts)
+
+        subgrp_size, rot_unit_cnt, lp_t_list = self._bufshr_params(lbs)
+        data_loops = lbs.nld.data_loops
 
         drams = [None] * de.NUM
         for dce, buf_cnt_pr in zip(
@@ -381,11 +672,11 @@ class TestLoopBlockingFixture(unittest.TestCase):
                 [(Util.prod(lpts[le.IFM][1:]), Util.prod(lpts[le.OFM][1:])),
                  (Util.prod(lpts[le.IFM][1:]), Util.prod(lpts[le.BAT][1:])),
                  (Util.prod(lpts[le.OFM][1:]), Util.prod(lpts[le.BAT][1:]))]):
-            gbufs[dce] = self._SimBuffer(buf_cnt_pr,
-                                         lbs.nld.unit_access[me.GBUF][dce],
-                                         is_ofm=(dce == de.OFM),
-                                         bypass=(not lbs.stored_in_gbuf[dce])
-                                        )
+            gbufs[dce] = self._SimBufferSharing(
+                buf_cnt_pr, lbs.nld.unit_access[me.GBUF][dce], (dce == de.OFM),
+                subgrp_size[dce], rot_unit_cnt[dce], lp_t_list,
+                data_loops[dce].loops(),
+                bypass=(not lbs.stored_in_gbuf[dce]))
         regfs = [None] * de.NUM
         for dce, buf_cnt_pr in zip(
                 [de.FIL, de.IFM, de.OFM],
@@ -434,7 +725,146 @@ class TestLoopBlockingFixture(unittest.TestCase):
 
         dram_access = [drams[dce].access_size() for dce in range(de.NUM)]
         gbuf_access = [gbufs[dce].access_size() for dce in range(de.NUM)]
+
+        # Sum over all nodes.
+        dram_access = [a * lbs.num_nodes // r for a, r
+                       in zip(dram_access, lbs.accfwd_reduction)]
+        gbuf_access = [a * lbs.num_nodes for a in gbuf_access]
+
+        # Buffer sharing.
+        if get_bufshr:
+            rotation_access = [gbufs[dce].rotation_access_size()
+                               * (lbs.num_nodes // subgrp_size[dce])
+                               for dce in range(de.NUM)]
+            wide_fetch_access = [gbufs[dce].wide_fetch_access_size()
+                                 * (lbs.num_nodes // subgrp_size[dce])
+                                 for dce in range(de.NUM)]
+            rotation_rounds = [gbufs[dce].rotation_rounds()
+                               for dce in range(de.NUM)]
+
+            return dram_access, gbuf_access, \
+                    (rotation_access, wide_fetch_access, rotation_rounds)
+
+        else:
+            for dce in range(de.NUM):
+                self.assertAlmostEqual(gbufs[dce].rotation_access_size(), 0,
+                                       msg='_sim_access_conv: non-0 '
+                                           'rotation access with no bufshr.')
+                self.assertAlmostEqual(gbufs[dce].wide_fetch_access_size(), 0,
+                                       msg='_sim_access_conv: non-0 '
+                                           'wide fetch access with no bufshr.')
+                self.assertEqual(gbufs[dce].rotation_rounds(), 0,
+                                 msg='_sim_access_conv: non-0 '
+                                     'rotation rounds with no bufshr.')
+
         return dram_access, gbuf_access
+
+    def _average_neighbor_nhops(self, bufshr, subgrp_size):
+        ''' Get the average neighbor number of hops. '''
+
+        avg_nbr_nhops = []
+
+        for dce in range(de.NUM):
+            # pylint: disable=protected-access
+
+            subgrp_dim, idx_pr = bufshr._subgrp_dim(dce, subgrp_size[dce])
+            nbr_dist = bufshr.nbr_dists[dce]
+
+            d_pr = subgrp_dim[idx_pr]
+            d_npr = subgrp_dim[1 - idx_pr]
+            dist_pr = nbr_dist[idx_pr]
+            dist_npr = nbr_dist[1 - idx_pr]
+            nhops_nbr = (d_pr - 1) * d_npr * dist_pr + (d_npr - 1) * dist_npr
+
+            nhops_nbr /= 1. * subgrp_size[dce]
+
+            coord = bufshr._coordinate(subgrp_size[dce] - 1, subgrp_dim, idx_pr)
+            nhops_lpbk = sum(coord * nbr_dist)
+
+            nhops_lpbk /= 1. * subgrp_size[dce]
+
+            nhops = nhops_nbr + nhops_lpbk
+
+            if subgrp_size[dce] <= 1:
+                self.assertAlmostEqual(nhops, 0)
+            elif subgrp_dim.size() == subgrp_size[dce]:
+                self.assertTrue(min(nbr_dist) <= nhops
+                                <= max(nbr_dist)
+                                + 1. * sum(subgrp_dim) / subgrp_dim.size(),
+                                '_average_neighbor_nhops: {}: '
+                                'subgrp_size {}, subgrp_dim {}, idx_pr {}, '
+                                'nbr_dist {}, nhops {} = {} + {}'
+                                .format(dce, subgrp_size[dce], subgrp_dim,
+                                        idx_pr, nbr_dist,
+                                        nhops, nhops_nbr, nhops_lpbk))
+
+            avg_nbr_nhops.append(nhops)
+
+        return avg_nbr_nhops
+
+    def _verify_bufshr_stats(self, dram_access, gbuf_access, bufshr_stats,
+                             lbs, bufshr, test_name):
+        ''' Verify the buffer sharing stats returned by access simulation. '''
+
+        rotation_access, wide_fetch_access, rotation_rounds = bufshr_stats
+
+        avg_nbr_nhops = self._average_neighbor_nhops(bufshr,
+                                                     lbs.bufshr_subgrp_size)
+
+        # Mem hierarchy.
+        access = lbs.get_access()
+
+        self.assertListEqual(access[me.DRAM], dram_access,
+                             'test_access: DRAM: '
+                             'model {} vs. sim {}.'
+                             .format(access[me.DRAM], dram_access))
+        self.assertListEqual(access[me.GBUF], gbuf_access,
+                             'test_access: GBUF: '
+                             'model {} vs. sim {}.'
+                             .format(access[me.GBUF], gbuf_access))
+        self.assertListEqual(access[me.REGF],
+                             [lbs.ops, lbs.ops, lbs.ops * 2])
+
+        # NoC.
+        noc_access = lbs.get_noc_access()
+
+        for dce in range(de.NUM):
+            self.assertAlmostEqual(lbs.bufshr_rotation_access[dce]
+                                   + lbs.bufshr_wide_fetch_access[dce],
+                                   noc_access[dce])
+
+        for dce in range(de.NUM):
+            if lbs.bufshr_subgrp_size[dce] <= 1:
+                self.assertAlmostEqual(noc_access[dce], 0)
+
+        for dce in range(de.NUM):
+            self.assertAlmostEqual(lbs.bufshr_rot_round_cnt[dce],
+                                   rotation_rounds[dce],
+                                   msg=('{}: mismatch rotation round count '
+                                        'at {}:\nmodel: {}; sim: {}.'
+                                        .format(test_name, dce,
+                                                lbs.bufshr_rot_round_cnt,
+                                                rotation_rounds)))
+
+        for dce in range(de.NUM):
+            self.assertAlmostEqual(lbs.bufshr_rotation_access[dce],
+                                   rotation_access[dce] * avg_nbr_nhops[dce],
+                                   msg=('{}: mismatch NoC rotation access '
+                                        'at {}:\nmodel: {}; sim: {} x {}.'
+                                        .format(test_name, dce,
+                                                lbs.bufshr_rotation_access,
+                                                rotation_access,
+                                                avg_nbr_nhops)))
+
+        for dce in range(de.NUM):
+            self.assertAlmostEqual(lbs.bufshr_wide_fetch_access[dce],
+                                   wide_fetch_access[dce] * avg_nbr_nhops[dce],
+                                   msg=('{}: mismatch NoC wide fetch access '
+                                        'at {}:\nmodel: {}; sim: {} x {}.'
+                                        .format(test_name, dce,
+                                                lbs.bufshr_wide_fetch_access,
+                                                wide_fetch_access,
+                                                avg_nbr_nhops)))
 
 
     def _regularized_scheme(self, bl_ts, bl_ords):

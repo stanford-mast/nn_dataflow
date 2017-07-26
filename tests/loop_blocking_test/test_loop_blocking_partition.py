@@ -21,7 +21,11 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 from nn_dataflow import BufShrScheme
 from nn_dataflow import DataCategoryEnum as de
 from nn_dataflow import LoopBlocking
+from nn_dataflow import LoopBlockingScheme
+from nn_dataflow import LoopEnum as le
 from nn_dataflow import ParallelEnum as pe
+from nn_dataflow import PartitionScheme
+from nn_dataflow import Util
 
 from . import TestLoopBlockingFixture
 
@@ -38,7 +42,9 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
     def test_scheme_dict(self):
         ''' get_scheme_dict stats. '''
 
-        for part, p_nld, p_occ in self._gen_all_partition():
+        for part in self._gen_all_partition():
+
+            p_nld, p_occ = self._part_nld(part)
 
             filter_size, ifmap_size, ofmap_size = self._total_part_size(part)
 
@@ -71,9 +77,11 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
                                         * ifm_fetch)
 
     def test_accfwd(self):
-        ''' scheme using accfwd. '''
+        ''' Scheme using accfwd. '''
 
-        for part, p_nld, p_occ in self._gen_all_partition():
+        for part in self._gen_all_partition():
+
+            p_nld, p_occ = self._part_nld(part)
 
             filter_size, ifmap_size, ofmap_size = self._total_part_size(part)
 
@@ -112,9 +120,11 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
                                         top_fetch[de.IFM] * ifmap_size)
 
     def test_bufshr(self):
-        ''' scheme using bufshr. '''
+        ''' Scheme using bufshr. '''
 
-        for part, p_nld, p_occ in self._gen_all_partition():
+        for part in self._gen_all_partition():
+
+            p_nld, p_occ = self._part_nld(part)
 
             bufshr = BufShrScheme(part)
 
@@ -150,4 +160,213 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
                     self.assertTrue(all(subgrp <= grp for subgrp, grp
                                         in zip(bufshr_subgrp_size,
                                                bufshr_grp_size)))
+
+    def test_bufshr_access(self):
+        ''' Access of scheme using bufshr. '''
+
+        for part in self._gen_all_partition():
+
+            p_nld, p_occ = self._part_nld(part)
+
+            bufshr = BufShrScheme(part)
+
+            for lbs in LoopBlocking.gen_loopblocking(
+                    p_nld, self.resource['PAR'], part, self.cost, p_occ,
+                    self.options['BUFSHR']):
+                if not lbs.is_valid():
+                    continue
+
+                # Skip those without bufshr.
+                if all(sgs <= 1 for sgs in lbs.bufshr_subgrp_size):
+                    continue
+
+                # Sim.
+                dram_access, gbuf_access, bufshr_stats = \
+                        self._sim_access_conv(lbs, get_bufshr=True)
+
+                self._verify_bufshr_stats(dram_access, gbuf_access,
+                                          bufshr_stats, lbs, bufshr,
+                                          'test_bufshr_access')
+
+    def test_bufshr_access_byp(self):
+        ''' Access of scheme using bufshr with bypassing. '''
+
+        for part in self._gen_all_partition():
+
+            p_nld, p_occ = self._part_nld(part)
+
+            bufshr = BufShrScheme(part)
+
+            for lbs in LoopBlocking.gen_loopblocking(
+                    p_nld, self.resource['PAR'], part, self.cost, p_occ,
+                    self.options['BUFSHR-BYP']):
+                if not lbs.is_valid():
+                    continue
+
+                # Skip those without bufshr.
+                if all(sgs <= 1 for sgs in lbs.bufshr_subgrp_size):
+                    continue
+                # Skip those without bypassing.
+                if all(lbs.stored_in_gbuf):
+                    continue
+
+                # Sim.
+                dram_access, gbuf_access, bufshr_stats = \
+                        self._sim_access_conv(lbs, get_bufshr=True)
+
+                self._verify_bufshr_stats(dram_access, gbuf_access,
+                                          bufshr_stats, lbs, bufshr,
+                                          'test_bufshr_access')
+
+    def test_bufshr_rotation_example(self):
+        ''' Example scheme using bufshr with rotation. '''
+
+        # Make a PartitionScheme that allows bufshr for all data categories.
+        part = PartitionScheme(order=range(pe.NUM),
+                               pdims=((2, 1), (1, 2), (1, 1), (2, 1)))
+        bufshr = BufShrScheme(part)
+        self.assertTrue(all(bufshr.size(dce) > 1 for dce in range(de.NUM)),
+                        'test_bufshr_rotation_example: '
+                        'made-up PartitionScheme is not expected: '
+                        '{}, bufshr size {}'
+                        .format(part,
+                                [bufshr.size(dce) for dce in range(de.NUM)]))
+
+        # Make a LoopBlockingScheme that uses bufshr for all data categories.
+        p_nld, p_occ = self._part_nld(part)
+        bl_ts = ((Util.idivc(p_nld.loopcnt[le.IFM], 6),
+                  Util.idivc(p_nld.loopcnt[le.OFM], 9),
+                  Util.idivc(p_nld.loopcnt[le.BAT], 2)),
+                 (3, 3, 2),
+                 (2, 3, 1))
+        bl_ords = (tuple(range(le.NUM)), tuple(range(le.NUM)))
+        lbs = LoopBlockingScheme(p_nld, bl_ts, bl_ords, self.resource['PAR'],
+                                 bufshr, p_occ, self.options['BUFSHR'])
+        self.assertTrue(lbs.is_valid())
+        self.assertGreater(sum(lbs.get_noc_access()), 0)
+        self.assertTrue(all(sgs > 1 for sgs in lbs.bufshr_subgrp_size)
+                        and all(t > 1 for t in bl_ts[0]),
+                        'test_bufshr_rotation_example: '
+                        'made-up LoopBlockingScheme is not expected: '
+                        '{}, top factors {}, bufshr subgrp size {}'
+                        .format((bl_ts, bl_ords), bl_ts[0],
+                                lbs.bufshr_subgrp_size))
+
+        # Sim.
+        dram_access, gbuf_access, bufshr_stats = \
+                self._sim_access_conv(lbs, get_bufshr=True)
+
+        self._verify_bufshr_stats(dram_access, gbuf_access, bufshr_stats,
+                                  lbs, bufshr, 'test_bufshr_rotation_example')
+
+    def test_bufshr_wide_fetch_example(self):
+        ''' Example scheme using bufshr with wide fetch. '''
+
+        # Make a PartitionScheme that allows bufshr for IFM.
+        part = PartitionScheme(order=range(pe.NUM),
+                               pdims=((2, 2), (1, 1), (2, 1), (1, 1)))
+        bufshr = BufShrScheme(part)
+        self.assertEqual(bufshr.size(de.IFM), 4,
+                         'test_bufshr_wide_fetch_example: '
+                         'made-up PartitionScheme is not expected: '
+                         '{}, bufshr size for {} {}.'
+                         .format(part, de.IFM, bufshr.size(de.IFM)))
+
+        for t1, t2 in [((3, 3, 2), (1, 1, 1)),
+                       ((1, 3, 1), (3, 1, 2))]:
+            # Make a LoopBlockingScheme that has wide fetch for IFM.
+            p_nld, p_occ = self._part_nld(part)
+            bl_ts = (tuple(Util.idivc(p_nld.loopcnt[lpe], t1[lpe] * t2[lpe])
+                           for lpe in range(le.NUM)),
+                     t1, t2)
+            bl_ords = (tuple(range(le.NUM)), tuple(range(le.NUM)))
+            lbs = LoopBlockingScheme(p_nld, bl_ts, bl_ords,
+                                     self.resource['PAR'], bufshr, p_occ,
+                                     self.options['BUFSHR'])
+            self.assertTrue(lbs.is_valid())
+            self.assertGreater(sum(lbs.get_noc_access()), 0)
+            self.assertEqual(lbs.bufshr_subgrp_size[de.IFM], 4,
+                             'test_bufshr_wide_fetch_example: '
+                             'made-up LoopBlockingScheme is not expected: '
+                             '{}, bufshr subgrp size for {} {}.'
+                             .format((bl_ts, bl_ords), de.IFM,
+                                     lbs.bufshr_subgrp_size[de.IFM]))
+            self.assertGreater(lbs.bufshr_wide_fetch_width[de.IFM], 1,
+                               'test_bufshr_wide_fetch_example: '
+                               'made-up LoopBlockingScheme is not expected: '
+                               '{}, bufshr wide fetch width for {} {}.'
+                               .format((bl_ts, bl_ords), de.IFM,
+                                       lbs.bufshr_wide_fetch_width[de.IFM]))
+
+            # Sim.
+            dram_access, gbuf_access, bufshr_stats = \
+                    self._sim_access_conv(lbs, get_bufshr=True)
+
+            self._verify_bufshr_stats(dram_access, gbuf_access, bufshr_stats,
+                                      lbs, bufshr,
+                                      'test_bufshr_wide_fetch_example')
+
+    def test_bufshr_multisubgrp_example(self):
+        ''' Example scheme using bufshr with multiple subgroups in a group. '''
+
+        # Make a PartitionScheme that allows bufshr for IFM.
+        part = PartitionScheme(order=list(reversed(range(pe.NUM))),
+                               pdims=((2, 2), (1, 1), (2, 1), (1, 1)))
+        bufshr = BufShrScheme(part)
+        self.assertEqual(bufshr.size(de.IFM), 4,
+                         'test_bufshr_multisubgrp_example: '
+                         'made-up PartitionScheme is not expected: '
+                         '{}, bufshr size for {} {}.'
+                         .format(part, de.IFM, bufshr.size(de.IFM)))
+
+        # Make a LoopBlockingScheme that has multi subgroups per group for IFM.
+        p_nld, p_occ = self._part_nld(part)
+        bl_ts = ((Util.idivc(p_nld.loopcnt[le.IFM], 1),
+                  Util.idivc(p_nld.loopcnt[le.OFM], 3),
+                  Util.idivc(p_nld.loopcnt[le.BAT], 2)),
+                 (1, 1, 2),
+                 (1, 3, 1))
+        bl_ords = (tuple(range(le.NUM)), tuple(range(le.NUM)))
+        lbs = LoopBlockingScheme(p_nld, bl_ts, bl_ords, self.resource['PAR'],
+                                 bufshr, p_occ, self.options['BUFSHR'])
+        self.assertTrue(lbs.is_valid())
+        self.assertGreater(sum(lbs.get_noc_access()), 0)
+        self.assertGreater(lbs.bufshr_grp_size[de.IFM],
+                           lbs.bufshr_subgrp_size[de.IFM],
+                           'test_bufshr_multisubgrp_example: '
+                           'made-up LoopBlockingScheme is not expected: '
+                           '{}, bufshr grp size {}, bufshr subgrp size {}'
+                           .format((bl_ts, bl_ords), lbs.bufshr_grp_size,
+                                   lbs.bufshr_subgrp_size))
+
+        # Sim.
+        dram_access, gbuf_access, bufshr_stats = \
+                self._sim_access_conv(lbs, get_bufshr=True)
+
+        self._verify_bufshr_stats(dram_access, gbuf_access, bufshr_stats,
+                                  lbs, bufshr,
+                                  'test_bufshr_multisubgrp_example')
+
+    def test_bufshr_get_noc_access(self):
+        ''' get_noc_access of scheme using bufshr. '''
+
+        for part in self._gen_all_partition():
+
+            p_nld, p_occ = self._part_nld(part)
+
+            for lbs in LoopBlocking.gen_loopblocking(
+                    p_nld, self.resource['PAR'], part, self.cost, p_occ,
+                    self.options['BUFSHR']):
+
+                noc_access = lbs.get_noc_access()
+
+                if not lbs.is_valid():
+                    self.assertIsNone(noc_access)
+
+                else:
+                    for dce in range(de.NUM):
+                        self.assertAlmostEqual(
+                            lbs.bufshr_rotation_access[dce]
+                            + lbs.bufshr_wide_fetch_access[dce],
+                            noc_access[dce])
 
