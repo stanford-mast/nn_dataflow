@@ -599,7 +599,7 @@ class LoopBlockingScheme(object):
         # Rotation round counts.
         self.bufshr_rot_round_cnt = [0] * de.NUM
         # Rotation unit counts.
-        self.bufshr_rot_unit_cnt = [float('nan')] * de.NUM
+        self.bufshr_rot_unit_cnt = [1] * de.NUM
 
         # NoC fetch due to wide fetch. Meaning similar to `bufshr_rot_fetch`.
         self.bufshr_wide_fetch = [0.] * de.NUM
