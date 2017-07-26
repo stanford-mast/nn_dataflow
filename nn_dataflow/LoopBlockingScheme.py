@@ -903,23 +903,13 @@ class LoopBlockingScheme(object):
                 wf_per_bufacc = bufshr.nhops_wide_fetch_once(
                     dce, subgrp_size[dce], wf_width)
                 # Use REGF filling (GBUF fetch).
-                # The last wide fetch can be combined with the rotation.
-                wf = wf_per_bufacc * (buf_fetch - rotrnds)
-                assert wf > -1e-4
+                wf = wf_per_bufacc * buf_fetch
                 wide_fetch.append(wf)
 
                 # Rotation fetch times.
                 rf_per_rot = bufshr.nhops_rotate_all(
                     dce, subgrp_size[dce], rotunits)
-                # The first rotation can be combined with the initial
-                # broadcast of each GBUF filling (DRAM fetch).
-                # After fetching from DRAM, data will be broadcast to all nodes
-                # regardless of who stores it (see Partition). So initially
-                # each node receives all data. This saves one rotation.
-                # Afterwards each node only stores partial data and relies on
-                # rotation to see all the data.
-                rf = rf_per_rot * (rotrnds - mem_fetch)
-                assert rf > -1e-4
+                rf = rf_per_rot * rotrnds
                 rot_fetch.append(rf)
 
             return rot_fetch, wide_fetch, \
