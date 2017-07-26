@@ -863,10 +863,8 @@ class LoopBlockingScheme(object):
                 # Rotation rounds.
                 rotrnds = 1
                 if idx_odlp is None or subgrp_size[dce] == 1:
-                    # No rotation, one round per mem fetch.
-                    # One rotation can support both read and write access.
-                    rotrnds *= (mem_fetch + 1) // 2 if dce == de.OFM \
-                            else mem_fetch
+                    # No rotation.
+                    rotrnds = 0
                 elif idx_odlp is not None:
                     # All unrelated loop factors above the outermost dim loop.
                     # At DRAM level.
@@ -876,11 +874,10 @@ class LoopBlockingScheme(object):
                     rotrnds *= Util.prod(tpl[1] for tpl
                                          in itertools.islice(lp_t_list,
                                                              idx_odlp))
-                # Over all GBUF filling (DRAM fetch).
-                assert ((buf_fetch + 1) // 2 if dce == de.OFM
-                        else buf_fetch) % rotrnds == 0
-                assert rotrnds % ((mem_fetch + 1) // 2 if dce == de.OFM
-                                  else mem_fetch) == 0
+                    assert ((buf_fetch + 1) // 2 if dce == de.OFM
+                            else buf_fetch) % rotrnds == 0
+                    assert rotrnds % ((mem_fetch + 1) // 2 if dce == de.OFM
+                                      else mem_fetch) == 0
                 rot_rnd_cnts.append(rotrnds)
 
                 # Number of rotation units.
