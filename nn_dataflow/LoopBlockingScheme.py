@@ -900,7 +900,26 @@ class LoopBlockingScheme(object):
                 wf_per_bufacc = bufshr.nhops_wide_fetch_once(
                     dce, subgrp_size[dce], wf_width)
                 # Use REGF filling (GBUF fetch).
-                wf = wf_per_bufacc * buf_fetch
+                # The last wide fetch before rotation can be combined with the
+                # rotation steps.
+                if dce == de.OFM:
+                    # For OFM, if we do multiple wide fetch per rotation step,
+                    # the last one has both read and write. If there is only
+                    # one wide fetch per rotation step, it only has write.
+                    if buf_fetch > 2 * rotrnds - 1:
+                        comb_wf_fetch = 2 * rotrnds
+                    else:
+                        assert buf_fetch == 2 * rotrnds - 1
+                        comb_wf_fetch = 2 * rotrnds - 1
+                else:
+                    comb_wf_fetch = rotrnds
+                # Since we do not rotate the last step, when wide fetch is
+                # non-0 (i.e., the last rotation unit is larger than one node
+                # buffer size), the wide fetch of the last unit has no rotation
+                # to combine with.
+                comb_wf_fetch *= 1. * (rotunits - 1) / rotunits
+                wf = wf_per_bufacc * (buf_fetch - comb_wf_fetch)
+                assert wf > -1e-4
                 wide_fetch.append(wf)
 
                 # Rotation fetch times.

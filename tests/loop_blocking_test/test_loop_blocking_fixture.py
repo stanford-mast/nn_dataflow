@@ -470,6 +470,11 @@ class TestLoopBlockingFixture(unittest.TestCase):
             # The rotation unit currently worked on.
             self.cur_rot_unit = 0
 
+            # Last wide fetch subrange index.
+            self.last_wf_subrng_idx = 0
+            # Amount of sequential wide fetch, can be combined with rotation.
+            self.seq_wf_acc = 0
+
             # Subrange index cache.
             self.sridx_pr_cache = {}
 
@@ -541,6 +546,9 @@ class TestLoopBlockingFixture(unittest.TestCase):
                     # from the current state.
                     self.cur_rot_unit = 0
 
+                    self.last_wf_subrng_idx = 0
+                    self.seq_wf_acc = 0
+
                 elif self.cur_rot_unit * self.rot_unit_size \
                         + self.buf_subrng_num >= self.subrng_num:
                     # The last rotation unit is already local. No more rotation.
@@ -562,13 +570,26 @@ class TestLoopBlockingFixture(unittest.TestCase):
                     # One rotation step.
                     self.rot_step_cnt[ridx_pr] += 1
 
+                    # Combine wide fetch with rotation.
+                    self.wf_access -= self.seq_wf_acc
+                    self.seq_wf_acc = 0
+
                 assert ru_idx == self.cur_rot_unit
 
             # Buffer index of which has this subrange.
             buf_idx = self._subrng_buf_idx(sridx_pr)
 
             # Wide fetch from possibly remote buffer.
-            self.wf_access += Util.prod(cnt_pr) * (read + write) * buf_idx
+            wf_acc = Util.prod(cnt_pr) * (read + write) * buf_idx
+            self.wf_access += wf_acc
+
+            # Record amount of sequential wide fetch.
+            subrng_idx = self.subrng_idx_dict[sridx_pr]
+            if subrng_idx >= self.last_wf_subrng_idx:
+                self.seq_wf_acc += wf_acc
+            else:
+                self.seq_wf_acc = wf_acc
+            self.last_wf_subrng_idx = subrng_idx
 
             return ret
 
