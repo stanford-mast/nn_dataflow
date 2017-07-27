@@ -259,6 +259,58 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
         self._verify_bufshr_stats(dram_access, gbuf_access, bufshr_stats,
                                   lbs, bufshr, 'test_bufshr_rotation_example')
 
+    def test_bufshr_skip_rot_example(self):
+        ''' Example scheme using bufshr that skips the single rotation. '''
+
+        # Make a PartitionScheme that allows bufshr for IFM.
+        part = PartitionScheme(order=range(pe.NUM),
+                               pdims=((2, 2), (1, 1), (2, 1), (1, 1)))
+        bufshr = BufShrScheme(part)
+        self.assertEqual(bufshr.size(de.IFM), 4,
+                         'test_bufshr_skip_rot_example: '
+                         'made-up PartitionScheme is not expected: '
+                         '{}, bufshr size for {} {}.'
+                         .format(part, de.IFM, bufshr.size(de.IFM)))
+
+        # Make a LoopBlockingScheme that has a single rotation for IFM.
+        p_nld, p_occ = self._part_nld(part)
+        bl_ts = ((Util.idivc(p_nld.loopcnt[le.IFM], 3),
+                  Util.idivc(p_nld.loopcnt[le.OFM], 3),
+                  Util.idivc(p_nld.loopcnt[le.BAT], 2)),
+                 (1, 1, 2),
+                 (3, 3, 1))
+        bl_ords = (tuple(range(le.NUM)), tuple(range(le.NUM)))
+        lbs = LoopBlockingScheme(p_nld, bl_ts, bl_ords, self.resource['PAR'],
+                                 bufshr, p_occ, self.options['BUFSHR'])
+        self.assertTrue(lbs.is_valid())
+        self.assertGreater(sum(lbs.get_noc_access()), 0)
+        self.assertEqual(lbs.bufshr_subgrp_size[de.IFM], 4,
+                         'test_bufshr_skip_rot_example: '
+                         'made-up LoopBlockingScheme is not expected: '
+                         '{}, bufshr subgrp size for {} {}.'
+                         .format((bl_ts, bl_ords), de.IFM,
+                                 lbs.bufshr_subgrp_size[de.IFM]))
+        self.assertGreater(lbs.bufshr_wide_fetch_width[de.IFM], 1,
+                           'test_bufshr_skip_rot_example: '
+                           'made-up LoopBlockingScheme is not expected: '
+                           '{}, bufshr wide fetch width for {} {}.'
+                           .format((bl_ts, bl_ords), de.IFM,
+                                   lbs.bufshr_wide_fetch_width[de.IFM]))
+        self.assertEqual(lbs.bufshr_rot_round_cnt[de.IFM], 0,
+                         'test_bufshr_skip_rot_example: '
+                         'made-up LoopBlockingScheme is not expected: '
+                         '{}, bufshr rotation rounds for {} {}'
+                         .format((bl_ts, bl_ords), de.IFM,
+                                 lbs.bufshr_rot_round_cnt[de.IFM]))
+
+        # Sim.
+        dram_access, gbuf_access, bufshr_stats = \
+                self._sim_access_conv(lbs, get_bufshr=True)
+
+        self._verify_bufshr_stats(dram_access, gbuf_access, bufshr_stats,
+                                  lbs, bufshr,
+                                  'test_bufshr_skip_rot_example')
+
     def test_bufshr_wide_fetch_example(self):
         ''' Example scheme using bufshr with wide fetch. '''
 
@@ -272,14 +324,15 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
                          '{}, bufshr size for {} {}.'
                          .format(part, de.IFM, bufshr.size(de.IFM)))
 
-        for t1, t2 in [((3, 3, 2), (1, 1, 1)),
-                       ((1, 3, 1), (3, 1, 2))]:
+        for t1, t2 in [((3, 3, 1), (1, 1, 2)),
+                       ((1, 3, 2), (3, 1, 1))]:
             # Make a LoopBlockingScheme that has wide fetch for IFM.
             p_nld, p_occ = self._part_nld(part)
             bl_ts = (tuple(Util.idivc(p_nld.loopcnt[lpe], t1[lpe] * t2[lpe])
                            for lpe in range(le.NUM)),
                      t1, t2)
-            bl_ords = (tuple(range(le.NUM)), tuple(range(le.NUM)))
+            # At GBUF level, from inner to outer: le.BAT, le.IFM, le.OFM.
+            bl_ords = (tuple(range(le.NUM)), (1, 2, 0))
             lbs = LoopBlockingScheme(p_nld, bl_ts, bl_ords,
                                      self.resource['PAR'], bufshr, p_occ,
                                      self.options['BUFSHR'])
@@ -297,6 +350,12 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
                                '{}, bufshr wide fetch width for {} {}.'
                                .format((bl_ts, bl_ords), de.IFM,
                                        lbs.bufshr_wide_fetch_width[de.IFM]))
+            self.assertGreater(lbs.bufshr_rot_round_cnt[de.IFM], 0,
+                               'test_bufshr_wide_fetch_example: '
+                               'made-up LoopBlockingScheme is not expected: '
+                               '{}, bufshr rotation rounds for {} {}'
+                               .format((bl_ts, bl_ords), de.IFM,
+                                       lbs.bufshr_rot_round_cnt[de.IFM]))
 
             # Sim.
             dram_access, gbuf_access, bufshr_stats = \
@@ -324,9 +383,10 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
         bl_ts = ((Util.idivc(p_nld.loopcnt[le.IFM], 1),
                   Util.idivc(p_nld.loopcnt[le.OFM], 3),
                   Util.idivc(p_nld.loopcnt[le.BAT], 2)),
-                 (1, 1, 2),
-                 (1, 3, 1))
-        bl_ords = (tuple(range(le.NUM)), tuple(range(le.NUM)))
+                 (1, 3, 2),
+                 (1, 1, 1))
+        # At GBUF level, from inner to outer: le.BAT, le.OFM, le.IFM.
+        bl_ords = (tuple(range(le.NUM)), (2, 1, 0))
         lbs = LoopBlockingScheme(p_nld, bl_ts, bl_ords, self.resource['PAR'],
                                  bufshr, p_occ, self.options['BUFSHR'])
         self.assertTrue(lbs.is_valid())
@@ -338,6 +398,12 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
                            '{}, bufshr grp size {}, bufshr subgrp size {}'
                            .format((bl_ts, bl_ords), lbs.bufshr_grp_size,
                                    lbs.bufshr_subgrp_size))
+        self.assertGreater(lbs.bufshr_rot_round_cnt[de.IFM], 0,
+                           'test_bufshr_multisubgrp_example: '
+                           'made-up LoopBlockingScheme is not expected: '
+                           '{}, bufshr rotation rounds for {} {}'
+                           .format((bl_ts, bl_ords), de.IFM,
+                                   lbs.bufshr_rot_round_cnt[de.IFM]))
 
         # Sim.
         dram_access, gbuf_access, bufshr_stats = \

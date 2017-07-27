@@ -421,6 +421,10 @@ class TestLoopBlockingFixture(unittest.TestCase):
             # Wide fetch accesses, in unit counts (* unit size).
             self.wf_access = 0
 
+            # Rotation rounds per load of a range. If only rotate a single
+            # round per data load, the rotation is unnecessary.
+            self.rot_rnd_cnt_per_load = None
+
             if self.bypass:
                 return
 
@@ -467,14 +471,25 @@ class TestLoopBlockingFixture(unittest.TestCase):
             # Rotation step happens when moving to the new rotation unit.
             assert self.subrng_num % rot_unit_cnt == 0
             self.rot_unit_size = self.subrng_num // rot_unit_cnt
+            # Steps per rotation round.
+            self.rot_steps_per_round = 1
+            while (self.rot_steps_per_round * self.rot_unit_size
+                   + self.buf_subrng_num < self.subrng_num
+                   and (self.rot_steps_per_round + 1) * self.rot_unit_size
+                   < self.subrng_num):
+                self.rot_steps_per_round += 1
 
             # The rotation unit currently worked on.
             self.cur_rot_unit = 0
+            # Rotation steps of the current load of the current range.
+            self.cur_rot_step_cnt = 0
 
             # Last wide fetch subrange index.
             self.last_wf_subrng_idx = 0
             # Amount of sequential wide fetch, can be combined with rotation.
             self.seq_wf_acc = 0
+            # Total saved (combined with rotation) wide fetch access.
+            self.saved_wf_access = 0
 
             # Subrange index cache.
             self.sridx_pr_cache = {}
@@ -491,24 +506,22 @@ class TestLoopBlockingFixture(unittest.TestCase):
             if steps == 0:
                 return 0
 
-            # Get steps per rotation round.
-            steps_per_round = 1
-            while (steps_per_round * self.rot_unit_size + self.buf_subrng_num
-                   < self.subrng_num
-                   and (steps_per_round + 1) * self.rot_unit_size
-                   < self.subrng_num):
-                steps_per_round += 1
+            assert steps % self.rot_steps_per_round == 0
 
-            assert steps % steps_per_round == 0
-
-            return steps // steps_per_round
+            if self.rot_rnd_cnt_per_load == 1:
+                return 0
+            return steps // self.rot_steps_per_round
 
         def rotation_access_size(self):
             ''' Get total rotation access size. '''
+            if self.rot_rnd_cnt_per_load == 1:
+                return 0
             return self.rot_access * self.unit_size
 
         def wide_fetch_access_size(self):
             ''' Get total wide fetch access size. '''
+            if self.rot_rnd_cnt_per_load == 1:
+                return (self.wf_access + self.saved_wf_access) * self.unit_size
             return self.wf_access * self.unit_size
 
         def do_access(self, idx_pr, cnt_pr, read=1, write=0):
@@ -526,6 +539,18 @@ class TestLoopBlockingFixture(unittest.TestCase):
                 # Miss in the shared buffer and load new range. Reset.
                 self.cur_rot_unit = 0
                 self.rot_step_cnt.setdefault(ridx_pr, 0)
+
+                if self.cur_rot_step_cnt == 0:
+                    # Initial fetch, no replaced data yet.
+                    assert self.rot_rnd_cnt_per_load is None
+                else:
+                    rot_rnd_cnt_per_load, rem_ = divmod(
+                        self.cur_rot_step_cnt, self.rot_steps_per_round)
+                    assert rem_ == 0
+                    assert self.rot_rnd_cnt_per_load is None \
+                            or self.rot_rnd_cnt_per_load == rot_rnd_cnt_per_load
+                    self.rot_rnd_cnt_per_load = rot_rnd_cnt_per_load
+                self.cur_rot_step_cnt = 0
 
             assert all(cnt <= subrng_cnt for cnt, subrng_cnt
                        in zip(cnt_pr, self.subrng_cnt_pr))
@@ -570,9 +595,11 @@ class TestLoopBlockingFixture(unittest.TestCase):
 
                     # One rotation step.
                     self.rot_step_cnt[ridx_pr] += 1
+                    self.cur_rot_step_cnt += 1
 
                     # Combine wide fetch with rotation.
                     self.wf_access -= self.seq_wf_acc
+                    self.saved_wf_access += self.seq_wf_acc
                     self.seq_wf_acc = 0
 
                 assert ru_idx == self.cur_rot_unit

@@ -878,6 +878,16 @@ class LoopBlockingScheme(object):
                             else buf_fetch) % rotrnds == 0
                     assert rotrnds % ((mem_fetch + 1) // 2 if dce == de.OFM
                                       else mem_fetch) == 0
+                # Optimization: after fetching data into GBUF, if the data only
+                # rotate a single time before being replaced, we do not need to
+                # store them after this single use. So instead we can stream
+                # each rotation unit to all the nodes, and replace it by the
+                # next rotation unit one by one. This is already supported as
+                # the data will be broadcast to all nodes regardless of who
+                # stores it (see Partition).
+                if rotrnds == ((mem_fetch + 1) // 2 if dce == de.OFM
+                               else mem_fetch):
+                    rotrnds = 0
                 rot_rnd_cnts.append(rotrnds)
 
                 # Number of rotation units.
