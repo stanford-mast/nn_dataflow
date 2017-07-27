@@ -18,10 +18,13 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+import math
 import unittest
 
 from nn_dataflow import BufShrScheme
 from nn_dataflow import DataCategoryEnum as de
+from nn_dataflow import DataDimLoops
+from nn_dataflow import LoopEnum as le
 from nn_dataflow import ParallelEnum as pe
 from nn_dataflow import PartitionScheme
 
@@ -111,6 +114,51 @@ class TestBufShrScheme(unittest.TestCase):
         self.assertTupleEqual(self.bufshr3.nbr_dists[de.FIL], (3, 5))
         self.assertTupleEqual(self.bufshr3.nbr_dists[de.IFM], (12, 10))
         self.assertTupleEqual(self.bufshr3.nbr_dists[de.OFM], (1, 1))
+
+    def test_default_data_loops(self):
+        ''' Default data_loops in constructor. '''
+        data_loops = [None] * de.NUM
+        data_loops[de.FIL] = DataDimLoops(le.IFM, le.OFM)
+        data_loops[de.IFM] = DataDimLoops(le.IFM, le.BAT)
+        data_loops[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+
+        for bufshr, ps in zip([self.bufshr1, self.bufshr2, self.bufshr3],
+                              [self.ps1, self.ps2, self.ps3]):
+
+            bufshr_ = BufShrScheme(ps, data_loops)
+
+            for dce in range(de.NUM):
+                self.assertTupleEqual(bufshr.dim(dce),
+                                      bufshr_.dim(dce))
+                self.assertTupleEqual(bufshr.nbr_dists[dce],
+                                      bufshr_.nbr_dists[dce])
+
+    def test_data_loops(self):
+        ''' data_loops in constructor. '''
+        data_loops = [None] * de.NUM
+        data_loops[de.FIL] = DataDimLoops(le.IFM, le.OFM)
+        data_loops[de.IFM] = DataDimLoops(le.OFM, le.BAT)
+        data_loops[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+
+        for ps in [self.ps1, self.ps2, self.ps3]:
+
+            bufshr = BufShrScheme(ps, data_loops)
+
+            self.assertTupleEqual(bufshr.dim(de.IFM), bufshr.dim(de.OFM))
+            self.assertTupleEqual(bufshr.nbr_dists[de.IFM],
+                                  bufshr.nbr_dists[de.OFM])
+
+    def test_data_loops_all_lpe(self):
+        ''' data_loops in constructor have all LoopEnum. '''
+        data_loops = [None] * de.NUM
+        data_loops[de.FIL] = DataDimLoops(le.IFM, le.OFM)
+        data_loops[de.IFM] = DataDimLoops(le.IFM, le.OFM, le.BAT)
+        data_loops[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+
+        bufshr = BufShrScheme(self.ps1, data_loops)
+
+        self.assertTupleEqual(bufshr.dim(de.IFM), (1, 1))
+        self.assertTrue(all(math.isnan(d) for d in bufshr.nbr_dists[de.IFM]))
 
     def test_nhops_rotate_all(self):
         ''' Get nhops_rotate_all. '''

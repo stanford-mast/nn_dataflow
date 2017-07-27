@@ -370,3 +370,21 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
                             + lbs.bufshr_wide_fetch_access[dce],
                             noc_access[dce])
 
+    def test_bufshr_localregionlayer(self):
+        ''' Scheme using bufshr for LocalRegionLayer. '''
+
+        for part in self._gen_all_partition(layerkey='POOL'):
+
+            p_nld, p_occ = self._part_nld(part, layerkey='POOL')
+
+            for lbs in LoopBlocking.gen_loopblocking(
+                    p_nld, self.resource['PAR'], part, self.cost, p_occ,
+                    self.options['BUFSHR']):
+                if not lbs.is_valid():
+                    continue
+
+                self.assertTrue(all(gs == 1 for gs in lbs.bufshr_grp_size),
+                                'test_bufshr_localregionlayer: '
+                                'non-1 bufshr group size {}, part {}'
+                                .format(lbs.bufshr_grp_size, part))
+

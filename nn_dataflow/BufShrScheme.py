@@ -21,8 +21,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import math
 
 from . import DataCategoryEnum as de
+from . import LoopEnum as le
 from . import ParallelEnum as pe
 from . import Util
+from .DataDimLoops import DataDimLoops
 from .PhyDim2 import PhyDim2
 
 class BufShrScheme(object):
@@ -30,52 +32,82 @@ class BufShrScheme(object):
     The buffer sharing scheme.
     '''
 
-    def __init__(self, part):
+    def __init__(self, part, data_loops=None):
+        '''
+        `part` is the PartitionScheme instance that determine the buffer
+        sharing scheme.
 
-        # Dimension of the node group.
-        self.dims = [PhyDim2(float('nan'), float('nan'))] * de.NUM
-        # Distance between the neighbors in the node group.
-        self.nbr_dists = [PhyDim2(float('nan'), float('nan'))] * de.NUM
+        `data_loops` is a DataDimLoops instance that determine the relationship
+        between DataCategoryEnum and ParallelEnum. Default is for ConvLayer.
+        '''
 
-        # Fil weights in gbuf can be shared by nodes with OFMP and BATP.
+        if data_loops is None:
+            data_loops = [None] * de.NUM
+            data_loops[de.FIL] = DataDimLoops(le.IFM, le.OFM)
+            data_loops[de.IFM] = DataDimLoops(le.IFM, le.BAT)
+            data_loops[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+
+        # Get node group corresponding to each LoopEnum, and the distance
+        # between neighbors in that node group.
+        lpe_dims = [PhyDim2(1, 1)] * le.NUM
+        lpe_nbr_dists = [PhyDim2(float('nan'), float('nan'))] * le.NUM
+
+        # le.BAT corresponds to pe.OFMP and pe.BATP.
         idx_ofmp = part.order.index(pe.OFMP)
         idx_batp = part.order.index(pe.BATP)
         dim_ofmp = part.dim(pe.OFMP)
         dim_batp = part.dim(pe.BATP)
         # If only one of OFMP and BATP exists, use that one.
         if dim_ofmp.size() == 1:
-            self.dims[de.FIL] = dim_batp
-            self.nbr_dists[de.FIL] = part.part_neighbor_dist(pe.BATP)
+            lpe_dims[le.BAT] = dim_batp
+            lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(pe.BATP)
         elif dim_batp.size() == 1:
-            self.dims[de.FIL] = dim_ofmp
-            self.nbr_dists[de.FIL] = part.part_neighbor_dist(pe.OFMP)
+            lpe_dims[le.BAT] = dim_ofmp
+            lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(pe.OFMP)
         else:
             # If both exist ...
             if abs(idx_ofmp - idx_batp) == 1:
                 # ... and are adjacent in the partitioning hierarchy, use
                 # both.
-                self.dims[de.FIL] = dim_batp * dim_ofmp
-                self.nbr_dists[de.FIL] = part.part_neighbor_dist(
+                lpe_dims[le.BAT] = dim_batp * dim_ofmp
+                lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(
                     pe.OFMP if idx_ofmp > idx_batp else pe.BATP)
             else:
                 # ... but are not adjacent, use the bottom one (with
                 # smaller distance).
                 if idx_ofmp > idx_batp:
-                    self.dims[de.FIL] = dim_ofmp
-                    self.nbr_dists[de.FIL] = part.part_neighbor_dist(pe.OFMP)
+                    lpe_dims[le.BAT] = dim_ofmp
+                    lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(pe.OFMP)
                 else:
-                    self.dims[de.FIL] = dim_batp
-                    self.nbr_dists[de.FIL] = part.part_neighbor_dist(pe.BATP)
+                    lpe_dims[le.BAT] = dim_batp
+                    lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(pe.BATP)
 
-        # Ifmaps in gbuf can be shared by nodes with OUTP.
-        self.dims[de.IFM] = part.dim(pe.OUTP)
-        self.nbr_dists[de.IFM] = part.part_neighbor_dist(pe.OUTP)
+        # le.OFM corresponds to pe.OUTP.
+        lpe_dims[le.OFM] = part.dim(pe.OUTP)
+        lpe_nbr_dists[le.OFM] = part.part_neighbor_dist(pe.OUTP)
 
-        # Ofmaps in gbuf can be shared by nodes with INNP.
-        self.dims[de.OFM] = part.dim(pe.INPP)
-        self.nbr_dists[de.OFM] = part.part_neighbor_dist(pe.INPP)
+        # le.IFM corresponds to pe.INNP.
+        lpe_dims[le.IFM] = part.dim(pe.INPP)
+        lpe_nbr_dists[le.IFM] = part.part_neighbor_dist(pe.INPP)
+
+        # Dimension of the node group.
+        self.dims = []
+        # Distance between the neighbors in the node group.
+        self.nbr_dists = []
+
+        # The nodes corresponding to the LoopEnum unrelated to the data
+        # category will fetch the same data, i.e., sharing the data.
+        for dce in range(de.NUM):
+            lpe = (data_loops[dce].drop(range(le.NUM)) + [None])[0]
+            if lpe is None:
+                self.dims.append(PhyDim2(1, 1))
+                self.nbr_dists.append(PhyDim2(float('nan'), float('nan')))
+            else:
+                self.dims.append(lpe_dims[lpe])
+                self.nbr_dists.append(lpe_nbr_dists[lpe])
 
         self.part = part
+        self.data_loops = data_loops
 
     def dim(self, dce):
         ''' Get the buffer sharing node group dimensions. '''
@@ -287,5 +319,6 @@ class BufShrScheme(object):
         return '{}({})'.format(
             self.__class__.__name__,
             ', '.join([
-                'part={}'.format(repr(self.part))]))
+                'part={}'.format(repr(self.part)),
+                'data_loops={}'.format(repr(self.data_loops))]))
 

@@ -244,16 +244,16 @@ class TestLoopBlockingFixture(unittest.TestCase):
         lp_ts[le.BAT] = tb
         return tuple(zip(*lp_ts))
 
-    def _part_nld(self, part):
+    def _part_nld(self, part, layerkey='PAR'):
         ''' Make a partitioned NestedLoopDesc and its partition occupation. '''
-        p_layer, p_batch_size, p_occ = part.part_layer(self.layer['PAR'],
+        p_layer, p_batch_size, p_occ = part.part_layer(self.layer[layerkey],
                                                        self.batch_size)
         p_nld = next(MapStrategyEyeriss(p_layer, p_batch_size,
                                         self.resource['PAR'].dim_array)
                      .gen_nested_loop_desc())
         return p_nld, p_occ
 
-    def _gen_all_partition(self):
+    def _gen_all_partition(self, layerkey='PAR'):
         '''
         Generate PartitionScheme.
         '''
@@ -263,14 +263,15 @@ class TestLoopBlockingFixture(unittest.TestCase):
             partition_hybrid=True, partition_batch=True, partition_ifmaps=True,
             ntops=2 ** 30, nprocesses=1, verbose=False)
 
-        for part in Partition.gen_partition(self.layer['PAR'], self.batch_size,
+        for part in Partition.gen_partition(self.layer[layerkey],
+                                            self.batch_size,
                                             self.resource['PAR'].dim_nodes,
                                             options):
             yield part
 
-    def _total_part_size(self, part):
+    def _total_part_size(self, part, layerkey='PAR'):
         ''' Get the total partitioned data size. '''
-        layer = self.layer['PAR']
+        layer = self.layer[layerkey]
 
         nifm = Util.idivc(layer.nifm, part.size(pe.INPP)) * part.size(pe.INPP)
         nofm = Util.idivc(layer.nofm, part.size(pe.OUTP)) * part.size(pe.OUTP)
