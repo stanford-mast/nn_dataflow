@@ -22,7 +22,6 @@ from collections import namedtuple, Counter
 import itertools
 
 from . import Util
-from .Util import StringifyClass, ContentHashClass
 
 _FMAP_POSITION_ATTRS = ['b', 'n', 'h', 'w']
 
@@ -32,7 +31,7 @@ A position in a batched fmap.
 FmapPosition = namedtuple('FmapPosition', _FMAP_POSITION_ATTRS)
 
 
-class FmapRange(StringifyClass, ContentHashClass):
+class FmapRange(Util.ContentHashClass):
     '''
     A range of a batched fmap.
     '''
@@ -135,20 +134,28 @@ class FmapRange(StringifyClass, ContentHashClass):
         return self > other or self == other
 
     def _compare(self, other):
-        # We compare the two range using their begin points.
-        if self.fp_beg > other.fp_beg:
-            return 1
-        elif self.fp_beg < other.fp_beg:
-            return -1
-
-        # If the begin points are identical, either the same range or overlap.
-        if self.fp_end == other.fp_end \
+        # Identical or empty ranges.
+        if (self.fp_beg == other.fp_beg and self.fp_end == other.fp_end) \
                 or (self.size() == 0 and other.size() == 0):
             return 0
 
-        assert self.overlap(other).size() > 0
-        raise ValueError('FmapRange: comparing two overlap ranges. '
-                         '{} vs. {}'.format(self, other))
+        # Overlap check.
+        if self.overlap(other).size() > 0:
+            raise ValueError('FmapRange: comparing two overlap ranges. '
+                             '{} vs. {}'.format(self, other))
+
+        # We compare the two range using their begin points.
+        if self.fp_beg > other.fp_beg:
+            return 1
+        assert self.fp_beg < other.fp_beg
+        return -1
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'fp_beg={}'.format(repr(self.fp_beg)),
+                'fp_end={}'.format(repr(self.fp_end))]))
 
 
 class FmapRangeMap(object):
@@ -172,13 +179,15 @@ class FmapRangeMap(object):
         if frng.size() == 0:
             return
 
-        idx = sum([1 if kv[0] < frng else 0 for kv in self.keyvals])
-        if idx < len(self.keyvals) and not (self.keyvals[idx][0] > frng):
-            prev = self.keyvals[idx-1][0] if idx > 0 else None
+        try:
+            idx = sum([1 if kv[0] < frng else 0 for kv in self.keyvals])
+            assert not (idx < len(self.keyvals) \
+                    and not (self.keyvals[idx][0] > frng))
+        except ValueError:
             raise ValueError('FmapRangeMap: added FmapRange overlaps with '
-                             'its next range. New: {}, prev: {}, next: {}.'
-                             .format(str(frng), str(prev),
-                                     str(self.keyvals[idx][0])))
+                             'existing ranges. Added: {}, existing: {}.'
+                             .format(str(frng),
+                                     [k for k, _ in self.keyvals]))
         self.keyvals.insert(idx, (frng, val))
 
         self.min_fpos = [min(a, b) for a, b in zip(self.min_fpos, frng.fp_beg)]
@@ -257,8 +266,8 @@ class FmapRangeMap(object):
         for key in counts.keys():
             if counts[key] == frng.size():
                 return key
-        raise ValueError('FmapRange: given fmap range does not correspond to '
-                         'a single value.')
+        raise ValueError('FmapRangeMap: given fmap range does not correspond '
+                         'to a single value.')
 
     def __str__(self):
         str_ = '{}:\n'.format(self.__class__.__name__)

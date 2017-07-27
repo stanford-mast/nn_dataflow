@@ -20,28 +20,36 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import namedtuple
 
+from . import DataDimLoops
 from . import DataCategoryEnum as de
+from . import LoopEnum as le
 from . import MemHierEnum as me
+from . import Util
 
-NESTED_LOOP_DESC_LIST = ['loopcnt_ifm',
-                         'loopcnt_ofm',
-                         'loopcnt_bat',
+NESTED_LOOP_DESC_LIST = ['loopcnt',
                          'usize_gbuf',
                          'usize_regf',
                          'unit_access',
                          'unit_ops',
                          'unit_time',
+                         'data_loops',
                         ]
 
 class NestedLoopDesc(namedtuple('NestedLoopDesc', NESTED_LOOP_DESC_LIST)):
     '''
-    Naive 3-nested loop (nifm, nofm, batch) description.
+    Naive nested loop description.
 
-    For our problem, only deal with nifm, nofm, and batch loops.
+    For our problem, only deal with the loops given by `LoopEnum`.
     '''
 
     def __new__(cls, *args, **kwargs):
         ntp = super(NestedLoopDesc, cls).__new__(cls, *args, **kwargs)
+
+        if not isinstance(ntp.loopcnt, tuple):
+            raise TypeError('NestedLoopDesc: loopcnt must be a tuple.')
+        if len(ntp.loopcnt) != le.NUM:
+            raise ValueError('NestedLoopDesc: loopcnt must have length {}.'
+                             .format(le.NUM))
 
         if not isinstance(ntp.usize_gbuf, tuple):
             raise TypeError('NestedLoopDesc: usize_gbuf must be a tuple.')
@@ -67,6 +75,16 @@ class NestedLoopDesc(namedtuple('NestedLoopDesc', NESTED_LOOP_DESC_LIST)):
                 raise ValueError('NestedLoopDesc: element in unit_access '
                                  'must have length {}.'.format(de.NUM))
 
+        if not isinstance(ntp.data_loops, tuple):
+            raise TypeError('NestedLoopDesc: data_loops must be a tuple.')
+        if len(ntp.data_loops) != de.NUM:
+            raise ValueError('NestedLoopDesc: data_loops must have length {}.'
+                             .format(de.NUM))
+        for dls in ntp.data_loops:
+            if not isinstance(dls, DataDimLoops):
+                raise TypeError('NestedLoopDesc: element in data_loops '
+                                'must be a DataDimLoops instance.')
+
         return ntp
 
     def usize_gbuf_of(self, dce):
@@ -91,4 +109,24 @@ class NestedLoopDesc(namedtuple('NestedLoopDesc', NESTED_LOOP_DESC_LIST)):
         if dce is None:
             return sum(self.unit_access[mhe])
         return self.unit_access[mhe][dce]
+
+    def total_ops(self):
+        '''
+        Get the total number of ops for all loops.
+        '''
+        return self.unit_ops * Util.prod(self.loopcnt)
+
+    def total_access_at_of(self, mhe, dce=None):
+        '''
+        Get the total number of accesses, i.e., accessing all data once, at
+        memory hierarchy `mhe` of data category `dce`.
+
+        If `dce` is None, return total accesses of all data.
+        '''
+        if dce is None:
+            return sum(self.total_access_at_of(mhe, dce2)
+                       for dce2 in range(de.NUM))
+
+        return self.unit_access_at_of(mhe, dce) \
+                * self.data_loops[dce].data_cnt(self.loopcnt)
 

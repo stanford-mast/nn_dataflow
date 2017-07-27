@@ -47,8 +47,8 @@ correspond to the analytical bypass schedule solution, and the hybrid
 partitioning scheme, in our ASPLOS'17 paper. See the paper for details.
 
 
-Verification
-------------
+Verification and testing
+------------------------
 To verify the tool against the Eyeriss ISCA'16 paper, run the following command
 at the top directory.
 ```
@@ -56,6 +56,29 @@ at the top directory.
 ```
 Use the output results to draw the energy breakdown and compare against Figure
 10 in the Eyeriss paper.
+
+To run (unit) tests, run the following at the top directory.
+```
+> python -m unittest discover
+```
+Or you can use `pytest` as
+```
+> python -m pytest
+```
+or simply
+```
+> pytest
+```
+
+You can also check the code coverage with `coverage`
+```
+> coverage run -m pytest
+> coverage report
+```
+or (with `pytest-cov` plugin)
+```
+> pytest --cov=nn_dataflow
+```
 
 
 Copyright & License

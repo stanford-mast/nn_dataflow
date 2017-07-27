@@ -66,7 +66,7 @@ def main(args):
             access = [0] * 4
 
             for layer_part in mappings:
-                if not layer_part.startswith(layer):
+                if not layer_part or not layer_part.startswith(layer):
                     continue
                 ops += mappings[layer_part].dict_loop['ops']
                 time += mappings[layer_part].dict_loop['time']
@@ -114,7 +114,7 @@ def main(args):
             access = [0] * 4
 
             for layer_part in mappings:
-                if not layer_part.startswith(layer):
+                if not layer_part or not layer_part.startswith(layer):
                     continue
                 ops += mappings[layer_part].dict_loop['ops']
                 access = [a1 + sum(a2) for a1, a2

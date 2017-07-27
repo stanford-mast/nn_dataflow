@@ -18,9 +18,9 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from .Util import StringifyClass, ContentHashClass
+from . import Util
 
-class Layer(StringifyClass, ContentHashClass):
+class Layer(Util.ContentHashClass):
     '''
     Base NN layer.
 
@@ -82,37 +82,37 @@ class Layer(StringifyClass, ContentHashClass):
         ''' Fmap width of input layer. '''
         return self.input_layer().wofm
 
-    def ofmap_size(self, word_size=1):
+    def ofmap_size(self, batch_size=1, word_size=1):
         '''
-        Get size of one output fmap.
+        Get size of one output fmap with `batch_size`.
 
         If `word_size` is set to word byte size, return size in bytes.
         '''
-        return self.hofm * self.wofm * word_size
+        return self.hofm * self.wofm * batch_size * word_size
 
-    def total_ofmap_size(self, word_size=1):
+    def total_ofmap_size(self, batch_size=1, word_size=1):
         '''
-        Get total size of all output fmaps.
-
-        If `word_size` is set to word byte size, return size in bytes.
-        '''
-        return self.nofm * self.ofmap_size(word_size)
-
-    def ifmap_size(self, word_size=1):
-        '''
-        Get size of one input fmap.
+        Get total size of all output fmaps with `batch_size`.
 
         If `word_size` is set to word byte size, return size in bytes.
         '''
-        return self.input_layer().ofmap_size(word_size)
+        return self.nofm * self.ofmap_size(batch_size, word_size)
 
-    def total_ifmap_size(self, word_size=1):
+    def ifmap_size(self, batch_size=1, word_size=1):
         '''
-        Get total size of all input fmaps.
+        Get size of one input fmap with `batch_size`.
 
         If `word_size` is set to word byte size, return size in bytes.
         '''
-        return self.input_layer().total_ofmap_size(word_size)
+        return self.input_layer().ofmap_size(batch_size, word_size)
+
+    def total_ifmap_size(self, batch_size=1, word_size=1):
+        '''
+        Get total size of all input fmaps with `batch_size`.
+
+        If `word_size` is set to word byte size, return size in bytes.
+        '''
+        return self.input_layer().total_ofmap_size(batch_size, word_size)
 
     def ops_per_neuron(self):
         ''' Number of operations per neuron. '''
@@ -121,6 +121,32 @@ class Layer(StringifyClass, ContentHashClass):
     def total_ops(self, batch_size=1):
         ''' Get total number of operations. '''
         return self.total_ofmap_size() * self.ops_per_neuron() * batch_size
+
+    def is_valid_padding_sifm(self, sifm):
+        ''' Whether the given `sifm` is valid when allowing padding. '''
+        if isinstance(sifm, int):
+            hifm = sifm
+            wifm = sifm
+        elif len(sifm) == 2:
+            hifm = sifm[0]
+            wifm = sifm[1]
+        else:
+            raise ValueError('Layer: sifm is invalid ({}), '
+                             'needs to be either one integer or '
+                             'a pair of integers'.format(sifm))
+
+        h_padding_rng = sorted((self.hofm * self.htrd, self.hifm))
+        w_padding_rng = sorted((self.wofm * self.wtrd, self.wifm))
+        return (h_padding_rng[0] <= hifm <= h_padding_rng[1]
+                and w_padding_rng[0] <= wifm <= w_padding_rng[1])
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'nofm={}'.format(repr(self.nofm)),
+                'sofm={}'.format(repr((self.hofm, self.wofm))),
+                'strd={}'.format(repr((self.htrd, self.wtrd)))]))
 
 
 class InputLayer(Layer):
@@ -143,17 +169,29 @@ class ConvLayer(Layer):
     nofm (M): # ofmap channels
     hifm, wifm (H): ifmap height/width
     hofm, wofm (E): ofmap height/width
-    sfil (R): weight filter width/height
+    hfil, wfil (R): weight filter width/height
     htrd, wtrd (U): stride height/width
     '''
 
     def __init__(self, nifm, nofm, sofm, sfil, strd=1):
         super(ConvLayer, self).__init__(nofm, sofm, strd=strd)
 
-        self.sfil = sfil
+        if isinstance(sfil, int):
+            hfil = sfil
+            wfil = sfil
+        elif len(sfil) == 2:
+            hfil = sfil[0]
+            wfil = sfil[1]
+        else:
+            raise ValueError('ConvLayer: sfil is invalid ({}), '
+                             'needs to be either one integer or '
+                             'a pair of integers'.format(sfil))
 
-        hifm = self.sfil + (self.hofm - 1) * self.htrd
-        wifm = self.sfil + (self.wofm - 1) * self.wtrd
+        self.hfil = hfil
+        self.wfil = wfil
+
+        hifm = self.hfil + (self.hofm - 1) * self.htrd
+        wifm = self.wfil + (self.wofm - 1) * self.wtrd
         self.inlayer = Layer(nifm, (hifm, wifm))
 
     def input_layer(self):
@@ -161,7 +199,7 @@ class ConvLayer(Layer):
 
     def ops_per_neuron(self):
         # 2D convolution across all ifmap channels.
-        return self.sfil * self.sfil * self.nifm
+        return self.hfil * self.wfil * self.nifm
 
     def filter_size(self, word_size=1):
         '''
@@ -169,7 +207,7 @@ class ConvLayer(Layer):
 
         If `word_size` is set to word byte size, return size in bytes.
         '''
-        return self.sfil * self.sfil * word_size
+        return self.hfil * self.wfil * word_size
 
     def total_filter_size(self, word_size=1):
         '''
@@ -179,6 +217,16 @@ class ConvLayer(Layer):
         '''
         return self.nifm * self.nofm * self.filter_size(word_size)
 
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'nifm={}'.format(repr(self.nifm)),
+                'nofm={}'.format(repr(self.nofm)),
+                'sofm={}'.format(repr((self.hofm, self.wofm))),
+                'sfil={}'.format(repr((self.hfil, self.wfil))),
+                'strd={}'.format(repr((self.htrd, self.wtrd)))]))
+
 
 class FCLayer(ConvLayer):
     '''
@@ -186,12 +234,20 @@ class FCLayer(ConvLayer):
 
     As a special case of CONVLayer.
 
-    hifm = wifm = sfil, strd = 1, hofm = wofm = 1
+    hifm = hfil, wifm = wfil, strd = 1, hofm = wofm = 1
     '''
 
-    def __init__(self, nifm, nofm, sfil):
+    def __init__(self, nifm, nofm, sfil=1):
         super(FCLayer, self).__init__(nifm, nofm, 1, sfil)
         assert self.hofm == 1 and self.wofm == 1
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'nifm={}'.format(repr(self.nifm)),
+                'nofm={}'.format(repr(self.nofm)),
+                'sfil={}'.format(repr((self.hfil, self.wfil)))]))
 
 
 class LocalRegionLayer(Layer):
@@ -241,6 +297,16 @@ class LocalRegionLayer(Layer):
         ''' The size of the local region corresponding to one output point. '''
         return self.nreg * self.hreg * self.wreg
 
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'nofm={}'.format(repr(self.nofm)),
+                'sofm={}'.format(repr((self.hofm, self.wofm))),
+                'nreg={}'.format(repr(self.nreg)),
+                'sreg={}'.format(repr((self.hreg, self.wreg))),
+                'strd={}'.format(repr((self.htrd, self.wtrd)))]))
+
 
 class PoolingLayer(LocalRegionLayer):
     '''
@@ -256,4 +322,13 @@ class PoolingLayer(LocalRegionLayer):
             strd = sreg
         super(PoolingLayer, self).__init__(nofm, sofm, 1, sreg, strd=strd)
         assert self.nreg == 1
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'nofm={}'.format(repr(self.nofm)),
+                'sofm={}'.format(repr((self.hofm, self.wofm))),
+                'sreg={}'.format(repr((self.hreg, self.wreg))),
+                'strd={}'.format(repr((self.htrd, self.wtrd)))]))
 

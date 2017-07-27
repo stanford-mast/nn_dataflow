@@ -25,15 +25,16 @@ from . import MemHierEnum
 from . import ParallelEnum
 from . import Partition
 from .Cost import Cost
+from .DataDimLoops import DataDimLoops
 from .DataLayout import DataLayout
 from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
 from .Layer import Layer, InputLayer, ConvLayer, FCLayer, \
         LocalRegionLayer, PoolingLayer
 from .LoopBlockingScheme import LoopBlockingScheme
-from .MapStrategy import MapStrategyEyeriss
+from .MapStrategy import MapStrategy, MapStrategyEyeriss
 from .NestedLoopDesc import NestedLoopDesc
 from .Network import Network
-from .NNDataflow import SchedulingResultDict
+from .NNDataflowScheme import NNDataflowScheme
 from .Option import Option
 from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
@@ -42,5 +43,5 @@ from .Scheduling import SchedulingCondition, SchedulingResult, Scheduling
 
 from .NNDataflow import NNDataflow
 
-__version__ = '1.5-rc.3'
+__version__ = '1.5-rc.5'
 

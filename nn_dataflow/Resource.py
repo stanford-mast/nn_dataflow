@@ -155,9 +155,9 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
             raise ValueError('Resource: can have at most 2 mem_regions.')
 
         if hasattr(ntp.size_gbuf, '__len__'):
-            raise TypeError('Cost: size_gbuf must be a scalar')
+            raise TypeError('Resource: size_gbuf must be a scalar')
         if hasattr(ntp.size_regf, '__len__'):
-            raise TypeError('Cost: size_regf must be a scalar')
+            raise TypeError('Resource: size_regf must be a scalar')
 
         return ntp
 

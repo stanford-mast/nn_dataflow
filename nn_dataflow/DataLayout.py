@@ -99,11 +99,8 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
         if not isinstance(other, DataLayout):
             raise TypeError('DataLayout: other must be a DataLayout object.')
 
-        try:
-            scfrng = self.frmap.complete_fmap_range()
-            ocfrng = other.frmap.complete_fmap_range()
-        except ValueError:
-            raise ValueError('DataLayout: frmap must be a complete map.')
+        scfrng = self.frmap.complete_fmap_range()
+        ocfrng = other.frmap.complete_fmap_range()
 
         coord_ofs = other.origin - self.origin
 
@@ -151,7 +148,7 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
                         frmap.add(frng, scoords + o2coords)
 
         else:
-            raise ValueError('NNDataflow: unrecognized merge symbol {}'
+            raise ValueError('DataLayout: unrecognized merge symbol {}'
                              .format(merge_symbol))
 
         assert frmap.is_complete()

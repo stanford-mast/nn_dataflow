@@ -24,19 +24,6 @@ from operator import mul
 Utilities.
 '''
 
-class StringifyClass(object):
-    '''
-    Class with a stringify interface.
-    '''
-    # pylint: disable=too-few-public-methods
-
-    def __str__(self):
-        return '{}({})'.format(
-            self.__class__.__name__,
-            ', '.join(['{}={}'.format(k, str(v)) for k, v
-                       in sorted(self.__dict__.items())]))
-
-
 class ContentHashClass(object):
     '''
     Class using the content instead of the object ID for hash.
@@ -74,7 +61,7 @@ def prod(lst):
 def approx_dividable(total, num, overhead=0.2):
     ''' Whether it is reasonable to divide `total` into `num` parts.
     `overhead` is the allowed max padding overhead.  '''
-    return idivc(total, num) * num < total * (1 + overhead)
+    return idivc(total, num) * num <= total * (1 + overhead)
 
 
 def factorize(value, num, limits=None):
@@ -90,7 +77,7 @@ def factorize(value, num, limits=None):
     if limits is None:
         limits = [float('inf')] * (num - 1)
     assert len(limits) >= num - 1
-    limits = limits[:num-1] + [float('inf')]
+    limits = list(limits[:num-1]) + [float('inf')]
 
     factors = [1] * num
     while True:
@@ -115,26 +102,41 @@ def factorize(value, num, limits=None):
 
 def closest_factor(value, factor):
     '''
-    Return the maximum factor of `value` that is no larger than `factor`, and
-    the minimum factor of `value` that is no less than `factor`, as a tuple.
+    Return the maximum factor of `value` that is no larger than `factor` (if
+    any), and the minimum factor of `value` that is no less than `factor` (if
+    any), as a tuple.
     '''
+    if not isinstance(value, int):
+        raise TypeError('value must be integers.')
+
+    if value < 0 or factor < 0:
+        raise ValueError('arguments must not be negative.')
+
     res = tuple()
 
     # Maximum no-larger factor.
-    f = int(factor)
-    while f > 1:
-        if value % f == 0 and f <= factor:
-            break
-        f -= 1
-    res += (max(1, f), )
+    if factor >= 1:
+        f = int(factor) + 1
+        while f > factor:
+            f -= 1
+        while True:
+            if f != 0 and value % f == 0:
+                break
+            f -= 1
+        assert f <= factor and value % f == 0
+        res += (f,)
 
     # Minimum no-smaller factor.
-    f = int(factor)
-    while f < value:
-        if f != 0 and value % f == 0 and f >= factor:
-            break
-        f += 1
-    res += (min(value, f), )
+    if factor <= abs(value):
+        f = int(factor) - 1
+        while f < factor:
+            f += 1
+        while True:
+            if f != 0 and value % f == 0:
+                break
+            f += 1
+        assert f >= factor and value % f == 0
+        res += (f,)
 
     return res
 
