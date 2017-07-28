@@ -56,6 +56,7 @@ class TestScheduling(unittest.TestCase):
         self.options = Option(
             sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
             partition_hybrid=True, partition_batch=True, partition_ifmaps=True,
+            partition_interlayer=False,
             ntops=10, nprocesses=1, verbose=False)
 
         self.ifmap_layouts = {}

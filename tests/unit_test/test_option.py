@@ -32,6 +32,7 @@ class TestOption(unittest.TestCase):
                          partition_hybrid=True,
                          partition_batch=False,
                          partition_ifmaps=False,
+                         partition_interlayer=False,
                          ntops=10,
                          nprocesses=16,
                          verbose=False
@@ -58,6 +59,7 @@ class TestOption(unittest.TestCase):
                        partition_hybrid=True,
                        partition_batch=False,
                        partition_ifmaps=False,
+                       partition_interlayer=False,
                        ntops=10,
                        nprocesses=16,
                        verbose=False
@@ -71,6 +73,7 @@ class TestOption(unittest.TestCase):
                        partition_hybrid=True,
                        partition_batch=False,
                        partition_ifmaps=False,
+                       partition_interlayer=False,
                        ntops=10,
                        nprocesses=16,
                        verbose=False
@@ -86,6 +89,7 @@ class TestOption(unittest.TestCase):
                        partition_hybrid=False,
                        partition_batch=False,
                        partition_ifmaps=True,
+                       partition_interlayer=False,
                        ntops=10,
                        nprocesses=16,
                        verbose=False
@@ -98,6 +102,7 @@ class TestOption(unittest.TestCase):
                          partition_hybrid=True,
                          partition_batch=False,
                          partition_ifmaps=False,
+                         partition_interlayer=False,
                          ntops=10,
                          nprocesses=16,
                          verbose=False

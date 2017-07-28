@@ -113,26 +113,31 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.options['BASE'] = Option(
             sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
             partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
+            partition_interlayer=None,
             ntops=2 ** 30, nprocesses=1, verbose=False)
         # Multiprocessing.
         self.options['MP'] = Option(
             sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
             partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
+            partition_interlayer=None,
             ntops=2 ** 30, nprocesses=8, verbose=False)
         # Limited top schemes.
         self.options['NTOPS'] = Option(
             sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
             partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
+            partition_interlayer=None,
             ntops=10, nprocesses=1, verbose=False)
         # Bypass.
         self.options['BYP'] = Option(
             sw_gbuf_bypass=(True,) * 3, sw_solve_loopblocking=False,
             partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
+            partition_interlayer=None,
             ntops=2 ** 30, nprocesses=1, verbose=False)
         # Bypass solver.
         self.options['BYPSOL'] = Option(
             sw_gbuf_bypass=(True,) * 3, sw_solve_loopblocking=True,
             partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
+            partition_interlayer=None,
             ntops=2 ** 30, nprocesses=1, verbose=False)
 
         # Cost.

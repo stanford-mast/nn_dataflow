@@ -60,6 +60,7 @@ class TestNNDataflow(unittest.TestCase):
                               partition_hybrid=False,
                               partition_batch=False,
                               partition_ifmaps=False,
+                              partition_interlayer=False,
                               ntops=1,
                               nprocesses=1,
                               verbose=False)
@@ -104,6 +105,7 @@ class TestNNDataflow(unittest.TestCase):
                          partition_hybrid=False,
                          partition_batch=False,
                          partition_ifmaps=False,
+                         partition_interlayer=False,
                          ntops=1,
                          nprocesses=1,
                          verbose=True)
@@ -368,6 +370,7 @@ class TestNNDataflow(unittest.TestCase):
                          partition_hybrid=True,
                          partition_batch=False,
                          partition_ifmaps=False,
+                         partition_interlayer=False,
                          ntops=1,
                          nprocesses=1,
                          verbose=False)
