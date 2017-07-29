@@ -28,6 +28,7 @@ from .Cost import Cost
 from .DataDimLoops import DataDimLoops
 from .DataLayout import DataLayout
 from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
+from .InterLayerPipeline import InterLayerPipeline
 from .Layer import Layer, InputLayer, ConvLayer, FCLayer, \
         LocalRegionLayer, PoolingLayer
 from .LoopBlockingScheme import LoopBlockingScheme
