@@ -248,6 +248,15 @@ class TestInterLayerPipeline(unittest.TestCase):
                 for nvidx in nexts:
                     self.assertIn(vidx, ilp.dag_prev_dict[nvidx])
 
+    def test_ops(self):
+        ''' Number of ops. '''
+        for net in self.net.values():
+
+            ilp = InterLayerPipeline(net, self.resource)
+
+            self.assertEqual(sum(ilp.dag_vertex_ops),
+                             sum(net[l].total_ops() for l in net))
+
     def test_gen_segment(self):
         ''' _gen_segment. '''
         # pylint: disable=protected-access

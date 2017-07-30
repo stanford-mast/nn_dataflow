@@ -157,8 +157,11 @@ class InterLayerPipeline(object):
         Also establish two dicts for the previous and next vertices of each DAG
         vertex.
 
+        Also record the number of operations of each DAG vertex.
+
         In summary, the attributes initialized include: `dag_input_vertex`,
-        `dag_vertex_list`, `dag_vertex_dict`, `dag_prev_dict`, `dag_next_dict`.
+        `dag_vertex_list`, `dag_vertex_dict`, `dag_prev_dict`, `dag_next_dict`,
+        `dag_vertex_ops`.
         '''
 
         # Vertex of the input layer.
@@ -242,6 +245,12 @@ class InterLayerPipeline(object):
         for vidx in self.dag_prev_dict:
             if self.dag_input_vertex in self.dag_prev_dict[vidx]:
                 self.dag_next_dict[self.dag_input_vertex].add(vidx)
+
+        # Number of ops of each vertex.
+        self.dag_vertex_ops = []
+        for v in self.dag_vertex_list:
+            ops = sum(self.network[l].total_ops() for l in v)
+            self.dag_vertex_ops.append(ops)
 
     def _topological_order(self, dag_vertex_set):
         '''
