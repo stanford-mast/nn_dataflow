@@ -334,3 +334,36 @@ class TestInterLayerPipeline(unittest.TestCase):
         self.assertEqual(len(seg_list), 2 ** len(ilp.dag_vertex_list) - 1)
         self.assertEqual(len(seg_set), 136)
 
+    def test_gen_segment_no_repeating(self):
+        ''' _gen_segment no_repeating. '''
+        # pylint: disable=protected-access
+        def _gen_all_segment(ilp, no_repeating):
+            return ilp._gen_segment(0, 0, set(), no_repeating=no_repeating)
+
+        for net in self.net.values():
+
+            ilp = InterLayerPipeline(net, self.resource)
+
+            seg_list_rep = [seg for _, seg in _gen_all_segment(ilp, False)]
+
+            ilp.seg_vertex_done.clear()
+            seg_list_norep = [seg for _, seg in _gen_all_segment(ilp, True)]
+
+            self.assertLess(len(seg_list_norep), len(seg_list_rep))
+            self.assertSetEqual(set(seg_list_norep), set(seg_list_rep))
+            self.assertEqual(len(seg_list_norep), len(set(seg_list_rep)))
+
+        # Large networks with forks.
+        for net_name in ['googlenet', 'resnet152']:
+            net = import_network(net_name)
+
+            ilp = InterLayerPipeline(net, self.resource)
+            seg_list_norep = [seg for _, seg in _gen_all_segment(ilp, True)]
+
+            self.assertEqual(len(seg_list_norep), len(set(seg_list_norep)))
+
+            # The number of different segments is between one and three times
+            # of the number of layers.
+            self.assertGreater(len(seg_list_norep), len(net))
+            self.assertLessEqual(len(seg_list_norep), len(net) * 3)
+

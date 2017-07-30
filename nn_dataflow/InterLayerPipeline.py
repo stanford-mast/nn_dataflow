@@ -40,7 +40,10 @@ class InterLayerPipeline(object):
 
         self._calc_sched_dag()
 
-    def _gen_segment(self, seg_idx, vertex_idx, done):
+        # Vertices starting from which we have generated the segments.
+        self.seg_vertex_done = set()
+
+    def _gen_segment(self, seg_idx, vertex_idx, done, no_repeating=False):
         '''
         Generate segments starting from segment index `seg_idx`, with starting
         vertex `vertex_idx`. Yield the segment index, and a tuple of the
@@ -52,6 +55,12 @@ class InterLayerPipeline(object):
 
         `done` is a set of vertices which have already been scheduled and the
         output is already in memory.
+
+        If `no_repreating` is True, we do not re-generate the same segments
+        with the same `vertex_idx` for different prefixes. For example, if we
+        have generated the segments starting from vertex 2 for prefix (0), (1),
+        then we do not generate these segments for prefix (0, 1). To make it
+        work, the upper level should cache the results.
 
         Rules:
 
@@ -122,10 +131,19 @@ class InterLayerPipeline(object):
                 # The segment is valid.
                 yield seg_idx, segment
 
+                # Skip if have done.
+                if no_repeating and frontier + 1 in self.seg_vertex_done:
+                    continue
+
                 # Recursion.
                 for tpl in self._gen_segment(seg_idx + 1, frontier + 1,
-                                             done.union(segment)):
+                                             done.union(segment),
+                                             no_repeating=no_repeating):
                     yield tpl
+
+        if no_repeating:
+            assert vertex_idx not in self.seg_vertex_done
+            self.seg_vertex_done.add(vertex_idx)
 
     def _calc_sched_dag(self):
         '''
