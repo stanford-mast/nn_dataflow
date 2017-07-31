@@ -24,53 +24,6 @@ from nn_dataflow import NodeRegion
 from nn_dataflow import PhyDim2
 from nn_dataflow import Resource
 
-class TestNodeRegion(unittest.TestCase):
-    ''' Tests for NodeRegion. '''
-
-    def test_valid_args(self):
-        ''' Valid arguments. '''
-        nr = NodeRegion(dim=PhyDim2(4, 4),
-                        origin=PhyDim2(1, 3))
-        self.assertTupleEqual(nr.dim, (4, 4), 'dim')
-        self.assertTupleEqual(nr.origin, (1, 3), 'origin')
-
-    def test_invalid_dim(self):
-        ''' Invalid dim. '''
-        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*dim.*'):
-            _ = NodeRegion(dim=(4, 4),
-                           origin=PhyDim2(1, 3))
-
-    def test_invalid_origin(self):
-        ''' Invalid origin. '''
-        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*origin.*'):
-            _ = NodeRegion(dim=PhyDim2(4, 4),
-                           origin=(1, 3))
-
-    def test_contains_node(self):
-        ''' Whether contains node. '''
-        nr = NodeRegion(dim=PhyDim2(4, 4),
-                        origin=PhyDim2(1, 3))
-        for h in range(1, 5):
-            for w in range(3, 7):
-                self.assertTrue(nr.contains_node(PhyDim2(h, w)))
-
-        num = 0
-        for h in range(-2, 10):
-            for w in range(-2, 10):
-                num += 1 if nr.contains_node(PhyDim2(h, w)) else 0
-        self.assertEqual(num, nr.dim.size())
-
-    def test_node_iter(self):
-        ''' Get node iterator. '''
-        nr = NodeRegion(dim=PhyDim2(4, 4),
-                        origin=PhyDim2(1, 3))
-        # No duplicates.
-        self.assertEqual(len(set(nr.node_iter())), nr.dim.size())
-        # All nodes is contained.
-        for c in nr.node_iter():
-            self.assertTrue(nr.contains_node(c))
-
-
 class TestResource(unittest.TestCase):
     ''' Tests for Resource. '''
 

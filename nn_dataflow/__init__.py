@@ -35,11 +35,12 @@ from .LoopBlockingScheme import LoopBlockingScheme
 from .MapStrategy import MapStrategy, MapStrategyEyeriss
 from .NestedLoopDesc import NestedLoopDesc
 from .Network import Network
+from .NodeRegion import NodeRegion
 from .NNDataflowScheme import NNDataflowScheme
 from .Option import Option
 from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
-from .Resource import NodeRegion, Resource
+from .Resource import Resource
 from .Scheduling import SchedulingCondition, SchedulingResult, Scheduling
 
 from .NNDataflow import NNDataflow
