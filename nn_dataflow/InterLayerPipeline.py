@@ -18,6 +18,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from . import Util
 from .Layer import ConvLayer
 from .Network import Network
 from .Resource import Resource
@@ -144,6 +145,64 @@ class InterLayerPipeline(object):
         if no_repeating:
             assert vertex_idx not in self.seg_vertex_done
             self.seg_vertex_done.add(vertex_idx)
+
+    def _allocate_segment(self, segment, max_util_drop=0.05):
+        '''
+        Allocate node resource to the vertices in the given `segment`. Return a
+        tuple of numbers of nodes allocated to the vertices in the segment.
+
+        `max_util_drop` specifies the maximum utilization drop due to mismatch
+        throughput between vertices.
+        '''
+
+        dim_nodes = self.resource.dim_nodes
+        total_nodes = dim_nodes.size()
+
+        assert segment
+        ops = [self.dag_vertex_ops[vidx] for vidx in segment]
+
+        # Enforce a common factor among the numbers of nodes allocated to all
+        # vertices in the segment. Such common factor is likely to be the
+        # common height of the vertex node regions.
+        common_factor_list = [cf for cf, _ in Util.factorize(dim_nodes.h, 2)]
+
+        for cf in sorted(common_factor_list, reverse=True):
+            # Pick the largest common factor within the utilization constraint.
+
+            # Number of nodes of each vertex should be approximate to the
+            # number of ops of the vertex.
+            nodes_raw = [o * 1. / sum(ops) * total_nodes for o in ops]
+
+            # Round to the common factor multiples.
+            assert total_nodes % cf == 0
+            nodes = [int(round(nr / cf)) * cf for nr in nodes_raw]
+            # Fix margin.
+            while sum(nodes) != total_nodes:
+                diff = [n - nr for n, nr in zip(nodes, nodes_raw)]
+                if sum(nodes) > total_nodes:
+                    # Decrease the nodes for the vertex with the maximum
+                    # positive difference.
+                    idx, _ = max(enumerate(diff), key=lambda tpl: tpl[1])
+                    nodes[idx] -= cf
+                else:
+                    # Increase the nodes for the vertex with the minimum
+                    # negative difference.
+                    idx, _ = min(enumerate(diff), key=lambda tpl: tpl[1])
+                    nodes[idx] += cf
+
+            if 0 in nodes:
+                continue
+
+            # Utilization.
+            time = max(o * 1. / n for o, n in zip(ops, nodes))
+            util = sum(ops) / time / sum(nodes)
+            assert util < 1 + 1e-6
+
+            if util >= 1 - max_util_drop:
+                return tuple(nodes)
+
+        # Not found.
+        return None
 
     def _calc_sched_dag(self):
         '''
