@@ -73,52 +73,58 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
         the origin of self.
 
         Requests are given as a list of number of nodes.
+
+        The strategy is to allocate stripe-wise in a zig-zag order, allowing
+        for folding in width. We first determine a stripe height as the
+        greatest common divisor of the requested numbers of nodes. Then
+        allocate each request as (stripe height, request size / stripe height)
+        to fill in the stripe, and move to the next stripe after the current
+        one is filled. If the width of a request is larger than the remaining
+        width of the current stripe, we use up the remaining width, and fold
+        the request width to the next stripe.
         '''
+
+        # FIXME: currently the subregions occupy the correct folded nodes in
+        # the region, but the returned shapes are the unfolded ones. The
+        # allocation is valid, but the subregion dimensions are not accurate,
+        # so the number of hops are not not accurate.
 
         if sum(request_list) > self.dim.size():
             return []
 
-        # The strategy is to allocate stripe-wise. First determine a stripe
-        # height, then allocate each request as (stripe height, request size /
-        # stripe height) to fill in the stripe, and move to next stripe after
-        # the current one is filled.
+        hstrp = Util.gcd(self.dim.h, *request_list)
+        subregions = []
 
-        # Prefer larger stripe height, which can split intra-layer and
-        # inter-layer to different dimensions.
-        hstrp_cands = sorted([h for h, _ in Util.factorize(self.dim.h, 2)],
-                             reverse=True)
+        ofs_h, ofs_w = 0, 0
+        move_right = True
 
-        for hstrp in hstrp_cands:
-            # Try each strip height.
-            subregions = []
+        for req in request_list:
 
-            offset = PhyDim2(0, 0)
-            for req in request_list:
-                # Subregion.
-                width = Util.idivc(req, hstrp)
-                subdim = PhyDim2(hstrp, width)
+            # Subregion.
+            assert req % hstrp == 0
+            width = req // hstrp
 
-                if offset.w + width <= self.dim.w:
-                    # Still fit in this stripe.
-                    pass
-                elif offset.h + hstrp + hstrp <= self.dim.h \
-                        and width <= self.dim.w:
-                    # Fit in the next stripe. Update offset.
-                    offset = PhyDim2(h=offset.h+hstrp, w=0)
-                else:
-                    # Cannot allocate any more.
-                    break
+            subdim = PhyDim2(hstrp, width)
+            if move_right:
+                origin = PhyDim2(ofs_h, ofs_w)
+            else:
+                origin = PhyDim2(ofs_h, self.dim.w - ofs_w - width)
 
-                subregions.append(NodeRegion(dim=subdim,
-                                             origin=self.origin+offset))
-                offset += PhyDim2(h=0, w=width)
+            subregions.append(NodeRegion(dim=subdim,
+                                         origin=self.origin + origin))
 
-            if len(subregions) == len(request_list):
-                # All allocated.
-                return subregions
+            # Move the offset
+            ofs_w += width
+            while ofs_w >= self.dim.w:
+                # Overflow, fold to the next stripe.
+                ofs_w -= self.dim.w
+                ofs_h += hstrp
+                move_right = not move_right
 
-        # None of the stripes works.
-        return []
+        # Not moved outside the region.
+        assert ofs_h + hstrp <= self.dim.h or ofs_w == 0
+
+        return subregions
 
 
 RESOURCE_LIST = ['dim_nodes',
