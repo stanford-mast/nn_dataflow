@@ -70,7 +70,7 @@ class InterLayerPipeline(object):
         or among the previous vertices of the current segment, we do not add it
         to the segment, because there is no benefit to co-locate them.
 
-        2. If a vertex has multiple previous vertices, no more than one of them
+        2. If a vertex has multiple previous vertices, none of them
         can be in the same segment as this vertex, because the output data
         availability timing of the previous vertices may not match.
 
@@ -91,21 +91,23 @@ class InterLayerPipeline(object):
 
             # Check whether the frontier can be added to the current segment.
 
+            frontier_prevs = self.dag_prev_dict[frontier]
+
             # Whether the frontier share dependencies with the current segment,
             # if the segment is not empty.
             share_deps = not segment \
-                    or not self.dag_prev_dict[frontier].isdisjoint(
+                    or not frontier_prevs.isdisjoint(
                         set.union(set(segment),
                                   *[self.dag_prev_dict[i] for i in segment]))
 
-            # The previous vertices in the current segment, whose output is
-            # still on-chip and has not stored into memory.
-            pending_prevs = self.dag_prev_dict[frontier] - done
-            assert pending_prevs.issubset(segment)
+            # Whether some of the multiple previous vertices are in the current
+            # segment.
+            coupled_prevs = len(frontier_prevs) > 1 \
+                    and not frontier_prevs.isdisjoint(segment)
 
-            if not share_deps or len(pending_prevs) > 1:
-                # Not sharing any dependencies (rule 1), or more than one
-                # previous vertices in the current segment (rule 2).
+            if not share_deps or coupled_prevs:
+                # Not sharing any dependencies (rule 1), or previous vertices
+                # overlap with the current segment (rule 2).
 
                 # Make sure the current segment is not empty.
                 assert segment

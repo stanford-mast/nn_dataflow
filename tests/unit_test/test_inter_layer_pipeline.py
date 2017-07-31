@@ -283,8 +283,8 @@ class TestInterLayerPipeline(unittest.TestCase):
         ilp = InterLayerPipeline(self.net['net4'], self.resource)
         seg_list = list(seg for _, seg in self._gen_all_segment(ilp))
         seg_set = set(seg_list)
-        self.assertEqual(len(seg_list), 3471)
-        self.assertEqual(len(seg_set), 36)
+        self.assertEqual(len(seg_list), 2319)
+        self.assertEqual(len(seg_set), 34)
 
         # Segments are valid.
         for net in self.net.values():
@@ -321,8 +321,6 @@ class TestInterLayerPipeline(unittest.TestCase):
         self.assertNotIn((0, 1, 2, 3), seg_sets)
         self.assertNotIn((3, 4), seg_sets)
         self.assertIn((3, 4, 5), seg_sets)
-        self.assertNotIn((6, 7), seg_sets)
-        self.assertIn((6, 7, 8, 9), seg_sets)
         self.assertNotIn((10, 11), seg_sets)
 
         # Real networks.
