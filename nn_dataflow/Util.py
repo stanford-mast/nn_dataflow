@@ -141,30 +141,6 @@ def closest_factor(value, factor):
     return res
 
 
-def quantize_pow2(value, approx=False):
-    '''
-    Quantize by ceiling to a number of power of two. Also allow some small
-    "good" numbers like 6, 12, 20, etc..
-    '''
-    n = 0
-    while True:
-        qval = 2 ** n
-        if qval >= value:
-            # qval is the first power of two value no less than value.
-            if approx:
-                # Try qval * 5/8, but no 5 and 10.
-                qval5 = qval * 5 // 8
-                if qval5 >= 20 and qval5 >= value:
-                    return qval5
-                # Try qval * 3/4, but no 3.
-                qval3 = qval * 3 // 4
-                if qval3 >= 6 and qval3 >= value:
-                    return qval3
-            return qval
-        else:
-            n += 1
-
-
 def get_ith_range(rng, idx, num):
     '''
     Divide the full range `rng` into `num` parts, and get the `idx`-th range.
@@ -174,6 +150,48 @@ def get_ith_range(rng, idx, num):
     end = rng[0] + (idx + 1) * length / num
     assert end <= rng[1]
     return beg, end
+
+
+def gcd(*values):
+    '''
+    Get the greatest common divisor of the given values.
+    '''
+    if any(not isinstance(v, int) for v in values):
+        raise TypeError('value must be integers.')
+    if any(v <= 0 for v in values):
+        raise ValueError('arguments must be positive.')
+
+    if not values:
+        raise ValueError('must give at least 1 value.')
+    if len(values) == 1:
+        return values[0]
+    if len(values) > 2:
+        return reduce(gcd, values)
+
+    a, b = values
+    while b:
+        a, b = b, a % b
+    return a
+
+
+def lcm(*values):
+    '''
+    Get the least common multiple of the given values.
+    '''
+    if any(not isinstance(v, int) for v in values):
+        raise TypeError('value must be integers.')
+    if any(v <= 0 for v in values):
+        raise ValueError('arguments must be positive.')
+
+    if not values:
+        raise ValueError('must give at least 1 value.')
+    if len(values) == 1:
+        return values[0]
+    if len(values) > 2:
+        return reduce(lcm, values)
+
+    a, b = values
+    return a * b // gcd(a, b)
 
 
 def isclose(vala, valb, rel_tol=1e-9, abs_tol=0.0):

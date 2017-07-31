@@ -268,6 +268,128 @@ class TestUtilGetIthRange(unittest.TestCase):
             self.assertLessEqual(max_size - min_size, 1)
 
 
+class TestUtilGCD(unittest.TestCase):
+    ''' Tests for Util.gcd. '''
+
+    def test_int(self):
+        ''' Integers. '''
+        self.assertEqual(Util.gcd(3, 4), 1)
+        self.assertEqual(Util.gcd(8, 4), 4)
+        self.assertEqual(Util.gcd(3, 9), 3)
+        self.assertEqual(Util.gcd(15, 12), 3)
+        self.assertEqual(Util.gcd(300, 410), 10)
+
+    def test_multi(self):
+        ''' Multiple values. '''
+        self.assertEqual(Util.gcd(4, 8, 10), 2)
+        self.assertEqual(Util.gcd(*range(6, 21, 3)), 3)
+
+    def test_single(self):
+        ''' Single value. '''
+        for v in range(1, 10):
+            self.assertEqual(Util.gcd(v), v)
+
+    def test_no_arg(self):
+        ''' No argument. '''
+        with self.assertRaises(ValueError):
+            _ = Util.gcd()
+
+    def test_float(self):
+        ''' Float. '''
+        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+            _ = Util.gcd(1., 2)
+
+        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+            _ = Util.gcd(1, 2.2)
+
+        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+            _ = Util.gcd(1, 2, 3, 4.2)
+
+    def test_non_positive(self):
+        ''' Non-positive values. '''
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.gcd(-1, 2)
+
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.gcd(1, -2)
+
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.gcd(3, 6, 9, 12, -21)
+
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.gcd(3, 0)
+
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.gcd(0, 3)
+
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.gcd(0, 5, 10, 15, 20)
+
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.gcd(5, 10, 0, 15, 20)
+
+
+class TestUtilLCM(unittest.TestCase):
+    ''' Tests for Util.lcm. '''
+
+    def test_int(self):
+        ''' Integers. '''
+        self.assertEqual(Util.lcm(3, 4), 12)
+        self.assertEqual(Util.lcm(8, 4), 8)
+        self.assertEqual(Util.lcm(3, 9), 9)
+        self.assertEqual(Util.lcm(15, 12), 60)
+        self.assertEqual(Util.lcm(300, 410), 12300)
+
+    def test_multi(self):
+        ''' Multiple values. '''
+        self.assertEqual(Util.lcm(4, 8, 10), 40)
+        self.assertEqual(Util.lcm(*range(6, 21, 3)), 180)
+
+    def test_single(self):
+        ''' Single value. '''
+        for v in range(1, 10):
+            self.assertEqual(Util.lcm(v), v)
+
+    def test_no_arg(self):
+        ''' No argument. '''
+        with self.assertRaises(ValueError):
+            _ = Util.lcm()
+
+    def test_float(self):
+        ''' Float. '''
+        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+            _ = Util.lcm(1., 2)
+
+        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+            _ = Util.lcm(1, 2.2)
+
+        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+            _ = Util.lcm(1, 2, 3, 4.2)
+
+    def test_non_positive(self):
+        ''' Non-positive values. '''
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.lcm(-1, 2)
+
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.lcm(1, -2)
+
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.lcm(3, 6, 9, 12, -21)
+
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.lcm(3, 0)
+
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.lcm(0, 3)
+
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.lcm(0, 5, 10, 15, 20)
+
+        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+            _ = Util.lcm(5, 10, 0, 15, 20)
+
+
 class TestUtilIsclose(unittest.TestCase):
     ''' Tests for Util.isclose. '''
 
