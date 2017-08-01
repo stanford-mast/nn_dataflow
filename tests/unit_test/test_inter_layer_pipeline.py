@@ -132,9 +132,11 @@ class TestInterLayerPipeline(unittest.TestCase):
             self.net[net_name] = import_network(net_name)
 
         self.resource = Resource(
-            dim_nodes=PhyDim2(8, 8), dim_array=PhyDim2(16, 16),
-            mem_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 8)),),
-            size_gbuf=65536, size_regf=64)
+            proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 8),
+                                   type=NodeRegion.PROC),
+            data_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 8),
+                                     type=NodeRegion.DATA),),
+            dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64)
 
     def test_valid_args(self):
         ''' Valid arguments. '''
@@ -382,7 +384,8 @@ class TestInterLayerPipeline(unittest.TestCase):
         for idx in range(len(ilp.dag_vertex_list)):
             segment = (idx,)
             nodes = ilp._allocate_segment(segment)
-            self.assertTupleEqual(nodes, (self.resource.dim_nodes.size(),))
+            self.assertTupleEqual(nodes,
+                                  (self.resource.proc_region.dim.size(),))
 
         # Multiple vertices.
         segment = (0, 1)
@@ -400,7 +403,8 @@ class TestInterLayerPipeline(unittest.TestCase):
         for _, segment in self._gen_all_segment(ilp, True):
             nodes = ilp._allocate_segment(segment)
             if nodes:
-                self.assertEqual(sum(nodes), self.resource.dim_nodes.size())
+                self.assertEqual(sum(nodes),
+                                 self.resource.proc_region.dim.size())
 
         # Real network.
         net = self.net['zfnet']
@@ -409,7 +413,8 @@ class TestInterLayerPipeline(unittest.TestCase):
         for _, segment in self._gen_all_segment(ilp, True):
             nodes = ilp._allocate_segment(segment, max_util_drop=0.1)
             if nodes:
-                self.assertEqual(sum(nodes), self.resource.dim_nodes.size())
+                self.assertEqual(sum(nodes),
+                                 self.resource.proc_region.dim.size())
 
                 time = max(ilp.dag_vertex_ops[i] * 1. / n for i, n
                            in zip(segment, nodes))

@@ -157,7 +157,8 @@ class InterLayerPipeline(object):
         throughput between vertices.
         '''
 
-        dim_nodes = self.resource.dim_nodes
+        proc_region = self.resource.proc_region
+        dim_nodes = proc_region.dim
         total_nodes = dim_nodes.size()
 
         assert segment

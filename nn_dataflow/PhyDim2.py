@@ -19,7 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from collections import namedtuple
-from operator import add, sub, mul
+from operator import add, sub, neg, mul
 
 class PhyDim2(namedtuple('PhyDim2', ['h', 'w'])):
     '''
@@ -48,6 +48,10 @@ class PhyDim2(namedtuple('PhyDim2', ['h', 'w'])):
         if not isinstance(other, PhyDim2):
             other = PhyDim2(other, other)
         return PhyDim2(*map(sub, self, other))
+
+    def __neg__(self):
+        ''' Return element-wise negative. '''
+        return PhyDim2(*map(neg, self))
 
     def __mul__(self, other):
         ''' Return element-wise `self * other`. '''

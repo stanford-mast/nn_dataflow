@@ -72,11 +72,14 @@ class TestDataLayout(unittest.TestCase):
 
     def test_is_in_region(self):
         ''' Whether is in region. '''
-        nr1 = NodeRegion(dim=PhyDim2(2, 2), origin=PhyDim2(1, 1))
+        nr1 = NodeRegion(dim=PhyDim2(2, 2), origin=PhyDim2(1, 1),
+                         type=NodeRegion.DATA)
         self.assertTrue(self.dly.is_in_region(nr1))
-        nr2 = NodeRegion(dim=PhyDim2(3, 3), origin=PhyDim2(0, 0))
+        nr2 = NodeRegion(dim=PhyDim2(3, 3), origin=PhyDim2(0, 0),
+                         type=NodeRegion.DATA)
         self.assertTrue(self.dly.is_in_region(nr2))
-        nr3 = NodeRegion(dim=PhyDim2(2, 2), origin=PhyDim2(0, 0))
+        nr3 = NodeRegion(dim=PhyDim2(2, 2), origin=PhyDim2(0, 0),
+                         type=NodeRegion.DATA)
         self.assertFalse(self.dly.is_in_region(nr3))
 
         frm = self.frm.copy()
@@ -84,9 +87,11 @@ class TestDataLayout(unittest.TestCase):
                 (PhyDim2(2, 2), PhyDim2(3, 3)))
         dly = DataLayout(origin=PhyDim2(1, 1), frmap=frm)
 
-        nr4 = NodeRegion(dim=PhyDim2(3, 3), origin=PhyDim2(1, 1))
+        nr4 = NodeRegion(dim=PhyDim2(3, 3), origin=PhyDim2(1, 1),
+                         type=NodeRegion.DATA)
         self.assertFalse(dly.is_in_region(nr4))
-        nr5 = NodeRegion(dim=PhyDim2(4, 4), origin=PhyDim2(1, 1))
+        nr5 = NodeRegion(dim=PhyDim2(4, 4), origin=PhyDim2(1, 1),
+                         type=NodeRegion.DATA)
         self.assertTrue(dly.is_in_region(nr5))
 
         frm.add(FmapRange((0, 0, 16, 0), (4, 4, 20, 20)),
@@ -94,7 +99,8 @@ class TestDataLayout(unittest.TestCase):
         dly = DataLayout(origin=PhyDim2(1, 1), frmap=frm)
 
         self.assertFalse(dly.is_in_region(nr5))
-        nr6 = NodeRegion(dim=PhyDim2(7, 7), origin=PhyDim2(0, 0))
+        nr6 = NodeRegion(dim=PhyDim2(7, 7), origin=PhyDim2(0, 0),
+                         type=NodeRegion.DATA)
         self.assertTrue(dly.is_in_region(nr6))
 
     def test_total_transfer_nhops(self):

@@ -4,7 +4,7 @@ List of major changes and improvements
 ## [Unreleased]
 
 
-## [v1.4 -- v1.5] -- 2017-07-20
+## [v1.4 -- v1.5] -- 2017-08-01
 
 ### Added
 
@@ -33,6 +33,8 @@ List of major changes and improvements
 
   - Add utilities to `LoopBlockingScheme` class.
 
+  - Add negative operation to `PhyDim2`.
+
 - Test.
 
   - Add unit tests.
@@ -45,6 +47,14 @@ List of major changes and improvements
   - Relax `__len__` of `Network` to work before setting input layer.
 
   - Allow different height and width for filters in `ConvLayer`.
+
+- Hardware models:
+
+  - Upgrade node dimensions to node region in `Resource`. The origins of node
+    region and memory regions are all absolute.
+
+  - Add `type` attribute to `NodeRegion` to differentiate processing and data
+    node regions in `Resource`.
 
 - Software models:
 

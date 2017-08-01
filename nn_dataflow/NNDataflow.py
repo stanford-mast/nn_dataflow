@@ -159,8 +159,8 @@ class NNDataflow(object):
                                                   _ofmap_layout(dfsch, pl_name))
 
             # Remap dst memory to src memory.
-            origin_diff = self.resource.mem_region_src().origin \
-                    - self.resource.mem_region_dst().origin
+            origin_diff = self.resource.src_data_region().origin \
+                    - self.resource.dst_data_region().origin
             ifmap_layout = ifmap_layout.view(origin_diff=origin_diff)
 
             # We already checked the ofmap layout dimension in Scheduling, and
@@ -176,12 +176,12 @@ class NNDataflow(object):
 
         input_layer = self.network.input_layer()
 
-        mem_region = self.resource.mem_region_dst()
+        input_region = self.resource.dst_data_region()
 
         for part in Partition.gen_partition(input_layer, self.batch_size,
-                                            mem_region.dim, options):
+                                            input_region.dim, options):
             input_layout = Partition.get_ofmap_layout(
-                input_layer, self.batch_size, part, mem_region)
+                input_layer, self.batch_size, part, input_region)
 
             yield input_layout
 

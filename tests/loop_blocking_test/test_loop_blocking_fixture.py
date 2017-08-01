@@ -51,19 +51,22 @@ class TestLoopBlockingFixture(unittest.TestCase):
         # Resource.
         self.resource = {}
         dim_array = PhyDim2(16, 16)
-        mem_regions = (NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1)),)
+        proc_region = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                 type=NodeRegion.PROC)
+        data_regions = (NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                   type=NodeRegion.DATA),)
         # Typical resource.
         self.resource['BASE'] = Resource(
-            dim_nodes=PhyDim2(1, 1), dim_array=dim_array,
-            mem_regions=mem_regions, size_gbuf=65536, size_regf=64)
+            proc_region=proc_region, data_regions=data_regions,
+            dim_array=dim_array, size_gbuf=65536, size_regf=64)
         # Larger resource with sufficient capacity, to make all schemes valid.
         self.resource['LG'] = Resource(
-            dim_nodes=PhyDim2(1, 1), dim_array=dim_array,
-            mem_regions=mem_regions, size_gbuf=1024 ** 3, size_regf=1024 ** 3)
+            proc_region=proc_region, data_regions=data_regions,
+            dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3)
         # Small resource.
         self.resource['SM'] = Resource(
-            dim_nodes=PhyDim2(1, 1), dim_array=dim_array,
-            mem_regions=mem_regions, size_gbuf=4096, size_regf=16)
+            proc_region=proc_region, data_regions=data_regions,
+            dim_array=dim_array, size_gbuf=4096, size_regf=16)
 
         # Nested loop description after mapping.
         self.nld = {}
@@ -214,9 +217,9 @@ class TestLoopBlockingFixture(unittest.TestCase):
     class _SimBuffer(object):
         ''' A data buffer model for simulation. '''
 
-        def __init__(self, buf_cnt_pr, unit_size, is_ofm, bypass=False):
+        def __init__(self, dce, buf_cnt_pr, unit_size, bypass=False):
 
-            self.is_ofm = is_ofm
+            self.dce = dce
             self.bypass = bypass
 
             # Accesses to this level, in unit counts (* unit size).
@@ -274,50 +277,51 @@ class TestLoopBlockingFixture(unittest.TestCase):
         '''
         self.assertTrue(lbs.is_valid(), '_sim_access_conv: invalid lbs.')
 
+        data_loops = lbs.nld.data_loops
+
         lpts = zip(*lbs.bl_ts)
 
+        # Get buffered unit counts at each level.
+        dram_buf_cnt_pr_list = [tuple(Util.prod(lpts[lpe])
+                                      for lpe in data_loops[dce].loops())
+                                for dce in range(de.NUM)]
+        gbuf_buf_cnt_pr_list = [tuple(Util.prod(lpts[lpe][1:])
+                                      for lpe in data_loops[dce].loops())
+                                for dce in range(de.NUM)]
+        regf_buf_cnt_pr_list = [tuple(Util.prod(lpts[lpe][2:])
+                                      for lpe in data_loops[dce].loops())
+                                for dce in range(de.NUM)]
+
+        # Initialize SimBuffer.
         drams = [None] * de.NUM
-        for dce, buf_cnt_pr in zip(
-                [de.FIL, de.IFM, de.OFM],
-                [(Util.prod(lpts[le.IFM]), Util.prod(lpts[le.OFM])),
-                 (Util.prod(lpts[le.IFM]), Util.prod(lpts[le.BAT])),
-                 (Util.prod(lpts[le.OFM]), Util.prod(lpts[le.BAT]))]):
-            drams[dce] = self._SimBuffer(buf_cnt_pr,
+        for dce, buf_cnt_pr in enumerate(dram_buf_cnt_pr_list):
+            drams[dce] = self._SimBuffer(dce, buf_cnt_pr,
                                          lbs.nld.unit_access[me.DRAM][dce]
                                          if lbs.stored_in_gbuf[dce]
                                          else lbs.nld.unit_access[me.GBUF][dce],
-                                         is_ofm=(dce == de.OFM)
                                         )
         gbufs = [None] * de.NUM
-        for dce, buf_cnt_pr in zip(
-                [de.FIL, de.IFM, de.OFM],
-                [(Util.prod(lpts[le.IFM][1:]), Util.prod(lpts[le.OFM][1:])),
-                 (Util.prod(lpts[le.IFM][1:]), Util.prod(lpts[le.BAT][1:])),
-                 (Util.prod(lpts[le.OFM][1:]), Util.prod(lpts[le.BAT][1:]))]):
-            gbufs[dce] = self._SimBuffer(buf_cnt_pr,
+        for dce, buf_cnt_pr in enumerate(gbuf_buf_cnt_pr_list):
+            gbufs[dce] = self._SimBuffer(dce, buf_cnt_pr,
                                          lbs.nld.unit_access[me.GBUF][dce],
-                                         is_ofm=(dce == de.OFM),
-                                         bypass=(not lbs.stored_in_gbuf[dce])
+                                         bypass=(not lbs.stored_in_gbuf[dce]),
                                         )
         regfs = [None] * de.NUM
-        for dce, buf_cnt_pr in zip(
-                [de.FIL, de.IFM, de.OFM],
-                [(Util.prod(lpts[le.IFM][2:]), Util.prod(lpts[le.OFM][2:])),
-                 (Util.prod(lpts[le.IFM][2:]), Util.prod(lpts[le.BAT][2:])),
-                 (Util.prod(lpts[le.OFM][2:]), Util.prod(lpts[le.BAT][2:]))]):
-            regfs[dce] = self._SimBuffer(buf_cnt_pr,
+        for dce, buf_cnt_pr in enumerate(regf_buf_cnt_pr_list):
+            regfs[dce] = self._SimBuffer(dce, buf_cnt_pr,
                                          lbs.nld.unit_access[me.REGF][dce],
-                                         is_ofm=(dce == de.OFM)
                                         )
 
         # Already generated psum for OFM.
         ofm_psum = set()
 
         # Simulation.
-        for iidx, oidx, bidx in lbs.gen_index():
+        for idx_tuple in lbs.gen_index():
 
-            for dce, idx_pr in zip([de.FIL, de.IFM, de.OFM],
-                                   [(iidx, oidx), (iidx, bidx), (oidx, bidx)]):
+            for dce in range(de.NUM):
+
+                idx_pr = tuple(data_loops[dce].take(idx_tuple))
+
                 if dce == de.OFM:
                     # Fetch and writeback, unless for the first time (no fetch).
                     write = 1
