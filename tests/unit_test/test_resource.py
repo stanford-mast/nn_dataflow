@@ -181,23 +181,6 @@ class TestResource(unittest.TestCase):
                          size_regf=(512,),
                         )
 
-    def test_invalid_data_regions_proc(self):
-        ''' Invalid data_regions with type PROC. '''
-        with self.assertRaisesRegexp(ValueError, 'Resource: .*data_.*type.*'):
-            _ = Resource(proc_region=NodeRegion(dim=PhyDim2(2, 2),
-                                                origin=PhyDim2(0, 0),
-                                                type=NodeRegion.PROC),
-                         data_regions=(NodeRegion(dim=PhyDim2(2, 1),
-                                                  origin=PhyDim2(0, 0),
-                                                  type=NodeRegion.PROC),
-                                       NodeRegion(dim=PhyDim2(2, 1),
-                                                  origin=PhyDim2(0, 1),
-                                                  type=NodeRegion.DATA)),
-                         dim_array=PhyDim2(16, 16),
-                         size_gbuf=131072,
-                         size_regf=512,
-                        )
-
     def test_src_data_region(self):
         ''' Accessor src_data_region. '''
         nr1 = NodeRegion(dim=PhyDim2(2, 1), origin=PhyDim2(0, 0),

@@ -52,9 +52,6 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
             if not isinstance(dr, NodeRegion):
                 raise TypeError('Resource: element in data_regions must be '
                                 'a NodeRegion instance.')
-            if dr.type != NodeRegion.DATA:
-                raise ValueError('Resource: element in data_regions must have '
-                                 'type DATA.')
         # Data regions can be used as either data source or data destination.
         # If a single region is provided, it is both the source and
         # destination; if two regions are provided, the first is the source and

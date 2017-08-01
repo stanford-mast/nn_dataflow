@@ -3,6 +3,12 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+### Changed
+
+- Hardware models.
+
+  - Allow data source/destination regions in `Resource` to be non-DATA type.
+
 
 ## [v1.4 -- v1.5] -- 2017-08-01
 
