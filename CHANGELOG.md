@@ -33,6 +33,8 @@ List of major changes and improvements
 
   - Add utilities to `LoopBlockingScheme` class.
 
+  - Add negative operation to `PhyDim2`.
+
 - Test.
 
   - Add unit tests.
