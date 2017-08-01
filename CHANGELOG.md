@@ -53,6 +53,9 @@ List of major changes and improvements
   - Upgrade node dimensions to node region in `Resource`. The origins of node
     region and memory regions are all absolute.
 
+  - Add `type` attribute to `NodeRegion` to differentiate processing and data
+    node regions in `Resource`.
+
 - Software models:
 
   - Add loop index generator to `LoopBlockingScheme` class.

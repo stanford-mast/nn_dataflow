@@ -29,26 +29,38 @@ class TestNodeRegion(unittest.TestCase):
     def test_valid_args(self):
         ''' Valid arguments. '''
         nr = NodeRegion(dim=PhyDim2(4, 4),
-                        origin=PhyDim2(1, 3))
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC)
         self.assertTupleEqual(nr.dim, (4, 4), 'dim')
         self.assertTupleEqual(nr.origin, (1, 3), 'origin')
+        self.assertEqual(nr.type, NodeRegion.PROC, 'type')
 
     def test_invalid_dim(self):
         ''' Invalid dim. '''
         with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*dim.*'):
             _ = NodeRegion(dim=(4, 4),
-                           origin=PhyDim2(1, 3))
+                           origin=PhyDim2(1, 3),
+                           type=NodeRegion.PROC)
 
     def test_invalid_origin(self):
         ''' Invalid origin. '''
         with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*origin.*'):
             _ = NodeRegion(dim=PhyDim2(4, 4),
-                           origin=(1, 3))
+                           origin=(1, 3),
+                           type=NodeRegion.PROC)
+
+    def test_invalid_type(self):
+        ''' Invalid type. '''
+        with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*type.*'):
+            _ = NodeRegion(dim=PhyDim2(4, 4),
+                           origin=PhyDim2(1, 3),
+                           type=NodeRegion.NUM)
 
     def test_contains_node(self):
         ''' Whether contains node. '''
         nr = NodeRegion(dim=PhyDim2(4, 4),
-                        origin=PhyDim2(1, 3))
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC)
         for h in range(1, 5):
             for w in range(3, 7):
                 self.assertTrue(nr.contains_node(PhyDim2(h, w)))
@@ -62,7 +74,8 @@ class TestNodeRegion(unittest.TestCase):
     def test_node_iter(self):
         ''' Get node iterator. '''
         nr = NodeRegion(dim=PhyDim2(4, 4),
-                        origin=PhyDim2(1, 3))
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC)
         # No duplicates.
         self.assertEqual(len(set(nr.node_iter())), nr.dim.size())
         # All nodes is contained.

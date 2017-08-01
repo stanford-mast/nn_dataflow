@@ -152,7 +152,7 @@ class LoopBlockingScheme(object):
             return
 
         # Parallel partitioning.
-        self.num_nodes = resource.node_region.dim.size()
+        self.num_nodes = resource.proc_region.dim.size()
         # Occupation.
         # Occupation only affects op counts and REGF accesses.
         self.part_occ = part_occ

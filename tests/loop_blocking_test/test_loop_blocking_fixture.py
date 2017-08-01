@@ -51,20 +51,22 @@ class TestLoopBlockingFixture(unittest.TestCase):
         # Resource.
         self.resource = {}
         dim_array = PhyDim2(16, 16)
-        node_region = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1))
-        mem_regions = (NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1)),)
+        proc_region = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                 type=NodeRegion.PROC)
+        data_regions = (NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                   type=NodeRegion.DATA),)
         # Typical resource.
         self.resource['BASE'] = Resource(
-            node_region=node_region, dim_array=dim_array,
-            mem_regions=mem_regions, size_gbuf=65536, size_regf=64)
+            proc_region=proc_region, data_regions=data_regions,
+            dim_array=dim_array, size_gbuf=65536, size_regf=64)
         # Larger resource with sufficient capacity, to make all schemes valid.
         self.resource['LG'] = Resource(
-            node_region=node_region, dim_array=dim_array,
-            mem_regions=mem_regions, size_gbuf=1024 ** 3, size_regf=1024 ** 3)
+            proc_region=proc_region, data_regions=data_regions,
+            dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3)
         # Small resource.
         self.resource['SM'] = Resource(
-            node_region=node_region, dim_array=dim_array,
-            mem_regions=mem_regions, size_gbuf=4096, size_regf=16)
+            proc_region=proc_region, data_regions=data_regions,
+            dim_array=dim_array, size_gbuf=4096, size_regf=16)
 
         # Nested loop description after mapping.
         self.nld = {}

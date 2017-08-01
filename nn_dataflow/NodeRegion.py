@@ -25,15 +25,24 @@ from .PhyDim2 import PhyDim2
 
 NODE_REGION_LIST = ['dim',
                     'origin',
+                    'type',
                    ]
 
 class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
     '''
     A node region defined by the dimension and origin offset.
 
+    The `type` attribute specifies the region type, which could be `PROC` for
+    computation processing nodes or 'DATA' for data storage nodes.
+
     NOTES: we cannot overload __contains__ and __iter__ as a node container,
     because the base namedtuple already defines them.
     '''
+
+    # Type enums.
+    PROC = 0
+    DATA = 1
+    NUM = 2
 
     def __new__(cls, *args, **kwargs):
         ntp = super(NodeRegion, cls).__new__(cls, *args, **kwargs)
@@ -42,6 +51,9 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
             raise TypeError('NodeRegion: dim must be a PhyDim2 object.')
         if not isinstance(ntp.origin, PhyDim2):
             raise TypeError('NodeRegion: origin must be a PhyDim2 object.')
+
+        if ntp.type not in range(cls.NUM):
+            raise ValueError('NodeRegion: type must be a valid type enum.')
 
         return ntp
 

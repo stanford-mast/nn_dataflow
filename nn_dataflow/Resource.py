@@ -23,8 +23,8 @@ from collections import namedtuple
 from .NodeRegion import NodeRegion
 from .PhyDim2 import PhyDim2
 
-RESOURCE_LIST = ['node_region',
-                 'mem_regions',
+RESOURCE_LIST = ['proc_region',
+                 'data_regions',
                  'dim_array',
                  'size_gbuf',
                  'size_regf',
@@ -40,22 +40,27 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
     def __new__(cls, *args, **kwargs):
         ntp = super(Resource, cls).__new__(cls, *args, **kwargs)
 
-        if not isinstance(ntp.node_region, NodeRegion):
-            raise TypeError('Resource: node_region must be '
+        if not isinstance(ntp.proc_region, NodeRegion):
+            raise TypeError('Resource: proc_region must be '
                             'a NodeRegion instance.')
+        if ntp.proc_region.type != NodeRegion.PROC:
+            raise ValueError('Resource: proc_region must have type PROC.')
 
-        if not isinstance(ntp.mem_regions, tuple):
-            raise TypeError('Resource: mem_regions must be a tuple.')
-        for mr in ntp.mem_regions:
-            if not isinstance(mr, NodeRegion):
-                raise TypeError('Resource: element in mem_regions must be '
+        if not isinstance(ntp.data_regions, tuple):
+            raise TypeError('Resource: data_regions must be a tuple.')
+        for dr in ntp.data_regions:
+            if not isinstance(dr, NodeRegion):
+                raise TypeError('Resource: element in data_regions must be '
                                 'a NodeRegion instance.')
-        # Memory regions can be used as either data source or data destination.
+            if dr.type != NodeRegion.DATA:
+                raise ValueError('Resource: element in data_regions must have '
+                                 'type DATA.')
+        # Data regions can be used as either data source or data destination.
         # If a single region is provided, it is both the source and
         # destination; if two regions are provided, the first is the source and
         # the second is the destination.
-        if len(ntp.mem_regions) > 2:
-            raise ValueError('Resource: can have at most 2 mem_regions.')
+        if len(ntp.data_regions) > 2:
+            raise ValueError('Resource: can have at most 2 data_regions.')
 
         if not isinstance(ntp.dim_array, PhyDim2):
             raise TypeError('Resource: dim_array must be a PhyDim2 object.')
@@ -67,11 +72,11 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
 
         return ntp
 
-    def mem_region_src(self):
-        ''' Get the memory region for the data source. '''
-        return self.mem_regions[0]
+    def src_data_region(self):
+        ''' Get the source data region. '''
+        return self.data_regions[0]
 
-    def mem_region_dst(self):
-        ''' Get the memory region for the data destination. '''
-        return self.mem_regions[-1]
+    def dst_data_region(self):
+        ''' Get the destination data region. '''
+        return self.data_regions[-1]
 

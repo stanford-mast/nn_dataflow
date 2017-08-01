@@ -43,13 +43,17 @@ class TestNNDataflow(unittest.TestCase):
 
         self.map_strategy = MapStrategyEyeriss
 
-        self.resource = Resource(node_region=NodeRegion(origin=PhyDim2(0, 0),
-                                                        dim=PhyDim2(1, 1)),
+        self.resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
+                                                        dim=PhyDim2(1, 1),
+                                                        type=NodeRegion.PROC),
+                                 data_regions=(NodeRegion(origin=PhyDim2(0, 0),
+                                                          dim=PhyDim2(1, 1),
+                                                          type=NodeRegion.DATA),
+                                              ),
                                  dim_array=PhyDim2(16, 16),
                                  size_gbuf=128 * 1024 // 2,  # 128 kB
                                  size_regf=512 // 2,  # 512 B
-                                 mem_regions=(NodeRegion(origin=PhyDim2(0, 0),
-                                                         dim=PhyDim2(1, 1)),))
+                                )
 
         self.cost = Cost(mac_op=1,
                          mem_hier=(200, 6, 2, 1),
@@ -75,7 +79,7 @@ class TestNNDataflow(unittest.TestCase):
         ''' Invalid network argument. '''
         with self.assertRaisesRegexp(TypeError, 'NNDataflow: .*resource.*'):
             _ = NNDataflow(self.alex_net, 4,
-                           self.resource.node_region, self.cost,
+                           self.resource.proc_region, self.cost,
                            self.map_strategy)
 
     def test_invalid_cost(self):
@@ -136,13 +140,17 @@ class TestNNDataflow(unittest.TestCase):
         ''' No valid dataflow is found. '''
 
         # Very small REGF.
-        self.resource = Resource(node_region=NodeRegion(origin=PhyDim2(0, 0),
-                                                        dim=PhyDim2(1, 1)),
+        self.resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
+                                                        dim=PhyDim2(1, 1),
+                                                        type=NodeRegion.PROC),
+                                 data_regions=(NodeRegion(origin=PhyDim2(0, 0),
+                                                          dim=PhyDim2(1, 1),
+                                                          type=NodeRegion.DATA),
+                                              ),
                                  dim_array=PhyDim2(16, 16),
                                  size_gbuf=128 * 1024 // 2,  # 128 kB
                                  size_regf=2,
-                                 mem_regions=(NodeRegion(origin=PhyDim2(0, 0),
-                                                         dim=PhyDim2(1, 1)),))
+                                )
 
         nnd = NNDataflow(self.alex_net, 4, self.resource, self.cost,
                          self.map_strategy)
@@ -249,13 +257,16 @@ class TestNNDataflow(unittest.TestCase):
 
         batch_size = 4
 
-        resource = Resource(node_region=NodeRegion(origin=PhyDim2(0, 0),
-                                                   dim=PhyDim2(1, 1)),
+        resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
+                                                   dim=PhyDim2(1, 1),
+                                                   type=NodeRegion.PROC),
+                            data_regions=(NodeRegion(origin=PhyDim2(0, 0),
+                                                     dim=PhyDim2(1, 1),
+                                                     type=NodeRegion.DATA),),
                             dim_array=PhyDim2(12, 14),
                             size_gbuf=108 * 1024 // 2,  # 108 kB
                             size_regf=261,  # 225 + 12 + 24
-                            mem_regions=(NodeRegion(origin=PhyDim2(0, 0),
-                                                    dim=PhyDim2(1, 1)),))
+                           )
 
         cost = Cost(mac_op=2e-12,
                     mem_hier=(460e-12, 15e-12, 4e-12, 1e-12),  # pJ/16-b
@@ -334,13 +345,16 @@ class TestNNDataflow(unittest.TestCase):
 
         ## L-1 configuration.
 
-        resource = Resource(node_region=NodeRegion(origin=PhyDim2(0, 0),
-                                                   dim=PhyDim2(1, 1)),
+        resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
+                                                   dim=PhyDim2(1, 1),
+                                                   type=NodeRegion.PROC),
+                            data_regions=(NodeRegion(origin=PhyDim2(0, 0),
+                                                     dim=PhyDim2(1, 1),
+                                                     type=NodeRegion.DATA),),
                             dim_array=PhyDim2(16, 16),
                             size_gbuf=576056 // 2,  # 576 kB
                             size_regf=1024 // 2,  # 1 kB
-                            mem_regions=(NodeRegion(origin=PhyDim2(0, 0),
-                                                    dim=PhyDim2(1, 1)),))
+                           )
 
         cost = Cost(mac_op=2e-12,
                     mem_hier=(240e-12, 28e-12, 4e-12, 1e-12),  # pJ/16-b
@@ -355,13 +369,16 @@ class TestNNDataflow(unittest.TestCase):
 
         ## T-16 configuration.
 
-        resource = Resource(node_region=NodeRegion(origin=PhyDim2(0, 0),
-                                                   dim=PhyDim2(4, 4)),
+        resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
+                                                   dim=PhyDim2(4, 4),
+                                                   type=NodeRegion.PROC),
+                            data_regions=(NodeRegion(origin=PhyDim2(0, 0),
+                                                     dim=PhyDim2(4, 4),
+                                                     type=NodeRegion.DATA),),
                             dim_array=PhyDim2(14, 14),
                             size_gbuf=133032 // 2,  # 133 kB
                             size_regf=512 // 2,  # 512 B
-                            mem_regions=(NodeRegion(origin=PhyDim2(0, 0),
-                                                    dim=PhyDim2(4, 4)),))
+                           )
 
         cost = Cost(mac_op=2e-12,
                     mem_hier=(80e-12, 14e-12, 4e-12, 0.6e-12),  # pJ/16-b
