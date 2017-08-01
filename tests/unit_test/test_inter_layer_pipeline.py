@@ -288,6 +288,13 @@ class TestInterLayerPipeline(unittest.TestCase):
         self.assertEqual(len(seg_list), 2319)
         self.assertEqual(len(seg_set), 34)
 
+        # Multiple first layers.
+        self.assertGreater(len(self.net['net3'].first_layers()), 1)
+        ilp = InterLayerPipeline(self.net['net3'], self.resource)
+        seg_set = set(seg_list)
+        self.assertIn((0,), seg_set)
+        self.assertIn((1,), seg_set)
+
         # Segments are valid.
         for net in self.net.values():
             ilp = InterLayerPipeline(net, self.resource)
