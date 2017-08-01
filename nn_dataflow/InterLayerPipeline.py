@@ -44,6 +44,34 @@ class InterLayerPipeline(object):
         # Vertices starting from which we have generated the segments.
         self.seg_vertex_done = set()
 
+    def gen_segment_allocation(self, options,
+                               no_repeating=False, max_util_drop=0.05):
+        '''
+        Generate all inter-layer pipelining segments and their resource
+        allocations.
+
+        Return segment index, a segment layer tuple, and a resource allocation
+        tuple. The two tuples contains sub-tuples, where different sub-tuples
+        are spatially scheduled, and different layers in a sub-tuple is
+        temporally scheduled.
+        '''
+
+        if not options.partition_interlayer:
+            # No inter-layer pipelining, each vertex sequentially occupies the
+            # whole resource.
+            for layer in self.network:
+                yield ((layer,),), ((self.resource,),)
+            return
+
+        for seg_idx, segment in self._gen_segment(0, 0, set(),
+                                                  no_repeating=no_repeating):
+
+            segalloc = self._allocate_segment(segment,
+                                              max_util_drop=max_util_drop)
+            if segalloc:
+                layers, resources = segalloc
+                yield seg_idx, layers, resources
+
     def _gen_segment(self, seg_idx, vertex_idx, done, no_repeating=False):
         '''
         Generate segments starting from segment index `seg_idx`, with starting
@@ -150,18 +178,30 @@ class InterLayerPipeline(object):
 
     def _allocate_segment(self, segment, max_util_drop=0.05):
         '''
-        Allocate node resource to the vertices in the given `segment`. Return a
-        tuple of numbers of nodes allocated to the vertices in the segment.
+        Allocate resource to the vertices in the given `segment`.
+
+        Return a segment layer tuple, and a resource allocation tuple. The two
+        tuples contains sub-tuples, where different sub-tuples are spatially
+        scheduled, and different layers in a sub-tuple is temporally scheduled.
+        Return None if allocation failed.
 
         `max_util_drop` specifies the maximum utilization drop due to mismatch
         throughput between vertices.
         '''
 
+        assert segment
+
+        # The segment layers.
+        layer_list = []
+
+        for vidx in segment:
+            layer_list.append(self.dag_vertex_list[vidx])
+
+        # Spatial allocation.
         proc_region = self.resource.proc_region
         dim_nodes = proc_region.dim
         total_nodes = dim_nodes.size()
 
-        assert segment
         ops = [self.dag_vertex_ops[vidx] for vidx in segment]
 
         # Enforce a common factor among the numbers of nodes allocated to all
@@ -202,10 +242,92 @@ class InterLayerPipeline(object):
             assert util < 1 + 1e-6
 
             if util >= 1 - max_util_drop:
-                return tuple(nodes)
+                # Found
+                break
 
-        # Not found.
-        return None
+        else:
+            # Not found.
+            return None
+
+        # Allocate in the processing region according to the number of nodes.
+        subregions = proc_region.allocate(nodes)
+        assert subregions
+
+        # The resource allocation.
+        resource_list = []
+
+        layer2sp = dict((l, sp_idx)
+                        for sp_idx, ltpl in enumerate(layer_list)
+                        for l in ltpl)
+
+        for ltpl, sr in zip(layer_list, subregions):
+
+            rtpl = tuple()
+
+            for tm_idx, layer in enumerate(ltpl):
+
+                # Data source.
+                prev_layers, _ = self.network.prev_layers(layer)
+
+                local_prev_layers = [pl for pl in prev_layers if pl in ltpl]
+                if local_prev_layers:
+                    assert len(local_prev_layers) == 1
+                    assert local_prev_layers[0] == ltpl[tm_idx - 1]
+
+                # Non-local data source.
+                # We ignore the local data sources.
+                nonlocal_prev_layers = [pl for pl in prev_layers
+                                        if pl not in ltpl]
+
+                if not nonlocal_prev_layers:
+                    # Data source is local.
+                    src_data_region = sr
+                elif any(pl in layer2sp for pl in nonlocal_prev_layers):
+                    # Data source is from the same segment.
+                    assert len(nonlocal_prev_layers) == 1
+                    prev_sp_idx = layer2sp[nonlocal_prev_layers[0]]
+                    src_data_region = subregions[prev_sp_idx]
+                else:
+                    # Data source is from memory.
+                    src_data_region = self.resource.src_data_region()
+
+                # Data destination.
+                next_layers = self.network.next_layers(layer)
+
+                local_next_layers = [nl for nl in next_layers if nl in ltpl]
+                if local_next_layers:
+                    assert len(local_next_layers) == 1
+                    assert local_next_layers[0] == ltpl[tm_idx + 1]
+
+                # Non-local data destination.
+                # We ignore the local data destinations.
+                nonlocal_next_layers = [nl for nl in next_layers
+                                        if nl not in ltpl]
+
+                if not nonlocal_next_layers:
+                    # Data destination is local.
+                    dst_data_region = sr
+                elif any(nl in layer2sp for nl in nonlocal_next_layers):
+                    # Data destination is to the same segment.
+                    assert len(nonlocal_next_layers) == 1
+                    # Put data in local. The next layer will fetch.
+                    dst_data_region = sr
+                else:
+                    # Data destination is to memory.
+                    dst_data_region = self.resource.dst_data_region()
+
+                rtpl += (Resource(proc_region=sr,
+                                  data_regions=(src_data_region,
+                                                dst_data_region),
+                                  dim_array=self.resource.dim_array,
+                                  size_gbuf=self.resource.size_gbuf,
+                                  size_regf=self.resource.size_regf),)
+
+            assert len(ltpl) == len(rtpl)
+            resource_list.append(rtpl)
+
+        assert len(layer_list) == len(resource_list)
+        return tuple(layer_list), tuple(resource_list)
 
     def _calc_sched_dag(self):
         '''

@@ -383,48 +383,172 @@ class TestInterLayerPipeline(unittest.TestCase):
         # Single vertex.
         for idx in range(len(ilp.dag_vertex_list)):
             segment = (idx,)
-            nodes = ilp._allocate_segment(segment)
-            self.assertTupleEqual(nodes,
-                                  (self.resource.proc_region.dim.size(),))
+            seg, alloc = ilp._allocate_segment(segment)
+
+            self.assertEqual(len(seg), 1)
+            self.assertTupleEqual(seg[0], ilp.dag_vertex_list[idx])
+
+            self.assertEqual(len(alloc), 1)
+            self.assertEqual(len(alloc[0]), len(ilp.dag_vertex_list[idx]))
+            for resource in alloc[0]:
+                self.assertTupleEqual(resource.proc_region.origin, (0, 0))
+                self.assertTupleEqual(resource.proc_region.dim,
+                                      self.resource.proc_region.dim)
 
         # Multiple vertices.
         segment = (0, 1)
-        self.assertTupleEqual(ilp._allocate_segment(segment), (16, 48))
+        _, alloc = ilp._allocate_segment(segment)
+        nodes = self._subregion_num_nodes(alloc)
+        self.assertTupleEqual(nodes, (16, 48))
         segment = (2, 3)
-        self.assertTupleEqual(ilp._allocate_segment(segment), (24, 40))
+        _, alloc = ilp._allocate_segment(segment)
+        nodes = self._subregion_num_nodes(alloc)
+        self.assertTupleEqual(nodes, (24, 40))
         segment = (1, 2)
-        nodes = ilp._allocate_segment(segment)
+        _, alloc = ilp._allocate_segment(segment)
+        nodes = self._subregion_num_nodes(alloc)
         self.assertTrue(nodes == (24, 40) or nodes == (22, 42))
         segment = (1, 2, 3)
-        nodes = ilp._allocate_segment(segment)
+        _, alloc = ilp._allocate_segment(segment)
+        nodes = self._subregion_num_nodes(alloc)
         self.assertTrue(nodes == (12, 20, 32) or nodes == (10, 20, 34))
 
         # All segments.
         for _, segment in self._gen_all_segment(ilp, True):
-            nodes = ilp._allocate_segment(segment)
-            if nodes:
-                self.assertEqual(sum(nodes),
-                                 self.resource.proc_region.dim.size())
+            segalloc = ilp._allocate_segment(segment)
+            if segalloc is None:
+                continue
+            seg, alloc = segalloc
+
+            for vidx, ltpl in zip(segment, seg):
+                self.assertTupleEqual(ltpl, ilp.dag_vertex_list[vidx])
+            self._validate_allocation(ilp, seg, alloc)
+
+            # This is a linear network structure.
+            rlist = sum(alloc, ())
+
+            # The data source of all layers except for the first in the
+            # segment should be previous processing regions.
+            for r in rlist[1:]:
+                self.assertEqual(r.src_data_region().type, NodeRegion.PROC,
+                                 'test_allocate_segment: data source '
+                                 'should be PROC region.')
+
+            # The data destination of all layers except for the last in the
+            # segment should be local.
+            for r in rlist[:-1]:
+                self.assertEqual(r.dst_data_region().type, NodeRegion.PROC,
+                                 'test_allocate_segment: data destination '
+                                 'should be PROC region.')
 
         # Real network.
         net = self.net['zfnet']
         ilp = InterLayerPipeline(net, self.resource)
 
         for _, segment in self._gen_all_segment(ilp, True):
-            nodes = ilp._allocate_segment(segment, max_util_drop=0.1)
-            if nodes:
-                self.assertEqual(sum(nodes),
-                                 self.resource.proc_region.dim.size())
+            segalloc = ilp._allocate_segment(segment, max_util_drop=0.1)
+            if segalloc is None:
+                continue
+            seg, alloc = segalloc
 
-                time = max(ilp.dag_vertex_ops[i] * 1. / n for i, n
-                           in zip(segment, nodes))
-                max_ops = time * sum(nodes)
-                real_ops = sum(ilp.dag_vertex_ops[i] for i in segment)
-                # Utilization.
-                self.assertGreaterEqual(real_ops / max_ops, 0.9)
+            for vidx, ltpl in zip(segment, seg):
+                self.assertTupleEqual(ltpl, ilp.dag_vertex_list[vidx])
+            self._validate_allocation(ilp, seg, alloc)
+
+            nodes = self._subregion_num_nodes(alloc)
+            time = max(ilp.dag_vertex_ops[i] * 1. / n for i, n
+                       in zip(segment, nodes))
+            max_ops = time * sum(nodes)
+            real_ops = sum(ilp.dag_vertex_ops[i] for i in segment)
+            # Utilization.
+            self.assertGreaterEqual(real_ops / max_ops, 0.9)
 
     @staticmethod
     def _gen_all_segment(ilp, no_repeating=False):
         # pylint: disable=protected-access
         return ilp._gen_segment(0, 0, set(), no_repeating=no_repeating)
+
+    def _subregion_num_nodes(self, allocation):
+        '''
+        Get a tuple of numbers of nodes for the vertices in the segment
+        allocation.
+        '''
+        nodes = []
+        for alloc in allocation:
+            self.assertTrue(all(isinstance(r, Resource) for r in alloc))
+            n = alloc[0].proc_region.dim.size()
+            self.assertTrue(all(r.proc_region.dim.size() == n
+                                for r in alloc))
+            nodes.append(n)
+        return tuple(nodes)
+
+    def _validate_allocation(self, ilp, layer_segment, allocation):
+        ''' Validate segment resource allocation. '''
+
+        # Number of nodes.
+        nodes = self._subregion_num_nodes(allocation)
+        self.assertEqual(sum(nodes), self.resource.proc_region.dim.size())
+
+        # Used processing nodes.
+        used_proc_nodes = set()
+
+        # Layers that have data currently on-chip.
+        data_regions = {}
+
+        for ltpl, rtpl in zip(layer_segment, allocation):
+
+            # Processing region.
+
+            for n in rtpl[0].proc_region.node_iter():
+                # FIXME: folded region.
+                # self.assertTrue(self.resource.proc_region.contains_node(n),
+                                # 'test_allocate_segment: node {} outside of '
+                                # 'the processing region {}'
+                                # .format(n, self.resource.proc_region))
+                self.assertNotIn(n, used_proc_nodes,
+                                 'test_allocate_segment: node {} has been '
+                                 'used.'.format(n))
+                used_proc_nodes.add(n)
+
+            for jdx, (l, r) in enumerate(zip(ltpl, rtpl)):
+
+                # Share processing region.
+                self.assertEqual(rtpl[0].proc_region, r.proc_region)
+
+                # Check data source.
+                prev_layers, _ = ilp.network.prev_layers(l)
+
+                for pl in prev_layers:
+                    if pl not in data_regions:
+                        # Previous layer is not on-chip, from memory.
+                        self.assertEqual(
+                            r.src_data_region(),
+                            self.resource.src_data_region(),
+                            'test_allocate_segment: layer {}\'s prev {} '
+                            'is not on-chip, should be from {}, but {}.'
+                            .format(l, pl, self.resource.src_data_region(),
+                                    r.src_data_region()))
+                    else:
+                        # Previous layer is on-chip.
+                        self.assertEqual(
+                            r.src_data_region(), data_regions[pl],
+                            'test_allocate_segment: layer {}\'s prev {} '
+                            'is on-chip, should be from {}, but {}.'
+                            .format(l, pl, data_regions[pl],
+                                    r.src_data_region()))
+
+                # Data destination.
+                if r.dst_data_region() == self.resource.dst_data_region():
+                    # Store back to memory.
+                    pass
+                else:
+                    # Local.
+                    self.assertEqual(r.dst_data_region(), r.proc_region,
+                                     'test_allocate_segment: data can only '
+                                     'be local if not storing back to mem.')
+                    # Overwrite last local layer.
+                    if jdx > 0:
+                        self.assertEqual(data_regions.pop(ltpl[jdx - 1]),
+                                         r.proc_region)
+                    data_regions[l] = r.dst_data_region()
 
