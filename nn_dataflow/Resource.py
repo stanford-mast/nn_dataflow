@@ -23,9 +23,9 @@ from collections import namedtuple
 from .NodeRegion import NodeRegion
 from .PhyDim2 import PhyDim2
 
-RESOURCE_LIST = ['dim_nodes',
-                 'dim_array',
+RESOURCE_LIST = ['node_region',
                  'mem_regions',
+                 'dim_array',
                  'size_gbuf',
                  'size_regf',
                 ]
@@ -33,15 +33,16 @@ RESOURCE_LIST = ['dim_nodes',
 class Resource(namedtuple('Resource', RESOURCE_LIST)):
     '''
     Hardware resource specification.
+
+    The origins of node region and memory regions are all absolute.
     '''
 
     def __new__(cls, *args, **kwargs):
         ntp = super(Resource, cls).__new__(cls, *args, **kwargs)
 
-        if not isinstance(ntp.dim_nodes, PhyDim2):
-            raise TypeError('Resource: dim_nodes must be a PhyDim2 object.')
-        if not isinstance(ntp.dim_array, PhyDim2):
-            raise TypeError('Resource: dim_array must be a PhyDim2 object.')
+        if not isinstance(ntp.node_region, NodeRegion):
+            raise TypeError('Resource: node_region must be '
+                            'a NodeRegion instance.')
 
         if not isinstance(ntp.mem_regions, tuple):
             raise TypeError('Resource: mem_regions must be a tuple.')
@@ -55,6 +56,9 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
         # the second is the destination.
         if len(ntp.mem_regions) > 2:
             raise ValueError('Resource: can have at most 2 mem_regions.')
+
+        if not isinstance(ntp.dim_array, PhyDim2):
+            raise TypeError('Resource: dim_array must be a PhyDim2 object.')
 
         if hasattr(ntp.size_gbuf, '__len__'):
             raise TypeError('Resource: size_gbuf must be a scalar')

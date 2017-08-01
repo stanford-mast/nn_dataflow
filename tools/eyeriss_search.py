@@ -98,6 +98,8 @@ def do_scheduling(args):
     size_gbuf = args.gbuf / word
     size_regf = args.regf / word
 
+    node_region = NodeRegion(dim=dim_nodes, origin=PhyDim2(0, 0))
+
     if args.mem_type == '2D':
         # Memory nodes are on two sides.
         mem_regions = (NodeRegion(dim=PhyDim2(h=dim_nodes.h, w=1),
@@ -108,9 +110,9 @@ def do_scheduling(args):
         # All nodes have memory.
         mem_regions = (NodeRegion(dim=dim_nodes, origin=PhyDim2(0, 0)),)
 
-    resource = Resource(dim_nodes=dim_nodes,
-                        dim_array=dim_array,
+    resource = Resource(node_region=node_region,
                         mem_regions=mem_regions,
+                        dim_array=dim_array,
                         size_gbuf=size_gbuf,
                         size_regf=size_regf)
 

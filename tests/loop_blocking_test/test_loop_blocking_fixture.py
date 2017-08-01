@@ -51,18 +51,19 @@ class TestLoopBlockingFixture(unittest.TestCase):
         # Resource.
         self.resource = {}
         dim_array = PhyDim2(16, 16)
+        node_region = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1))
         mem_regions = (NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1)),)
         # Typical resource.
         self.resource['BASE'] = Resource(
-            dim_nodes=PhyDim2(1, 1), dim_array=dim_array,
+            node_region=node_region, dim_array=dim_array,
             mem_regions=mem_regions, size_gbuf=65536, size_regf=64)
         # Larger resource with sufficient capacity, to make all schemes valid.
         self.resource['LG'] = Resource(
-            dim_nodes=PhyDim2(1, 1), dim_array=dim_array,
+            node_region=node_region, dim_array=dim_array,
             mem_regions=mem_regions, size_gbuf=1024 ** 3, size_regf=1024 ** 3)
         # Small resource.
         self.resource['SM'] = Resource(
-            dim_nodes=PhyDim2(1, 1), dim_array=dim_array,
+            node_region=node_region, dim_array=dim_array,
             mem_regions=mem_regions, size_gbuf=4096, size_regf=16)
 
         # Nested loop description after mapping.

@@ -48,6 +48,11 @@ List of major changes and improvements
 
   - Allow different height and width for filters in `ConvLayer`.
 
+- Hardware models:
+
+  - Upgrade node dimensions to node region in `Resource`. The origins of node
+    region and memory regions are all absolute.
+
 - Software models:
 
   - Add loop index generator to `LoopBlockingScheme` class.

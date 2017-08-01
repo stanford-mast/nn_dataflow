@@ -33,7 +33,8 @@ class TestSchedulingCondition(unittest.TestCase):
     def setUp(self):
 
         self.resource = Resource(
-            dim_nodes=PhyDim2(1, 1), dim_array=PhyDim2(16, 16),
+            node_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1)),
+            dim_array=PhyDim2(16, 16),
             mem_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1)),),
             size_gbuf=65536, size_regf=64)
 

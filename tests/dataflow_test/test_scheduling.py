@@ -49,7 +49,8 @@ class TestScheduling(unittest.TestCase):
                          noc_hop=50, unit_static=50)
 
         self.resource = Resource(
-            dim_nodes=PhyDim2(4, 4), dim_array=PhyDim2(16, 16),
+            node_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 4)),
+            dim_array=PhyDim2(16, 16),
             mem_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 1)),),
             size_gbuf=65536, size_regf=64)
 
@@ -130,7 +131,7 @@ class TestScheduling(unittest.TestCase):
                                           in zip(r.dict_part['unit_nhops'],
                                                  r.dict_loop['fetch'][0])])
                 self.assertEqual(r.dict_part['num_nodes'],
-                                 self.resource.dim_nodes.size())
+                                 self.resource.node_region.dim.size())
 
             # Ofmap layout.
             for r in res:

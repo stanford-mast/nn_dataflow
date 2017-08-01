@@ -43,7 +43,8 @@ class TestNNDataflow(unittest.TestCase):
 
         self.map_strategy = MapStrategyEyeriss
 
-        self.resource = Resource(dim_nodes=PhyDim2(1, 1),
+        self.resource = Resource(node_region=NodeRegion(origin=PhyDim2(0, 0),
+                                                        dim=PhyDim2(1, 1)),
                                  dim_array=PhyDim2(16, 16),
                                  size_gbuf=128 * 1024 // 2,  # 128 kB
                                  size_regf=512 // 2,  # 512 B
@@ -74,7 +75,7 @@ class TestNNDataflow(unittest.TestCase):
         ''' Invalid network argument. '''
         with self.assertRaisesRegexp(TypeError, 'NNDataflow: .*resource.*'):
             _ = NNDataflow(self.alex_net, 4,
-                           self.resource.dim_nodes, self.cost,
+                           self.resource.node_region, self.cost,
                            self.map_strategy)
 
     def test_invalid_cost(self):
@@ -135,7 +136,8 @@ class TestNNDataflow(unittest.TestCase):
         ''' No valid dataflow is found. '''
 
         # Very small REGF.
-        self.resource = Resource(dim_nodes=PhyDim2(1, 1),
+        self.resource = Resource(node_region=NodeRegion(origin=PhyDim2(0, 0),
+                                                        dim=PhyDim2(1, 1)),
                                  dim_array=PhyDim2(16, 16),
                                  size_gbuf=128 * 1024 // 2,  # 128 kB
                                  size_regf=2,
@@ -247,7 +249,8 @@ class TestNNDataflow(unittest.TestCase):
 
         batch_size = 4
 
-        resource = Resource(dim_nodes=PhyDim2(1, 1),
+        resource = Resource(node_region=NodeRegion(origin=PhyDim2(0, 0),
+                                                   dim=PhyDim2(1, 1)),
                             dim_array=PhyDim2(12, 14),
                             size_gbuf=108 * 1024 // 2,  # 108 kB
                             size_regf=261,  # 225 + 12 + 24
@@ -331,7 +334,8 @@ class TestNNDataflow(unittest.TestCase):
 
         ## L-1 configuration.
 
-        resource = Resource(dim_nodes=PhyDim2(1, 1),
+        resource = Resource(node_region=NodeRegion(origin=PhyDim2(0, 0),
+                                                   dim=PhyDim2(1, 1)),
                             dim_array=PhyDim2(16, 16),
                             size_gbuf=576056 // 2,  # 576 kB
                             size_regf=1024 // 2,  # 1 kB
@@ -351,7 +355,8 @@ class TestNNDataflow(unittest.TestCase):
 
         ## T-16 configuration.
 
-        resource = Resource(dim_nodes=PhyDim2(4, 4),
+        resource = Resource(node_region=NodeRegion(origin=PhyDim2(0, 0),
+                                                   dim=PhyDim2(4, 4)),
                             dim_array=PhyDim2(14, 14),
                             size_gbuf=133032 // 2,  # 133 kB
                             size_regf=512 // 2,  # 512 B

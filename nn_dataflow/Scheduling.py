@@ -133,6 +133,7 @@ class Scheduling(object):
         '''
         tops = []
 
+        node_region = condition.resource.node_region
         mem_region_src = condition.resource.mem_region_src()
         mem_region_dst = condition.resource.mem_region_dst()
 
@@ -156,16 +157,18 @@ class Scheduling(object):
 
         # Explore parallel partitioning schemes.
         for part in Partition.gen_partition(self.layer, self.batch_size,
-                                            condition.resource.dim_nodes,
-                                            options):
+                                            node_region.dim, options):
             # Ofmap layout.
             ofmap_layout = Partition.get_ofmap_layout(
                 self.layer, self.batch_size, part, mem_region_dst)
 
             # Partition NoC hop cost.
+            # Layouts are viewed from the node region origin.
             unit_nhops = Partition.part_layer_unit_nhops(
                 self.layer, self.batch_size, part, filter_node_coord_list,
-                ifmap_layout, ofmap_layout, options)
+                ifmap_layout.view(origin_diff=-node_region.origin),
+                ofmap_layout.view(origin_diff=-node_region.origin),
+                options)
 
             # Explore single-node schedules.
             for lbs in self.schedule_search_per_node(
