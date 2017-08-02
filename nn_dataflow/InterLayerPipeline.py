@@ -44,16 +44,14 @@ class InterLayerPipeline(object):
         # Vertices starting from which we have generated the segments.
         self.seg_vertex_done = set()
 
-    def gen_segment_allocation(self, options,
-                               no_repeating=False, max_util_drop=0.05):
+    def gen_segment_allocation(self, options, max_util_drop=0.05):
         '''
         Generate all inter-layer pipelining segments and their resource
         allocations.
 
-        Return segment index, a segment layer tuple, and a resource allocation
-        tuple. The two tuples contains sub-tuples, where different sub-tuples
-        are spatially scheduled, and different layers in a sub-tuple is
-        temporally scheduled.
+        Return a segment layer tuple, and a resource allocation tuple. The two
+        tuples contains sub-tuples, where different sub-tuples are spatially
+        scheduled, and different layers in a sub-tuple is temporally scheduled.
         '''
 
         if not options.partition_interlayer:
@@ -63,33 +61,20 @@ class InterLayerPipeline(object):
                 yield ((layer,),), ((self.resource,),)
             return
 
-        for seg_idx, segment in self._gen_segment(0, 0, set(),
-                                                  no_repeating=no_repeating):
+        for segment in self._gen_segment():
 
             segalloc = self._allocate_segment(segment,
                                               max_util_drop=max_util_drop)
             if segalloc:
-                layers, resources = segalloc
-                yield seg_idx, layers, resources
+                yield segalloc
 
-    def _gen_segment(self, seg_idx, vertex_idx, done, no_repeating=False):
+    def _gen_segment(self, vertex_idx=0, done=None):
         '''
-        Generate segments starting from segment index `seg_idx`, with starting
-        vertex `vertex_idx`. Yield the segment index, and a tuple of the
-        vertices in the segment.
-
-        Segment index is a sequence number that back-traces when reaching the
-        end of the network. If it back-traces to N, the previously yielded
-        segments with index smaller than N will be reused.
+        Generate segments starting from vertex `vertex_idx`. Yield a tuple of
+        the vertices in the segment.
 
         `done` is a set of vertices which have already been scheduled and the
         output is already in memory.
-
-        If `no_repreating` is True, we do not re-generate the same segments
-        with the same `vertex_idx` for different prefixes. For example, if we
-        have generated the segments starting from vertex 2 for prefix (0), (1),
-        then we do not generate these segments for prefix (0, 1). To make it
-        work, the upper level should cache the results.
 
         Rules:
 
@@ -108,6 +93,9 @@ class InterLayerPipeline(object):
         '''
 
         segment = tuple()
+
+        if not done:
+            done = set()
 
         if self.dag_input_vertex not in done:
             # Input layer is always in memory.
@@ -160,21 +148,19 @@ class InterLayerPipeline(object):
                     break
             else:
                 # The segment is valid.
-                yield seg_idx, segment
+                yield segment
 
                 # Skip if have done.
-                if no_repeating and frontier + 1 in self.seg_vertex_done:
+                if frontier + 1 in self.seg_vertex_done:
                     continue
 
                 # Recursion.
-                for tpl in self._gen_segment(seg_idx + 1, frontier + 1,
-                                             done.union(segment),
-                                             no_repeating=no_repeating):
+                for tpl in self._gen_segment(frontier + 1,
+                                             done.union(segment)):
                     yield tpl
 
-        if no_repeating:
-            assert vertex_idx not in self.seg_vertex_done
-            self.seg_vertex_done.add(vertex_idx)
+        assert vertex_idx not in self.seg_vertex_done
+        self.seg_vertex_done.add(vertex_idx)
 
     def _allocate_segment(self, segment, max_util_drop=0.05):
         '''

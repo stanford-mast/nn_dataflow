@@ -261,123 +261,78 @@ class TestInterLayerPipeline(unittest.TestCase):
 
     def test_gen_segment(self):
         ''' _gen_segment. '''
+        # pylint: disable=protected-access
 
         # Simple case.
         ilp = InterLayerPipeline(self.net['net1'], self.resource)
-        self.assertEqual(len(list(self._gen_all_segment(ilp))),
-                         2 ** len(ilp.dag_vertex_list) - 1)
+        num = len(ilp.dag_vertex_list)
+        self.assertEqual(len(list(ilp._gen_segment())),
+                         (num + 1) * num // 2)
 
         # Linear case.
-        # Number of different segments of n = 2 ** n - 1.
-        # Number of compositions of n = 2 ** (n - 1).
+        # Number of different segments of n = 1 + ... + n
         ilp = InterLayerPipeline(self.net['net2'], self.resource)
-        cnt1 = 0
-        cnt2 = 0
-        for _, segment in self._gen_all_segment(ilp):
-            cnt1 += 1
-            if len(self.net['net2']) - 1 in segment:
-                # The last segment, defines a composition.
-                cnt2 += 1
-        self.assertEqual(cnt1, 2 ** len(ilp.dag_vertex_list) - 1)
-        self.assertEqual(cnt2, 2 ** (len(ilp.dag_vertex_list) - 1))
+        num = len(ilp.dag_vertex_list)
+        self.assertEqual(len(list(ilp._gen_segment())),
+                         (num + 1) * num // 2)
 
         # Fork case.
         ilp = InterLayerPipeline(self.net['net4'], self.resource)
-        seg_list = list(seg for _, seg in self._gen_all_segment(ilp))
-        seg_set = set(seg_list)
-        self.assertEqual(len(seg_list), 2319)
-        self.assertEqual(len(seg_set), 34)
+        seg_list = list(ilp._gen_segment())
+        self.assertEqual(len(seg_list), 34)
 
         # Multiple first layers.
         self.assertGreater(len(self.net['net3'].first_layers()), 1)
         ilp = InterLayerPipeline(self.net['net3'], self.resource)
-        seg_set = set(seg_list)
-        self.assertIn((0,), seg_set)
-        self.assertIn((1,), seg_set)
-
-        # Segments are valid.
-        for net in self.net.values():
-            ilp = InterLayerPipeline(net, self.resource)
-            seg_list = []
-
-            for idx, segment in self._gen_all_segment(ilp):
-                # Segment index, sequential or back-trace.
-                self.assertLessEqual(idx, len(seg_list))
-
-                # Segment, consecutive layers.
-                self.assertTupleEqual(segment, tuple(range(min(segment),
-                                                           max(segment) + 1)))
-
-                seg_list = seg_list[0:idx]
-                if seg_list:
-                    # Compare against previous segment.
-                    prev_segment = seg_list[-1]
-                    self.assertEqual(max(prev_segment) + 1, min(segment))
-
-                seg_list.append(segment)
+        seg_list = list(ilp._gen_segment())
+        self.assertIn((0,), seg_list)
+        self.assertIn((1,), seg_list)
 
         # Verify rules.
         ilp = InterLayerPipeline(self.net['net5'], self.resource)
-        seg_sets = set(seg for _, seg in self._gen_all_segment(ilp))
+        seg_list = list(ilp._gen_segment())
         # Layers with no shared dependencies.
-        self.assertNotIn((2, 3, 4), seg_sets)
-        self.assertNotIn((8, 9), seg_sets)
+        self.assertNotIn((2, 3, 4), seg_list)
+        self.assertNotIn((8, 9), seg_list)
         # Multiple previous layers.
-        self.assertNotIn((5, 6, 7), seg_sets)
-        self.assertNotIn((8, 9, 10), seg_sets)
-        self.assertNotIn((10, 11, 12), seg_sets)
+        self.assertNotIn((5, 6, 7), seg_list)
+        self.assertNotIn((8, 9, 10), seg_list)
+        self.assertNotIn((10, 11, 12), seg_list)
         # Multiple next layers.
-        self.assertNotIn((0, 1, 2, 3), seg_sets)
-        self.assertNotIn((3, 4), seg_sets)
-        self.assertIn((3, 4, 5), seg_sets)
-        self.assertNotIn((10, 11), seg_sets)
+        self.assertNotIn((0, 1, 2, 3), seg_list)
+        self.assertNotIn((3, 4), seg_list)
+        self.assertIn((3, 4, 5), seg_list)
+        self.assertNotIn((10, 11), seg_list)
+
+        # No duplicate.
+        for net in self.net.values():
+            ilp = InterLayerPipeline(net, self.resource)
+            seg_list = list(ilp._gen_segment())
+            self.assertEqual(len(seg_list), len(set(seg_list)))
 
         # Real networks.
         ilp = InterLayerPipeline(self.net['zfnet'], self.resource)
         self.assertEqual(len(ilp.dag_vertex_list), 8)
-        seg_list = list(seg for _, seg in self._gen_all_segment(ilp))
-        seg_set = set(seg_list)
-        self.assertEqual(len(seg_list), 2 ** len(ilp.dag_vertex_list) - 1)
-        self.assertEqual(len(seg_set), 36)
+        seg_list = list(ilp._gen_segment())
+        self.assertEqual(len(seg_list), 36)
 
         ilp = InterLayerPipeline(self.net['vgg_net'], self.resource)
         self.assertEqual(len(ilp.dag_vertex_list), 16)
-        seg_list = list(seg for _, seg in self._gen_all_segment(ilp))
-        seg_set = set(seg_list)
-        self.assertEqual(len(seg_list), 2 ** len(ilp.dag_vertex_list) - 1)
-        self.assertEqual(len(seg_set), 136)
-
-    def test_gen_segment_no_repeating(self):
-        ''' _gen_segment no_repeating. '''
-
-        for net in self.net.values():
-
-            ilp = InterLayerPipeline(net, self.resource)
-
-            seg_list_rep = [seg for _, seg
-                            in self._gen_all_segment(ilp, False)]
-
-            ilp.seg_vertex_done.clear()
-            seg_list_norep = [seg for _, seg
-                              in self._gen_all_segment(ilp, True)]
-
-            self.assertLess(len(seg_list_norep), len(seg_list_rep))
-            self.assertSetEqual(set(seg_list_norep), set(seg_list_rep))
-            self.assertEqual(len(seg_list_norep), len(set(seg_list_rep)))
+        seg_list = list(ilp._gen_segment())
+        self.assertEqual(len(seg_list), 136)
 
         # Large networks with forks.
         for net_name in ['googlenet', 'resnet152']:
             net = import_network(net_name)
 
             ilp = InterLayerPipeline(net, self.resource)
-            seg_list_norep = [seg for _, seg in self._gen_all_segment(ilp, True)]
-
-            self.assertEqual(len(seg_list_norep), len(set(seg_list_norep)))
+            seg_list = list(ilp._gen_segment())
+            self.assertEqual(len(seg_list), len(set(seg_list)))
 
             # The number of different segments is between one and three times
             # of the number of layers.
-            self.assertGreater(len(seg_list_norep), len(net))
-            self.assertLessEqual(len(seg_list_norep), len(net) * 3)
+            self.assertGreater(len(seg_list), len(net))
+            self.assertLessEqual(len(seg_list), len(net) * 3)
 
     def test_allocate_segment(self):
         ''' _allocate_segment. '''
@@ -421,7 +376,7 @@ class TestInterLayerPipeline(unittest.TestCase):
         self.assertTrue(nodes == (12, 20, 32) or nodes == (10, 20, 34))
 
         # All segments.
-        for _, segment in self._gen_all_segment(ilp, True):
+        for segment in ilp._gen_segment():
             segalloc = ilp._allocate_segment(segment)
             if segalloc is None:
                 continue
@@ -452,7 +407,7 @@ class TestInterLayerPipeline(unittest.TestCase):
         net = self.net['zfnet']
         ilp = InterLayerPipeline(net, self.resource)
 
-        for _, segment in self._gen_all_segment(ilp, True):
+        for segment in ilp._gen_segment():
             segalloc = ilp._allocate_segment(segment, max_util_drop=0.1)
             if segalloc is None:
                 continue
@@ -469,11 +424,6 @@ class TestInterLayerPipeline(unittest.TestCase):
             real_ops = sum(ilp.dag_vertex_ops[i] for i in segment)
             # Utilization.
             self.assertGreaterEqual(real_ops / max_ops, 0.9)
-
-    @staticmethod
-    def _gen_all_segment(ilp, no_repeating=False):
-        # pylint: disable=protected-access
-        return ilp._gen_segment(0, 0, set(), no_repeating=no_repeating)
 
     def _subregion_num_nodes(self, allocation):
         '''
