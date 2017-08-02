@@ -9,6 +9,10 @@ List of major changes and improvements
 
   - Add fmap temporal partitioning.
 
+  - Add scheduling constraints for loop blocking and partitioning.
+    - The batch loop blocking factor is allowed to be inexact but a multiple of
+      the constrained factor.
+
 
 ### Changed
 

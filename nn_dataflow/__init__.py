@@ -43,6 +43,7 @@ from .PartitionScheme import PartitionScheme
 from .PhyDim2 import PhyDim2
 from .Resource import Resource
 from .Scheduling import SchedulingCondition, SchedulingResult, Scheduling
+from .SchedulingConstraint import SchedulingConstraint
 
 from .NNDataflow import NNDataflow
 
