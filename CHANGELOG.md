@@ -3,6 +3,13 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+### Added
+
+- Software models.
+
+  - Add fmap temporal partitioning.
+
+
 ### Changed
 
 - Hardware models.

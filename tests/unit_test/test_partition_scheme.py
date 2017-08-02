@@ -184,6 +184,40 @@ class TestPartitionScheme(unittest.TestCase):
         self.assertAlmostEqual(p_occ, 1. * (128 * 112 * 112 * 16)
                                / (32 * 23 * 23 * 2 * self.ps2.size()))
 
+    def test_part_layer_fmap_tpart(self):
+        ''' Get part_layer with fmap_tpart. '''
+        batch_size = 16
+
+        layer = ConvLayer(32, 128, 28, 3)
+        p_layer, p_batch_size, p_occ = self.ps1.part_layer(layer, batch_size)
+        tp_layer, tp_batch_size, tp_occ = self.ps1.part_layer(
+            layer, batch_size, fmap_tpart=4)
+        self.assertEqual(p_layer.wofm, tp_layer.wofm)
+        self.assertEqual(p_layer.nofm, tp_layer.nofm)
+        self.assertEqual(p_layer.nifm, tp_layer.nifm)
+        self.assertGreater(p_layer.hofm, tp_layer.hofm)
+        self.assertEqual(tp_layer.hofm, 3)  # ceil(28 / (3 * 4))
+        self.assertLess(p_batch_size, tp_batch_size)
+        self.assertEqual(tp_batch_size, 16)  # ceil(16 / 5) * 4
+        self.assertGreaterEqual(p_occ, tp_occ)
+        self.assertAlmostEqual(tp_occ, 1. * (32 * 128 * 28 * 28 * 16)
+                               / (4 * 22 * 3 * 28 * 16 * self.ps1.size()))
+
+        layer = PoolingLayer(128, 112, 2)
+        p_layer, p_batch_size, p_occ = self.ps2.part_layer(layer, batch_size)
+        tp_layer, tp_batch_size, tp_occ = self.ps2.part_layer(
+            layer, batch_size, fmap_tpart=4)
+        self.assertEqual(p_layer.wofm, tp_layer.wofm)
+        self.assertEqual(p_layer.nofm, tp_layer.nofm)
+        self.assertEqual(p_layer.nifm, tp_layer.nifm)
+        self.assertGreater(p_layer.hofm, tp_layer.hofm)
+        self.assertEqual(tp_layer.hofm, 6)  # ceil(112 / (5 * 4))
+        self.assertLess(p_batch_size, tp_batch_size)
+        self.assertEqual(tp_batch_size, 8)  # ceil(16 / 9) * 4
+        self.assertGreaterEqual(p_occ, tp_occ)
+        self.assertAlmostEqual(tp_occ, 1. * (128 * 112 * 112 * 16)
+                               / (32 * 23 * 6 * 8 * self.ps2.size()))
+
     def test_part_layer_invalid_inpart(self):
         ''' Get part_layer invalid INPP. '''
         with self.assertRaisesRegexp(ValueError, 'PartitionScheme: .*input.*'):
