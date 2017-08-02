@@ -68,6 +68,23 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.resource['SM'] = Resource(
             proc_region=proc_region, data_regions=data_regions,
             dim_array=dim_array, size_gbuf=4096, size_regf=16)
+        # Resource with no data regions.
+        self.resource['SRCNOTDATA'] = Resource(
+            proc_region=proc_region,
+            data_regions=(NodeRegion(origin=PhyDim2(1, 1), dim=PhyDim2(1, 1),
+                                     type=NodeRegion.PROC),
+                          data_regions[-1]),
+            dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3)
+        self.resource['DSTNOTDATA'] = Resource(
+            proc_region=proc_region,
+            data_regions=(data_regions[0],
+                          NodeRegion(origin=PhyDim2(1, 1), dim=PhyDim2(1, 1),
+                                     type=NodeRegion.PROC)),
+            dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3)
+        self.resource['DATALOCAL'] = Resource(
+            proc_region=proc_region,
+            data_regions=(proc_region,),
+            dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3)
 
         # Nested loop description after mapping.
         self.nld = {}

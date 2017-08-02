@@ -20,6 +20,11 @@ List of major changes and improvements
 
   - Allow data source/destination regions in `Resource` to be non-DATA type.
 
+- Software models.
+
+  - `LoopBlockingScheme` supports remote node buffers as data regions (non-data
+    type data regions).
+
 
 ## [v1.4 -- v1.5] -- 2017-08-01
 

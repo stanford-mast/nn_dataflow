@@ -408,3 +408,77 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
                 self.assertAlmostEqual(lbs_.get_scheme_dict(self.cost)['time'],
                                        time)
 
+    def test_data_region_fetch(self):
+        ''' PROC type data regions. '''
+
+        # Multiple fetches with normal DATA regions.
+        bl_ts = self._make_bl_ts((0, 1, 1), (0, 1, 1), (0, 1, 1))
+        bl_ords = [[0] * le.NUM for _ in range(2)]
+        bl_ords[0][le.IFM] = 1
+        bl_ords[0][le.OFM] = 2
+        bl_ords[0][le.BAT] = 0
+        bl_ords[1] = range(le.NUM)
+        lbs_norm = self._lbs(bl_ts, bl_ords)
+        self.assertTrue(lbs_norm.is_valid())
+        self.assertGreater(lbs_norm.fetch[0][de.IFM], 1)
+        self.assertGreater(lbs_norm.fetch[0][de.OFM], 1)
+
+        lbs = self._lbs(bl_ts, bl_ords, rsrckey='SRCNOTDATA')
+        self.assertFalse(lbs.is_valid())
+        lbs = self._lbs(bl_ts, bl_ords, rsrckey='DSTNOTDATA')
+        self.assertFalse(lbs.is_valid())
+
+        # Single top-level fetch.
+        bl_ts = self._make_bl_ts((1, 0, 1), (1, 0, 1), (1, 0, 1))
+        lbs_norm = self._lbs(bl_ts, rsrckey='LG')
+
+        lbs = self._lbs(bl_ts, rsrckey='SRCNOTDATA')
+        self.assertTrue(lbs.is_valid())
+        self.assertLess(lbs.get_cost(self.cost), lbs_norm.get_cost(self.cost))
+        self.assertAlmostEqual(lbs_norm.get_cost(self.cost)
+                               - lbs.get_cost(self.cost),
+                               lbs.remote_gbuf_access[de.IFM]
+                               * (self.cost.mem_hier_at(me.DRAM)
+                                  - self.cost.mem_hier_at(me.GBUF)))
+        self.assertAlmostEqual(lbs.access[me.DRAM][de.FIL],
+                               lbs_norm.access[me.DRAM][de.FIL])
+        self.assertAlmostEqual(lbs.access[me.DRAM][de.IFM], 0)
+        self.assertAlmostEqual(lbs.access[me.DRAM][de.OFM],
+                               lbs_norm.access[me.DRAM][de.OFM])
+        self.assertAlmostEqual(lbs.access[me.GBUF][de.IFM],
+                               lbs_norm.access[me.GBUF][de.IFM])
+        self.assertAlmostEqual(lbs.remote_gbuf_access[de.IFM],
+                               lbs_norm.access[me.DRAM][de.IFM])
+
+        lbs = self._lbs(bl_ts, bl_ords, rsrckey='DSTNOTDATA')
+        self.assertTrue(lbs.is_valid())
+        self.assertLess(lbs.get_cost(self.cost), lbs_norm.get_cost(self.cost))
+        self.assertAlmostEqual(lbs_norm.get_cost(self.cost)
+                               - lbs.get_cost(self.cost),
+                               lbs.remote_gbuf_access[de.OFM]
+                               * (self.cost.mem_hier_at(me.DRAM)
+                                  - self.cost.mem_hier_at(me.GBUF)))
+        self.assertAlmostEqual(lbs.access[me.DRAM][de.FIL],
+                               lbs_norm.access[me.DRAM][de.FIL])
+        self.assertAlmostEqual(lbs.access[me.DRAM][de.IFM],
+                               lbs_norm.access[me.DRAM][de.IFM])
+        self.assertAlmostEqual(lbs.access[me.DRAM][de.OFM], 0)
+        self.assertAlmostEqual(lbs.access[me.GBUF][de.OFM],
+                               lbs_norm.access[me.GBUF][de.OFM])
+        self.assertAlmostEqual(lbs.remote_gbuf_access[de.OFM],
+                               lbs_norm.access[me.DRAM][de.OFM])
+
+        lbs = self._lbs(bl_ts, bl_ords, rsrckey='DATALOCAL')
+        self.assertTrue(lbs.is_valid())
+        self.assertLess(lbs.get_cost(self.cost), lbs_norm.get_cost(self.cost))
+        self.assertAlmostEqual(lbs.access[me.DRAM][de.FIL],
+                               lbs_norm.access[me.DRAM][de.FIL])
+        self.assertAlmostEqual(lbs.access[me.DRAM][de.IFM], 0)
+        self.assertAlmostEqual(lbs.access[me.DRAM][de.OFM], 0)
+        self.assertAlmostEqual(lbs.access[me.GBUF][de.IFM],
+                               lbs_norm.access[me.GBUF][de.IFM])
+        self.assertAlmostEqual(lbs.access[me.GBUF][de.OFM],
+                               lbs_norm.access[me.GBUF][de.OFM])
+        self.assertAlmostEqual(lbs.remote_gbuf_access[de.IFM], 0)
+        self.assertAlmostEqual(lbs.remote_gbuf_access[de.OFM], 0)
+

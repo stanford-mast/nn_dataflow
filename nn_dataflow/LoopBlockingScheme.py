@@ -25,6 +25,7 @@ from . import DataCategoryEnum as de
 from . import LoopEnum as le
 from . import MemHierEnum as me
 from . import Util
+from .NodeRegion import NodeRegion
 
 class LoopBlockingScheme(object):
     '''
@@ -133,6 +134,28 @@ class LoopBlockingScheme(object):
         # Data fetch calculation.
         self._set_fetch()
 
+        # Check resource data src/dst region.
+        self.src_is_dram = (resource.src_data_region().type == NodeRegion.DATA)
+        self.dst_is_dram = (resource.dst_data_region().type == NodeRegion.DATA)
+
+        # If data regions are not DRAM, can only access once, no spilling.
+        if not self.src_is_dram:
+            if self.fetch[BL.GBUF][de.IFM] > 1:
+                self.valid = False
+                return
+            if resource.src_data_region() == resource.proc_region:
+                self.fetch[BL.GBUF][de.IFM] = 0
+                # Force to store in gbuf.
+                self.stored_in_gbuf[de.IFM] = True
+        if not self.dst_is_dram:
+            if self.fetch[BL.GBUF][de.OFM] > 1:
+                self.valid = False
+                return
+            if resource.src_data_region() == resource.proc_region:
+                self.fetch[BL.GBUF][de.OFM] = 0
+                # Force to store in gbuf.
+                self.stored_in_gbuf[de.OFM] = True
+
         # Now with the fetch times, we can calculate the actual
         # `stored_in_gbuf` values.
         # Only store in gbuf if having reuse.
@@ -162,6 +185,8 @@ class LoopBlockingScheme(object):
         self.ops = float('nan')
         self.time = float('nan')
         self.access = [[float('nan')] * de.NUM for _ in range(me.NUM)]
+        # Remote gbuf access.
+        self.remote_gbuf_access = [0.] * de.NUM
 
     def is_valid(self):
         '''
@@ -226,6 +251,8 @@ class LoopBlockingScheme(object):
         access_total = [sum(acc) for acc in self.access]
         c += sum(mc * ma for mc, ma in zip(cost.mem_hier, access_total))
 
+        c += sum(self.remote_gbuf_access) * cost.mem_hier_at(me.GBUF)
+
         c += self.time * cost.unit_static * self.num_nodes
 
         return c
@@ -250,6 +277,8 @@ class LoopBlockingScheme(object):
                             ('time', self.time),
                             ('access', self.access),
                             ('fetch', self.fetch),
+                            ('remote_gbuf_access', self.remote_gbuf_access),
+                            ('is_dram', (self.src_is_dram, self.dst_is_dram)),
                             ('size', size),
                             ('unit_size', self.unit_size),
                             ('unit_cnt', self.unit_cnt),
@@ -433,6 +462,13 @@ class LoopBlockingScheme(object):
                                 * self.fetch[self.BL.GBUF][dce]
                                 * self.num_nodes
                                 for dce in range(de.NUM)]
+
+        if not self.src_is_dram:
+            self.remote_gbuf_access[de.IFM] += self.access[me.DRAM][de.IFM]
+            self.access[me.DRAM][de.IFM] = 0
+        if not self.dst_is_dram:
+            self.remote_gbuf_access[de.OFM] += self.access[me.DRAM][de.OFM]
+            self.access[me.DRAM][de.OFM] = 0
 
         self.finalized_stats = True
 
