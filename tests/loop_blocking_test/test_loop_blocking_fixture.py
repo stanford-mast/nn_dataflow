@@ -34,6 +34,7 @@ from nn_dataflow import NodeRegion
 from nn_dataflow import Option
 from nn_dataflow import PhyDim2
 from nn_dataflow import Resource
+from nn_dataflow import SchedulingConstraint
 from nn_dataflow import Util
 
 class TestLoopBlockingFixture(unittest.TestCase):
@@ -142,6 +143,11 @@ class TestLoopBlockingFixture(unittest.TestCase):
             partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
             partition_interlayer=None,
             ntops=2 ** 30, nprocesses=1, verbose=False)
+
+        # Constraint.
+        self.none_cstr = SchedulingConstraint()
+        self.cstr = SchedulingConstraint(top_bl_t=(1, None, 1),
+                                         top_bl_lpe=le.IFM)
 
         # Cost.
         self.cost = Cost(mac_op=1, mem_hier=(200, 6, 2, 1),

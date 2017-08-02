@@ -87,8 +87,8 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         cnt = 0
         for _ in LoopBlocking.gen_loopblocking(
-                self.nld['BASE'], self.resource['LG'], self.cost, 1,
-                self.options['BASE']):
+                self.nld['BASE'], self.resource['LG'], self.none_cstr,
+                self.cost, 1, self.options['BASE']):
             cnt += 1
 
         self.assertEqual(cnt, exp_cnt)
@@ -98,14 +98,14 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         cnt1 = 0
         for _ in LoopBlocking.gen_loopblocking(
-                self.nld['BASE'], self.resource['LG'], self.cost, 1,
-                self.options['BASE']):
+                self.nld['BASE'], self.resource['LG'], self.none_cstr,
+                self.cost, 1, self.options['BASE']):
             cnt1 += 1
 
         cnt8 = 0
         for _ in LoopBlocking.gen_loopblocking(
-                self.nld['BASE'], self.resource['LG'], self.cost, 1,
-                self.options['MP']):
+                self.nld['BASE'], self.resource['LG'], self.none_cstr,
+                self.cost, 1, self.options['MP']):
             cnt8 += 1
 
         self.assertEqual(cnt1, cnt8)
@@ -116,8 +116,8 @@ class TestLoopBlocking(TestLoopBlockingFixture):
         acc_dict = {}
 
         for lbs in LoopBlocking.gen_loopblocking(
-                self.nld['BASE'], self.resource['LG'], self.cost, 1,
-                self.options['BASE']):
+                self.nld['BASE'], self.resource['LG'], self.none_cstr,
+                self.cost, 1, self.options['BASE']):
 
             if not lbs.is_valid():
                 continue
@@ -142,14 +142,15 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         tops = list(LoopBlocking.gen_loopblocking(self.nld['BASE'],
                                                   self.resource['LG'],
+                                                  self.none_cstr,
                                                   self.cost, 1,
                                                   self.options['NTOPS']))
 
         cost_prev = -float('inf')
 
         for lbs in LoopBlocking.gen_loopblocking(
-                self.nld['BASE'], self.resource['LG'], self.cost, 1,
-                self.options['BASE']):
+                self.nld['BASE'], self.resource['LG'], self.none_cstr,
+                self.cost, 1, self.options['BASE']):
 
             if not lbs.is_valid():
                 continue
@@ -168,12 +169,39 @@ class TestLoopBlocking(TestLoopBlockingFixture):
         cnt = 0
 
         for lbs in LoopBlocking.gen_loopblocking(
-                self.nld['BASE'], self.resource['BASE'], self.cost, 1,
-                self.options['BYPSOL']):
+                self.nld['BASE'], self.resource['BASE'], self.none_cstr,
+                self.cost, 1, self.options['BYPSOL']):
 
             self.assertTrue(lbs.is_valid())
 
             cnt += 1
 
         self.assertLessEqual(cnt, 8)
+
+    def test_gen_loopblocking_cstr(self):
+        ''' gen_loopblocking with constraint. '''
+
+        for lbs in LoopBlocking.gen_loopblocking(
+                self.nld['BASE'], self.resource['LG'], self.cstr,
+                self.cost, 1, self.options['BASE']):
+
+            self.assertTrue(self.cstr.is_valid_top_bl(lbs.bl_ts[0],
+                                                      lbs.bl_ords[0]))
+
+    def test_gen_loopblocking_cstr_sol(self):
+        ''' gen_loopblocking using bypass solvers with constraint. '''
+
+        cnt1 = len(list(LoopBlocking.gen_loopblocking(
+            self.nld['BASE'], self.resource['BASE'], self.none_cstr,
+            self.cost, 1, self.options['BYPSOL'])))
+
+        cnt2 = 0
+        for lbs in LoopBlocking.gen_loopblocking(
+                self.nld['BASE'], self.resource['BASE'], self.cstr,
+                self.cost, 1, self.options['BYPSOL']):
+            self.assertTrue(self.cstr.is_valid_top_bl(lbs.bl_ts[0],
+                                                      lbs.bl_ords[0]))
+            cnt2 += 1
+
+        self.assertLessEqual(cnt2, cnt1)
 

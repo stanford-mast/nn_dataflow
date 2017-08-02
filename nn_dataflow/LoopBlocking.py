@@ -115,7 +115,7 @@ def _is_conv_loops(nested_loop_desc):
 
 
 def _gen_loopblocking_perprocess(
-        nested_loop_desc, resource, cost, part_occ, options,
+        nested_loop_desc, resource, constraint, cost, part_occ, options,
         gen_tifm, gen_tofm, gen_tbat, gen_ords):
 
     def _gen_bl_ts():
@@ -138,6 +138,8 @@ def _gen_loopblocking_perprocess(
         for bl_ts, bl_ords in itertools.product(_gen_bl_ts(), gen_ords):
             if is_conv_loops and skip_conv(bl_ts, bl_ords):
                 continue
+            if not constraint.is_valid_top_bl(bl_ts[0], bl_ords[0]):
+                continue
             lbs = LoopBlockingScheme(
                 nested_loop_desc, bl_ts, bl_ords, resource, part_occ, options)
             yield lbs
@@ -146,7 +148,8 @@ def _gen_loopblocking_perprocess(
                            key=lambda lbs: lbs.get_cost(cost))
 
 
-def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
+def gen_loopblocking(nested_loop_desc, resource, constraint, cost,
+                     part_occ, options):
     '''
     Generator for loop blocking.
     '''
@@ -158,7 +161,8 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
         for bl_ts, bl_ords in gen(nested_loop_desc, resource, options):
             lbs = LoopBlockingScheme(nested_loop_desc, bl_ts, bl_ords,
                                      resource, part_occ, options)
-            yield lbs
+            if constraint.is_valid_top_bl(lbs.bl_ts[0], lbs.bl_ords[0]):
+                yield lbs
         return
 
     ## Exhaustive search.
@@ -203,7 +207,8 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
     list_ords = list(gen_ords)
     for tifm, tofm in itertools.product(gen_tifm, gen_tofm):
         r = apply_func(_gen_loopblocking_perprocess,
-                       (nested_loop_desc, resource, cost, part_occ, options,
+                       (nested_loop_desc, resource, constraint, cost,
+                        part_occ, options,
                         [tifm], [tofm], list_tbat, list_ords))
         results.append(r)
 
