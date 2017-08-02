@@ -18,6 +18,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+import re
 import unittest
 
 from nn_dataflow import InputLayer, FCLayer, PoolingLayer
@@ -424,6 +425,22 @@ class TestInterLayerPipeline(unittest.TestCase):
             real_ops = sum(ilp.dag_vertex_ops[i] for i in segment)
             # Utilization.
             self.assertGreaterEqual(real_ops / max_ops, 0.9)
+
+    def test_ordered_layer_list(self):
+        ''' Get ordered_layer_list. '''
+
+        # https://stackoverflow.com/a/4836734/5277823
+        nat_key = lambda key: tuple(int(c) if c.isdigit() else c.lower()
+                                    for c in re.split('([0-9]+)', key))
+
+        for net_name in ['net1', 'net2', 'net3', 'net4', 'net5']:
+            net = self.net[net_name]
+            ilp = InterLayerPipeline(net, self.resource)
+            ord_list = ilp.ordered_layer_list()
+
+            # In natural order.
+            self.assertTrue(all(nat_key(l1) < nat_key(l2) for l1, l2
+                                in zip(ord_list, ord_list[1:])))
 
     def _subregion_num_nodes(self, allocation):
         '''

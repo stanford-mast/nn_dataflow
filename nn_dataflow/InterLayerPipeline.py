@@ -44,6 +44,13 @@ class InterLayerPipeline(object):
         # Vertices starting from which we have generated the segments.
         self.seg_vertex_done = set()
 
+    def ordered_layer_list(self):
+        '''
+        Get a list of the layers in their topological order in the scheduling
+        DAG.
+        '''
+        return list(sum(self.dag_vertex_list, tuple()))
+
     def gen_segment_allocation(self, options, max_util_drop=0.05):
         '''
         Generate all inter-layer pipelining segments and their resource
