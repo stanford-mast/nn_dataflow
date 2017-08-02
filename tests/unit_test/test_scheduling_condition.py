@@ -26,6 +26,7 @@ from nn_dataflow import NodeRegion
 from nn_dataflow import PhyDim2
 from nn_dataflow import Resource
 from nn_dataflow import SchedulingCondition
+from nn_dataflow import SchedulingConstraint
 
 class TestSchedulingCondition(unittest.TestCase):
     ''' Tests for SchedulingCondition. '''
@@ -39,6 +40,8 @@ class TestSchedulingCondition(unittest.TestCase):
                                      type=NodeRegion.DATA),),
             dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64)
 
+        self.none_cstr = SchedulingConstraint()
+
         frmap = FmapRangeMap()
         frmap.add(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)), (PhyDim2(0, 0),))
         self.ifmap_layout = DataLayout(origin=PhyDim2(0, 0), frmap=frmap)
@@ -46,8 +49,10 @@ class TestSchedulingCondition(unittest.TestCase):
     def test_valid_args(self):
         ''' Valid arguments. '''
         condition = SchedulingCondition(resource=self.resource,
+                                        constraint=self.none_cstr,
                                         ifmap_layout=self.ifmap_layout)
         self.assertEqual(condition.resource, self.resource)
+        self.assertEqual(condition.constraint, self.none_cstr)
         self.assertEqual(condition.ifmap_layout, self.ifmap_layout)
 
     def test_invalid_resource(self):
@@ -55,6 +60,15 @@ class TestSchedulingCondition(unittest.TestCase):
         with self.assertRaisesRegexp(TypeError,
                                      'SchedulingCondition: .*resource.*'):
             _ = SchedulingCondition(resource=None,
+                                    constraint=self.none_cstr,
+                                    ifmap_layout=self.ifmap_layout)
+
+    def test_invalid_constraint(self):
+        ''' Invalid constraint. '''
+        with self.assertRaisesRegexp(TypeError,
+                                     'SchedulingCondition: .*constraint.*'):
+            _ = SchedulingCondition(resource=self.resource,
+                                    constraint=None,
                                     ifmap_layout=self.ifmap_layout)
 
     def test_invalid_ifmap_layout(self):
@@ -62,5 +76,6 @@ class TestSchedulingCondition(unittest.TestCase):
         with self.assertRaisesRegexp(TypeError,
                                      'SchedulingCondition: .*ifmap_layout.*'):
             _ = SchedulingCondition(resource=self.resource,
+                                    constraint=self.none_cstr,
                                     ifmap_layout=None)
 

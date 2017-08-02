@@ -27,6 +27,7 @@ from .Network import Network
 from .NNDataflowScheme import NNDataflowScheme
 from .Resource import Resource
 from .Scheduling import SchedulingCondition, Scheduling
+from .SchedulingConstraint import SchedulingConstraint
 
 class NNDataflow(object):
     '''
@@ -110,6 +111,7 @@ class NNDataflow(object):
                 layer_name, dfsch_list, options):
 
             condition = SchedulingCondition(resource=self.resource,
+                                            constraint=SchedulingConstraint(),
                                             ifmap_layout=ifmap_layout)
 
             try:

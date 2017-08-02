@@ -28,13 +28,15 @@ from .DataLayout import DataLayout
 from .Layer import Layer
 from .MapStrategy import MapStrategy
 from .Resource import Resource
+from .SchedulingConstraint import SchedulingConstraint
 
 class SchedulingCondition(namedtuple('SchedulingCondition',
                                      ['resource',
+                                      'constraint',
                                       'ifmap_layout',
                                      ])):
     '''
-    Layer scheduling condition (constraints).
+    Layer scheduling condition.
     '''
 
     def __new__(cls, *args, **kwargs):
@@ -43,6 +45,9 @@ class SchedulingCondition(namedtuple('SchedulingCondition',
         if not isinstance(ntp.resource, Resource):
             raise TypeError('SchedulingCondition: resource must be '
                             'a Resource instance.')
+        if not isinstance(ntp.constraint, SchedulingConstraint):
+            raise TypeError('SchedulingCondition: constraint must be '
+                            'a SchedulingConstraint instance.')
         if not isinstance(ntp.ifmap_layout, DataLayout):
             raise TypeError('SchedulingCondition: ifmap_layout must be '
                             'a DataLayout instance.')
@@ -172,10 +177,11 @@ class Scheduling(object):
 
             # Explore single-node schedules.
             for lbs in self.schedule_search_per_node(
-                    part, condition.resource, options):
+                    part, condition.resource, condition.constraint, options):
 
                 # Make scheduling result.
-                r = self._get_result(lbs, part, unit_nhops, ofmap_layout)
+                r = self._get_result(lbs, part, condition.constraint,
+                                     unit_nhops, ofmap_layout)
                 tops.append(r)
 
         # Pick the top n.
@@ -204,7 +210,7 @@ class Scheduling(object):
         '''
         return (self.pernode_sched_cache_hits, self.pernode_sched_cache_misses)
 
-    def schedule_search_per_node(self, part, resource, options):
+    def schedule_search_per_node(self, *args):
         '''
         Search the best mapping strategies and loop blocking schemes for a
         single node after partitioning, given the partitioning scheme and
@@ -213,9 +219,11 @@ class Scheduling(object):
         Return the top LoopBlockingScheme instances.
         '''
 
+        part, resource, constraint, options = args
+
         # NOTE: need to ensure the key's __eq__ and __hash__ have been
         # redefined.
-        cache_key = (part, resource, options)
+        cache_key = tuple(args)
 
         cache_val = self.pernode_sched_cache.get(cache_key, None)
 
@@ -231,7 +239,8 @@ class Scheduling(object):
 
         # Partitioned layer.
         p_layer, p_batch_size, p_occ = part.part_layer(self.layer,
-                                                       self.batch_size)
+                                                       self.batch_size,
+                                                       constraint.fmap_tpart)
 
         # Mapping strategy.
         map_strategy = self.map_strategy_class(p_layer, p_batch_size,
@@ -242,7 +251,8 @@ class Scheduling(object):
 
             # Explore loop blocking schemes.
             for lbs in LoopBlocking.gen_loopblocking(
-                    nested_loop_desc, resource, self.cost, p_occ, options):
+                    nested_loop_desc, resource, constraint, self.cost,
+                    p_occ, options):
 
                 if lbs.is_valid():
                     top_lbs_list.append(lbs)
@@ -251,10 +261,12 @@ class Scheduling(object):
 
         return top_lbs_list
 
-    def _get_result(self, lbs, part, unit_nhops, ofmap_layout):
+    def _get_result(self, lbs, part, constraint, unit_nhops, ofmap_layout):
         '''
         Make the schedule result from loop blocking and partitioning.
         '''
+
+        assert constraint.is_valid_top_bl(lbs.bl_ts[0], lbs.bl_ords[0])
 
         # Loop blocking.
         dict_loop = lbs.get_scheme_dict(self.cost)
@@ -267,6 +279,7 @@ class Scheduling(object):
                                  ('num_nodes', part.size()),
                                  ('total_nhops', total_nhops),
                                  ('part', part.__dict__),
+                                 ('fmap_tpart', constraint.fmap_tpart),
                                  ('unit_nhops', unit_nhops)])
 
         return SchedulingResult(dict_loop=dict_loop,
