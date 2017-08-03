@@ -34,7 +34,8 @@ class TestDataLayout(unittest.TestCase):
         self.frm.add(FmapRange((0, 0, 8, 0), (2, 4, 16, 16)), (PhyDim2(1, 0),))
         self.frm.add(FmapRange((2, 0, 0, 0), (4, 4, 8, 16)), (PhyDim2(0, 1),))
         self.frm.add(FmapRange((2, 0, 8, 0), (4, 4, 16, 16)), (PhyDim2(1, 1),))
-        self.dly = DataLayout(origin=PhyDim2(1, 1), frmap=self.frm)
+        self.dly = DataLayout(origin=PhyDim2(1, 1), frmap=self.frm,
+                              type=NodeRegion.DATA)
 
     def test_valid_args(self):
         ''' Valid arguments. '''
@@ -44,31 +45,41 @@ class TestDataLayout(unittest.TestCase):
     def test_invalid_origin(self):
         ''' Invalid origin. '''
         with self.assertRaisesRegexp(TypeError, 'DataLayout: .*origin.*'):
-            _ = DataLayout(origin=(2, 3), frmap=self.frm)
+            _ = DataLayout(origin=(2, 3), frmap=self.frm, type=NodeRegion.DATA)
 
     def test_invalid_frmap_type(self):
         ''' Invalid frmap type. '''
         with self.assertRaisesRegexp(TypeError, 'DataLayout: .*frmap.*'):
             _ = DataLayout(origin=PhyDim2(2, 3),
-                           frmap=FmapRange((0,) * 4, (1,) * 4))
+                           frmap=FmapRange((0,) * 4, (1,) * 4),
+                           type=NodeRegion.DATA)
 
     def test_invalid_frmap_incomplete(self):
         ''' Invalid frmap incomplete. '''
         frm = self.frm.copy()
         frm.add(FmapRange((4, 4, 16, 16), (5, 5, 19, 19)), (PhyDim2(4, 4),))
         with self.assertRaisesRegexp(ValueError, 'DataLayout: .*frmap.*'):
-            _ = DataLayout(origin=PhyDim2(2, 3), frmap=frm)
+            _ = DataLayout(origin=PhyDim2(2, 3), frmap=frm,
+                           type=NodeRegion.DATA)
 
     def test_invalid_frmap_value_type(self):
         ''' Invalid frmap value type. '''
         frm = FmapRangeMap()
         frm.add(FmapRange((0,) * 4, (5, 5, 19, 19)), PhyDim2(4, 4))
         with self.assertRaisesRegexp(TypeError, 'DataLayout: .*frmap.*'):
-            _ = DataLayout(origin=PhyDim2(2, 3), frmap=frm)
+            _ = DataLayout(origin=PhyDim2(2, 3), frmap=frm,
+                           type=NodeRegion.DATA)
         frm = FmapRangeMap()
         frm.add(FmapRange((0,) * 4, (5, 5, 19, 19)), (PhyDim2(4, 4), 4))
         with self.assertRaisesRegexp(TypeError, 'DataLayout: .*frmap.*'):
-            _ = DataLayout(origin=PhyDim2(2, 3), frmap=frm)
+            _ = DataLayout(origin=PhyDim2(2, 3), frmap=frm,
+                           type=NodeRegion.DATA)
+
+    def test_invalid_type(self):
+        ''' Invalid type. '''
+        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*type.*'):
+            _ = DataLayout(origin=PhyDim2(2, 3), frmap=self.frm,
+                           type=NodeRegion.NUM)
 
     def test_is_in_region(self):
         ''' Whether is in region. '''
@@ -81,11 +92,15 @@ class TestDataLayout(unittest.TestCase):
         nr3 = NodeRegion(dim=PhyDim2(2, 2), origin=PhyDim2(0, 0),
                          type=NodeRegion.DATA)
         self.assertFalse(self.dly.is_in_region(nr3))
+        nr4 = NodeRegion(dim=PhyDim2(3, 3), origin=PhyDim2(0, 0),
+                         type=NodeRegion.PROC)
+        self.assertFalse(self.dly.is_in_region(nr4))
 
         frm = self.frm.copy()
         frm.add(FmapRange((0, 0, 0, 16), (4, 4, 16, 20)),
                 (PhyDim2(2, 2), PhyDim2(3, 3)))
-        dly = DataLayout(origin=PhyDim2(1, 1), frmap=frm)
+        dly = DataLayout(origin=PhyDim2(1, 1), frmap=frm,
+                         type=NodeRegion.DATA)
 
         nr4 = NodeRegion(dim=PhyDim2(3, 3), origin=PhyDim2(1, 1),
                          type=NodeRegion.DATA)
@@ -96,7 +111,8 @@ class TestDataLayout(unittest.TestCase):
 
         frm.add(FmapRange((0, 0, 16, 0), (4, 4, 20, 20)),
                 (PhyDim2(1, 1), PhyDim2(3, 3), PhyDim2(5, 5)))
-        dly = DataLayout(origin=PhyDim2(1, 1), frmap=frm)
+        dly = DataLayout(origin=PhyDim2(1, 1), frmap=frm,
+                         type=NodeRegion.DATA)
 
         self.assertFalse(dly.is_in_region(nr5))
         nr6 = NodeRegion(dim=PhyDim2(7, 7), origin=PhyDim2(0, 0),
@@ -115,7 +131,8 @@ class TestDataLayout(unittest.TestCase):
                 (PhyDim2(2, 2), PhyDim2(3, 3)))
         frm.add(FmapRange((0, 0, 16, 0), (4, 4, 20, 20)),
                 (PhyDim2(1, 1), PhyDim2(3, 3), PhyDim2(5, 5)))
-        dly = DataLayout(origin=PhyDim2(1, 1), frmap=frm)
+        dly = DataLayout(origin=PhyDim2(1, 1), frmap=frm,
+                         type=NodeRegion.DATA)
 
         self.assertEqual(dly.total_transfer_nhops(fr, PhyDim2(-1, -2)),
                          nhops, 'total_transfer_nhops')
@@ -132,7 +149,8 @@ class TestDataLayout(unittest.TestCase):
                 (PhyDim2(2, 2), PhyDim2(3, 3)))
         frm.add(FmapRange((0, 0, 16, 0), (4, 4, 20, 20)),
                 (PhyDim2(1, 1), PhyDim2(3, 3), PhyDim2(5, 5)))
-        dly = DataLayout(origin=PhyDim2(1, 1), frmap=frm)
+        dly = DataLayout(origin=PhyDim2(1, 1), frmap=frm,
+                         type=NodeRegion.DATA)
 
         cfr = dly.frmap.complete_fmap_range()
         counters = dly.frmap.rget_counter(cfr)
@@ -140,6 +158,7 @@ class TestDataLayout(unittest.TestCase):
 
         dly1 = dly.view(PhyDim2(-1, -1))
         self.assertEqual(dly1.origin, PhyDim2(0, 0), 'view: origin')
+        self.assertEqual(dly1.type, dly.type, 'view: type')
         self.assertEqual(dly1.frmap.complete_fmap_range(), cfr,
                          'view: complete_fmap_range')
         self.assertDictEqual(dly1.frmap.rget_counter(cfr), counters,
@@ -149,6 +168,7 @@ class TestDataLayout(unittest.TestCase):
             nhops, 'view: nhops')
 
         dly2 = dly.view(PhyDim2(3, 1))
+        self.assertEqual(dly2.type, dly.type, 'view: type')
         self.assertEqual(dly2.frmap.complete_fmap_range(), cfr,
                          'view: complete_fmap_range')
         self.assertDictEqual(dly2.frmap.rget_counter(cfr), counters,
@@ -166,10 +186,13 @@ class TestDataLayout(unittest.TestCase):
                 (PhyDim2(0, 0), PhyDim2(1, 1)))
         frm.add(FmapRange((0, 1, 0, 0), (4, 3, 16, 16)),
                 (PhyDim2(1, 0), PhyDim2(2, 2)))
-        dly = DataLayout(origin=PhyDim2(-1, -1), frmap=frm)
+        dly = DataLayout(origin=PhyDim2(-1, -1), frmap=frm,
+                         type=NodeRegion.DATA)
 
         mdly1 = self.dly.merge('|', dly)
         mdly2 = dly.merge('|', self.dly)
+        self.assertEqual(mdly1.type, self.dly.type, 'merge |: type')
+        self.assertEqual(mdly2.type, dly.type, 'merge |: type')
         self.assertEqual(mdly1.frmap.complete_fmap_range(),
                          mdly2.frmap.complete_fmap_range(),
                          'merge |: complete_fmap_range')
@@ -187,9 +210,15 @@ class TestDataLayout(unittest.TestCase):
 
         frm.add(FmapRange((0, 3, 0, 0), (4, 4, 16, 16)),
                 (PhyDim2(1, 3), PhyDim2(2, 1), PhyDim2(-1, -2)))
-        dly = DataLayout(origin=PhyDim2(-1, -1), frmap=frm)
-        mdly1 = self.dly.merge('+', dly)
-        mdly2 = dly.merge('+', self.dly)
+        # Only type differs from self.dly.
+        sdly = DataLayout(origin=self.dly.origin, frmap=self.dly.frmap,
+                          type=NodeRegion.PROC)
+        dly = DataLayout(origin=PhyDim2(-1, -1), frmap=frm,
+                         type=NodeRegion.PROC)
+        mdly1 = sdly.merge('+', dly)
+        mdly2 = dly.merge('+', sdly)
+        self.assertEqual(mdly1.type, sdly.type, 'merge +: type')
+        self.assertEqual(mdly2.type, dly.type, 'merge +: type')
         self.assertEqual(mdly1.frmap.complete_fmap_range(),
                          mdly2.frmap.complete_fmap_range(),
                          'merge +: complete_fmap_range')
@@ -200,19 +229,28 @@ class TestDataLayout(unittest.TestCase):
                          mdly2.total_transfer_nhops(fr, PhyDim2(0, 0)),
                          'merge +: nhops')
         self.assertEqual(mdly1.total_transfer_nhops(fr, PhyDim2(0, 0)),
-                         self.dly.total_transfer_nhops(fr, PhyDim2(0, 0))
+                         sdly.total_transfer_nhops(fr, PhyDim2(0, 0))
                          + dly.total_transfer_nhops(fr, PhyDim2(0, 0)),
                          'merge +: nhops')
 
     def test_merge_invalid_type(self):
-        ''' Merge unmatch. '''
+        ''' Merge invalid. '''
         with self.assertRaisesRegexp(TypeError, 'DataLayout: .*other.*'):
             _ = self.dly.merge('|', self.frm)
         with self.assertRaisesRegexp(TypeError, 'DataLayout: .*other.*'):
             _ = self.dly.merge('+', PhyDim2(1, 3))
 
+    def test_merge_invalid_region_type(self):
+        ''' Merge invalid region type. '''
+        dly = DataLayout(origin=self.dly.origin, frmap=self.dly.frmap,
+                         type=NodeRegion.PROC)
+        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*type.*'):
+            _ = self.dly.merge('|', dly)
+        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*type.*'):
+            _ = self.dly.merge('+', dly)
+
     def test_merge_invalid_merge_symbol(self):
-        ''' Merge unmatch. '''
+        ''' Merge invalid merge symbol. '''
         with self.assertRaisesRegexp(ValueError, 'DataLayout: .*symbol.*'):
             _ = self.dly.merge('*', self.dly)
         with self.assertRaisesRegexp(ValueError, 'DataLayout: .*symbol.*'):
@@ -225,7 +263,8 @@ class TestDataLayout(unittest.TestCase):
                    FmapRange((0,) * 4, (3, 4, 16, 16))]:
             frm = FmapRangeMap()
             frm.add(fr, (PhyDim2(1, 1),))
-            dly = DataLayout(origin=PhyDim2(-1, -1), frmap=frm)
+            dly = DataLayout(origin=PhyDim2(-1, -1), frmap=frm,
+                             type=NodeRegion.DATA)
 
             with self.assertRaisesRegexp(ValueError, 'DataLayout: .*match.*'):
                 _ = self.dly.merge('|', dly)
@@ -234,7 +273,8 @@ class TestDataLayout(unittest.TestCase):
 
         frm = FmapRangeMap()
         frm.add(FmapRange((0,) * 4, (4, 2, 16, 16)), (PhyDim2(1, 1),))
-        dly = DataLayout(origin=PhyDim2(-1, -1), frmap=frm)
+        dly = DataLayout(origin=PhyDim2(-1, -1), frmap=frm,
+                         type=NodeRegion.DATA)
 
         with self.assertRaisesRegexp(ValueError, 'DataLayout: .*match.*'):
             _ = self.dly.merge('+', dly)

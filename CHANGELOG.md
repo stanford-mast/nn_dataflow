@@ -91,6 +91,9 @@ List of major changes and improvements
 
   - Add number of nodes to scheduling result.
 
+  - Add `type` attribute to `DataLayout` to denote the type of the reside
+    region.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.
