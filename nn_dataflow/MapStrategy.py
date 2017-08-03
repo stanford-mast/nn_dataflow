@@ -96,13 +96,6 @@ class MapStrategyEyeriss(MapStrategy):
                 / (self.dim_array.size() * self.fold.size())
         assert self.util <= 1. + 1e-6
 
-        assert self.util > 0.5, \
-                ('MapEyeriss: PE array resource utilization < 50%. '
-                 'Physical PE set {}; array size {}; logic PE set {}; '
-                 'folded logic PE set {}. Can\'t we fit more?'
-                 .format(self.dim_ppeset, self.dim_array,
-                         self.dim_lpeset, self.dim_flpeset))
-
         # Loops of data.
         self._calc_data_loops()
 

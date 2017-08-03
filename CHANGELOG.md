@@ -26,6 +26,12 @@ List of major changes and improvements
     type data regions).
 
 
+### Fixed
+
+- Remove assertion to allow lower array utilization which could occur during
+  mapping small layers, e.g., with fmap temporal partitioning.
+
+
 ## [v1.4 -- v1.5] -- 2017-08-01
 
 ### Added
