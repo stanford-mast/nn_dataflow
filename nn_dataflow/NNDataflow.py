@@ -112,7 +112,8 @@ class NNDataflow(object):
 
             condition = SchedulingCondition(resource=self.resource,
                                             constraint=SchedulingConstraint(),
-                                            ifmap_layout=ifmap_layout)
+                                            ifmap_layout=ifmap_layout,
+                                            sched_seq=(0, 0, 0))
 
             try:
                 tops = layer_sched.schedule_search(condition, options)

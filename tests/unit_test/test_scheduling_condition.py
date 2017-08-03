@@ -46,14 +46,18 @@ class TestSchedulingCondition(unittest.TestCase):
         frmap.add(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)), (PhyDim2(0, 0),))
         self.ifmap_layout = DataLayout(origin=PhyDim2(0, 0), frmap=frmap)
 
+        self.sched_seq = (2, 0, 0)
+
     def test_valid_args(self):
         ''' Valid arguments. '''
         condition = SchedulingCondition(resource=self.resource,
                                         constraint=self.none_cstr,
-                                        ifmap_layout=self.ifmap_layout)
+                                        ifmap_layout=self.ifmap_layout,
+                                        sched_seq=self.sched_seq)
         self.assertEqual(condition.resource, self.resource)
         self.assertEqual(condition.constraint, self.none_cstr)
         self.assertEqual(condition.ifmap_layout, self.ifmap_layout)
+        self.assertTupleEqual(condition.sched_seq, self.sched_seq)
 
     def test_invalid_resource(self):
         ''' Invalid resource. '''
@@ -61,7 +65,8 @@ class TestSchedulingCondition(unittest.TestCase):
                                      'SchedulingCondition: .*resource.*'):
             _ = SchedulingCondition(resource=None,
                                     constraint=self.none_cstr,
-                                    ifmap_layout=self.ifmap_layout)
+                                    ifmap_layout=self.ifmap_layout,
+                                    sched_seq=self.sched_seq)
 
     def test_invalid_constraint(self):
         ''' Invalid constraint. '''
@@ -69,13 +74,31 @@ class TestSchedulingCondition(unittest.TestCase):
                                      'SchedulingCondition: .*constraint.*'):
             _ = SchedulingCondition(resource=self.resource,
                                     constraint=None,
-                                    ifmap_layout=self.ifmap_layout)
+                                    ifmap_layout=self.ifmap_layout,
+                                    sched_seq=self.sched_seq)
 
     def test_invalid_ifmap_layout(self):
-        ''' Invalid resource. '''
+        ''' Invalid ifmap_layout. '''
         with self.assertRaisesRegexp(TypeError,
                                      'SchedulingCondition: .*ifmap_layout.*'):
             _ = SchedulingCondition(resource=self.resource,
                                     constraint=self.none_cstr,
-                                    ifmap_layout=None)
+                                    ifmap_layout=None,
+                                    sched_seq=self.sched_seq)
+
+    def test_invalid_sched_seq(self):
+        ''' Invalid sched_seq. '''
+        with self.assertRaisesRegexp(TypeError,
+                                     'SchedulingCondition: .*sched_seq.*'):
+            _ = SchedulingCondition(resource=self.resource,
+                                    constraint=self.none_cstr,
+                                    ifmap_layout=self.ifmap_layout,
+                                    sched_seq=list(self.sched_seq))
+
+        with self.assertRaisesRegexp(ValueError,
+                                     'SchedulingCondition: .*sched_seq.*'):
+            _ = SchedulingCondition(resource=self.resource,
+                                    constraint=self.none_cstr,
+                                    ifmap_layout=self.ifmap_layout,
+                                    sched_seq=self.sched_seq[:-1])
 

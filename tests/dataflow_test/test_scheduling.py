@@ -74,6 +74,8 @@ class TestScheduling(unittest.TestCase):
                 self.layers[wlkey].input_layer(), self.batch_size, part,
                 self.resource.src_data_region())
 
+        self.sched_seq = (2, 0, 1)
+
     def test_valid_args(self):
         ''' Valid arguments for constructor. '''
         schd = Scheduling(self.layers['BASE'], self.batch_size, self.cost,
@@ -117,7 +119,8 @@ class TestScheduling(unittest.TestCase):
 
             condition = SchedulingCondition(resource=self.resource,
                                             constraint=self.cstr,
-                                            ifmap_layout=ifmap_layout)
+                                            ifmap_layout=ifmap_layout,
+                                            sched_seq=self.sched_seq)
 
             res = schd.schedule_search(condition, self.options)
 
@@ -153,6 +156,10 @@ class TestScheduling(unittest.TestCase):
                                  .size(),
                                  layer.total_ofmap_size(self.batch_size))
 
+            # Sequence number.
+            for r in res:
+                self.assertTupleEqual(r.sched_seq, condition.sched_seq)
+
     def test_schedule_search_ilayout(self):
         ''' Invalid ifmap_layout. '''
         layer = self.layers['BASE']
@@ -165,7 +172,8 @@ class TestScheduling(unittest.TestCase):
         condition = SchedulingCondition(
             resource=self.resource,
             constraint=self.none_cstr,
-            ifmap_layout=ifmap_layout.view(PhyDim2(1, 1)))
+            ifmap_layout=ifmap_layout.view(PhyDim2(1, 1)),
+            sched_seq=self.sched_seq)
 
         with self.assertRaisesRegexp(ValueError, 'Scheduling: .*ifmap.*'):
             _ = schd.schedule_search(condition, self.options)
@@ -174,7 +182,8 @@ class TestScheduling(unittest.TestCase):
         condition = SchedulingCondition(
             resource=self.resource,
             constraint=self.none_cstr,
-            ifmap_layout=self.ifmap_layouts['POOL'])
+            ifmap_layout=self.ifmap_layouts['POOL'],
+            sched_seq=self.sched_seq)
 
         with self.assertRaisesRegexp(ValueError, 'Scheduling: .*ifmap.*'):
             _ = schd.schedule_search(condition, self.options)
@@ -192,7 +201,8 @@ class TestScheduling(unittest.TestCase):
 
         condition = SchedulingCondition(resource=self.resource,
                                         constraint=self.cstr,
-                                        ifmap_layout=ifmap_layout)
+                                        ifmap_layout=ifmap_layout,
+                                        sched_seq=self.sched_seq)
 
         _ = schd.schedule_search(condition, self.options)
 
@@ -216,7 +226,8 @@ class TestScheduling(unittest.TestCase):
 
         condition = SchedulingCondition(resource=self.resource,
                                         constraint=self.cstr,
-                                        ifmap_layout=ifmap_layout)
+                                        ifmap_layout=ifmap_layout,
+                                        sched_seq=self.sched_seq)
 
         _ = schd.schedule_search(condition, self.options)
 

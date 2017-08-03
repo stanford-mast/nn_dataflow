@@ -34,6 +34,7 @@ class SchedulingCondition(namedtuple('SchedulingCondition',
                                      ['resource',
                                       'constraint',
                                       'ifmap_layout',
+                                      'sched_seq',
                                      ])):
     '''
     Layer scheduling condition.
@@ -51,6 +52,11 @@ class SchedulingCondition(namedtuple('SchedulingCondition',
         if not isinstance(ntp.ifmap_layout, DataLayout):
             raise TypeError('SchedulingCondition: ifmap_layout must be '
                             'a DataLayout instance.')
+        if not isinstance(ntp.sched_seq, tuple):
+            raise TypeError('SchedulingCondition: sched_seq must be a tuple.')
+        if len(ntp.sched_seq) != 3:
+            raise ValueError('SchedulingCondition: sched_seq must have '
+                             '(segment, spatial, temporal) 3 indices.')
 
         return ntp
 
@@ -59,6 +65,7 @@ class SchedulingResult(namedtuple('SchedulingResult',
                                   ['dict_loop',
                                    'dict_part',
                                    'ofmap_layout',
+                                   'sched_seq',
                                   ])):
     '''
     Layer scheduling result.
@@ -74,6 +81,11 @@ class SchedulingResult(namedtuple('SchedulingResult',
         if not isinstance(ntp.ofmap_layout, DataLayout):
             raise TypeError('SchedulingResult: ofmap_layout must be '
                             'a DataLayout instance.')
+        if not isinstance(ntp.sched_seq, tuple):
+            raise TypeError('SchedulingResult: sched_seq must be a tuple.')
+        if len(ntp.sched_seq) != 3:
+            raise ValueError('SchedulingResult: sched_seq must have '
+                             '(segment, spatial, temporal) 3 indices.')
 
         return ntp
 
@@ -181,7 +193,8 @@ class Scheduling(object):
 
                 # Make scheduling result.
                 r = self._get_result(lbs, part, condition.constraint,
-                                     unit_nhops, ofmap_layout)
+                                     condition.sched_seq, unit_nhops,
+                                     ofmap_layout)
                 tops.append(r)
 
         # Pick the top n.
@@ -261,7 +274,8 @@ class Scheduling(object):
 
         return top_lbs_list
 
-    def _get_result(self, lbs, part, constraint, unit_nhops, ofmap_layout):
+    def _get_result(self, lbs, part, constraint, sched_seq, unit_nhops,
+                    ofmap_layout):
         '''
         Make the schedule result from loop blocking and partitioning.
         '''
@@ -284,5 +298,6 @@ class Scheduling(object):
 
         return SchedulingResult(dict_loop=dict_loop,
                                 dict_part=dict_part,
-                                ofmap_layout=ofmap_layout)
+                                ofmap_layout=ofmap_layout,
+                                sched_seq=sched_seq)
 

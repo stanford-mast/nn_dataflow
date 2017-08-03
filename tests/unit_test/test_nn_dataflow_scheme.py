@@ -62,9 +62,10 @@ class TestNNDataflowScheme(unittest.TestCase):
                 self.network['c1'], self.batch_size,
                 PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
                 NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
-                           type=NodeRegion.DATA)))
+                           type=NodeRegion.DATA)),
+            sched_seq=(0, 0, 0))
 
-        self.pres = SchedulingResult(
+        self.p1res = SchedulingResult(
             dict_loop=OrderedDict([('cost', 0.1), ('time', 0.05), ('ops', 0.1),
                                    ('access', [[.7, .8, .9]] * me.NUM),
                                   ]),
@@ -75,12 +76,17 @@ class TestNNDataflowScheme(unittest.TestCase):
                 self.network['p1'], self.batch_size,
                 PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
                 NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
-                           type=NodeRegion.DATA)))
+                           type=NodeRegion.DATA)),
+            sched_seq=(0, 0, 1))
+
+        self.p2res = SchedulingResult(
+            dict_loop=self.p1res.dict_loop, dict_part=self.p1res.dict_part,
+            ofmap_layout=self.p1res.ofmap_layout, sched_seq=(0, 0, 2))
 
         self.dtfl = NNDataflowScheme(self.network, self.input_layout)
         self.dtfl['c1'] = self.c1res
-        self.dtfl['p1'] = self.pres
-        self.dtfl['p2'] = self.pres
+        self.dtfl['p1'] = self.p1res
+        self.dtfl['p2'] = self.p2res
 
     def test_init(self):
         ''' Initial. '''
@@ -145,14 +151,16 @@ class TestNNDataflowScheme(unittest.TestCase):
         df['c1'] = self.c1res
 
         with self.assertRaisesRegexp(KeyError, 'NNDataflowScheme: .*c1*'):
-            df['c1'] = self.c1res
+            df['c1'] = SchedulingResult(
+                dict_loop=self.c1res.dict_loop, dict_part=self.c1res.dict_part,
+                ofmap_layout=self.c1res.ofmap_layout, sched_seq=(1, 0, 0))
 
     def test_setitem_prev_not_in(self):
         ''' __setitem__ already exists. '''
         df = NNDataflowScheme(self.network, self.input_layout)
 
         with self.assertRaisesRegexp(KeyError, 'NNDataflowScheme: .*p1*'):
-            df['p1'] = self.pres
+            df['p1'] = self.p1res
 
     def test_delitem(self):
         ''' __delitem__. '''

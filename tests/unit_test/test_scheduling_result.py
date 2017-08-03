@@ -47,14 +47,18 @@ class TestSchedulingResult(unittest.TestCase):
         frmap.add(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)), (PhyDim2(0, 0),))
         self.ofmap_layout = DataLayout(origin=PhyDim2(0, 0), frmap=frmap)
 
+        self.sched_seq = (2, 0, 0)
+
     def test_valid_args(self):
         ''' Valid arguments. '''
         result = SchedulingResult(dict_loop=self.dict_loop,
                                   dict_part=self.dict_part,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertIn('ops', result.dict_loop)
         self.assertIn('total_nhops', result.dict_part)
         self.assertEqual(result.ofmap_layout, self.ofmap_layout)
+        self.assertTupleEqual(result.sched_seq, self.sched_seq)
 
     def test_invalid_dict_loop(self):
         ''' Invalid dict_loop. '''
@@ -62,7 +66,8 @@ class TestSchedulingResult(unittest.TestCase):
                                      'SchedulingResult: .*dict_loop.*'):
             _ = SchedulingResult(dict_loop={},
                                  dict_part=self.dict_part,
-                                 ofmap_layout=self.ofmap_layout)
+                                 ofmap_layout=self.ofmap_layout,
+                                 sched_seq=self.sched_seq)
 
     def test_invalid_dict_part(self):
         ''' Invalid dict_part. '''
@@ -70,7 +75,8 @@ class TestSchedulingResult(unittest.TestCase):
                                      'SchedulingResult: .*dict_part.*'):
             _ = SchedulingResult(dict_loop=self.dict_loop,
                                  dict_part={},
-                                 ofmap_layout=self.ofmap_layout)
+                                 ofmap_layout=self.ofmap_layout,
+                                 sched_seq=self.sched_seq)
 
     def test_invalid_ofmap_layout(self):
         ''' Invalid ofmap_layout. '''
@@ -78,34 +84,55 @@ class TestSchedulingResult(unittest.TestCase):
                                      'SchedulingResult: .*ofmap_layout.*'):
             _ = SchedulingResult(dict_loop=self.dict_loop,
                                  dict_part=self.dict_part,
-                                 ofmap_layout=None)
+                                 ofmap_layout=None,
+                                 sched_seq=self.sched_seq)
+
+    def test_invalid_sched_seq(self):
+        ''' Invalid sched_seq. '''
+        with self.assertRaisesRegexp(TypeError,
+                                     'SchedulingResult: .*sched_seq.*'):
+            _ = SchedulingResult(dict_loop=self.dict_loop,
+                                 dict_part=self.dict_part,
+                                 ofmap_layout=self.ofmap_layout,
+                                 sched_seq=list(self.sched_seq))
+
+        with self.assertRaisesRegexp(ValueError,
+                                     'SchedulingResult: .*sched_seq.*'):
+            _ = SchedulingResult(dict_loop=self.dict_loop,
+                                 dict_part=self.dict_part,
+                                 ofmap_layout=self.ofmap_layout,
+                                 sched_seq=self.sched_seq[:-1])
 
     def test_total_cost(self):
         ''' Accessor total_cost. '''
         result = SchedulingResult(dict_loop=self.dict_loop,
                                   dict_part=self.dict_part,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertAlmostEqual(result.total_cost, 1.234 + 9.876)
 
     def test_total_time(self):
         ''' Accessor total_time. '''
         result = SchedulingResult(dict_loop=self.dict_loop,
                                   dict_part=self.dict_part,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertAlmostEqual(result.total_time, 123.4)
 
     def test_total_ops(self):
         ''' Accessor total_ops. '''
         result = SchedulingResult(dict_loop=self.dict_loop,
                                   dict_part=self.dict_part,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertEqual(result.total_ops, 1234)
 
     def test_total_accesses(self):
         ''' Accessor total_cost. '''
         result = SchedulingResult(dict_loop=self.dict_loop,
                                   dict_part=self.dict_part,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertSequenceEqual(result.total_accesses,
                                  [9, 120, 1500, 18000])
 
@@ -113,6 +140,7 @@ class TestSchedulingResult(unittest.TestCase):
         ''' Accessor total_noc_hops. '''
         result = SchedulingResult(dict_loop=self.dict_loop,
                                   dict_part=self.dict_part,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertEqual(result.total_noc_hops, 1368)
 
