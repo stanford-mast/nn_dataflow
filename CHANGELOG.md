@@ -56,6 +56,8 @@ List of major changes and improvements
   - Add `type` attribute to `NodeRegion` to differentiate processing and data
     node regions in `Resource`.
 
+  - Change default cost of the NoC hop traversal.
+
 - Software models:
 
   - Add loop index generator to `LoopBlockingScheme` class.
