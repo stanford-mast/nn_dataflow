@@ -24,6 +24,7 @@ from nn_dataflow import ConvLayer
 from nn_dataflow import DataCategoryEnum as de
 from nn_dataflow import DataLayout
 from nn_dataflow import FmapRange, FmapRangeMap
+from nn_dataflow import NodeRegion
 from nn_dataflow import ParallelEnum as pe
 from nn_dataflow import Partition
 from nn_dataflow import PartitionScheme
@@ -296,7 +297,7 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
 
             frmap.add(FmapRange(begs, ends), (_coord(idxs),))
 
-        dl = DataLayout(frmap=frmap, origin=origin)
+        dl = DataLayout(frmap=frmap, origin=origin, type=NodeRegion.DATA)
         assert dl.frmap.complete_fmap_range().size() == Util.prod(sizes)
 
         return dl

@@ -223,7 +223,7 @@ def argparser():
                     metavar=('DRAM_COST', 'GBUF_COST', 'ITCN_COST',
                              'REGF_COST'),
                     help='cost of access to memory hierarchy')
-    ap.add_argument('--hop-cost', type=float, default=100,
+    ap.add_argument('--hop-cost', type=float, default=10,
                     help='cost of access through one NoC hop')
     ap.add_argument('--unit-static-cost', type=float, default=0,
                     help='static cost for unit execution time')

@@ -25,8 +25,8 @@ from nn_dataflow import Option
 class TestOption(unittest.TestCase):
     ''' Tests for Option. '''
 
-    def test_valid_args(self):
-        ''' Valid arguments. '''
+    def test_valid_kwargs(self):
+        ''' Valid keyword arguments. '''
         options = Option(sw_gbuf_bypass=(False, False, False),
                          sw_solve_loopblocking=False,
                          hw_access_forwarding=False,
@@ -56,99 +56,74 @@ class TestOption(unittest.TestCase):
         self.assertEqual(options.nprocesses, 16, 'nprocesses')
         self.assertEqual(options.verbose, False, 'verbose')
 
+    def test_valid_args(self):
+        ''' Valid arguments. '''
+        options = Option((False, True, False), True)
+        self.assertEqual(options.sw_gbuf_bypass, (False, True, False),
+                         'sw_gbuf_bypass')
+        self.assertEqual(options.sw_solve_loopblocking, True,
+                         'sw_solve_loopblocking')
+
+    def test_default_args(self):
+        ''' Default arguments. '''
+        options = Option()
+        self.assertTupleEqual(options.sw_gbuf_bypass, (False, False, False))
+        self.assertEqual(options.sw_solve_loopblocking, False)
+        self.assertEqual(options.partition_hybrid, False)
+        self.assertEqual(options.partition_batch, False)
+        self.assertEqual(options.partition_ifmaps, False)
+        self.assertEqual(options.ntops, 1)
+        self.assertEqual(options.nprocesses, 1)
+        self.assertEqual(options.verbose, False)
+
+    def test_invalid_args(self):
+        ''' Invalid args. '''
+        with self.assertRaisesRegexp(TypeError, 'Option: .*at most.*100'):
+            _ = Option(*[None] * 100)
+
+    def test_invalid_kwargs(self):
+        ''' Invalid kwargs. '''
+        with self.assertRaisesRegexp(TypeError, 'Option: .*bad.*'):
+            _ = Option(bad='')
+
+    def test_invalid_both_args_kwargs(self):
+        ''' Invalid both args and kwargs are given. '''
+        with self.assertRaisesRegexp(TypeError, 'Option: .*sw_gbuf_bypass.*'):
+            _ = Option((False,) * 3, sw_gbuf_bypass=(False,) * 3)
+
     def test_invalid_swgbyp_type(self):
         ''' Invalid sw_gbuf_bypass type. '''
         with self.assertRaisesRegexp(TypeError, 'Option: .*sw_gbuf_bypass.*'):
-            _ = Option(sw_gbuf_bypass=[False, False, False],
-                       sw_solve_loopblocking=False,
-                       hw_access_forwarding=False,
-                       hw_gbuf_sharing=False,
-                       partition_hybrid=True,
-                       partition_batch=False,
-                       partition_ifmaps=False,
-                       ntops=10,
-                       nprocesses=16,
-                       verbose=False
-                      )
+            _ = Option(sw_gbuf_bypass=[False, False, False])
 
     def test_invalid_swgbyp_len(self):
         ''' Invalid sw_gbuf_bypass len. '''
         with self.assertRaisesRegexp(ValueError, 'Option: .*sw_gbuf_bypass.*'):
-            _ = Option(sw_gbuf_bypass=(False, False),
-                       sw_solve_loopblocking=False,
-                       hw_access_forwarding=False,
-                       hw_gbuf_sharing=False,
-                       partition_hybrid=True,
-                       partition_batch=False,
-                       partition_ifmaps=False,
-                       ntops=10,
-                       nprocesses=16,
-                       verbose=False
-                      )
+            _ = Option(sw_gbuf_bypass=(False, False))
 
     def test_invalid_swsol_hwbufshr(self):
         ''' Invalid sw_solve_loopblocking and hw_gbuf_sharing comb. '''
         with self.assertRaisesRegexp(ValueError,
                                      'Option: .*sw_solve_loopblocking.*'
                                      'hw_gbuf_sharing.*'):
-            _ = Option(sw_gbuf_bypass=(False, False, False),
-                       sw_solve_loopblocking=True,
-                       hw_access_forwarding=False,
-                       hw_gbuf_sharing=True,
-                       partition_hybrid=False,
-                       partition_batch=False,
-                       partition_ifmaps=True,
-                       ntops=10,
-                       nprocesses=16,
-                       verbose=False
-                      )
+            _ = Option(sw_solve_loopblocking=True, hw_gbuf_sharing=True)
 
     def test_invalid_hwaccfwd_hwbufshr(self):
         ''' Invalid hw_access_forwarding and hw_gbuf_sharing comb. '''
         with self.assertRaisesRegexp(ValueError,
                                      'Option: .*hw_access_forwarding.*'
                                      'hw_gbuf_sharing.*'):
-            _ = Option(sw_gbuf_bypass=(False, False, False),
-                       sw_solve_loopblocking=False,
-                       hw_access_forwarding=True,
-                       hw_gbuf_sharing=True,
-                       partition_hybrid=False,
-                       partition_batch=False,
-                       partition_ifmaps=True,
-                       ntops=10,
-                       nprocesses=16,
-                       verbose=False
-                      )
+            _ = Option(hw_access_forwarding=True, hw_gbuf_sharing=True)
 
     def test_invalid_part_hybrid_ifmaps(self):
         ''' Invalid partition_hybrid and partition_ifmaps comb. '''
         with self.assertRaisesRegexp(ValueError,
                                      'Option: .*partition_ifmaps.*'
                                      'partition_hybrid.*'):
-            _ = Option(sw_gbuf_bypass=(False, False, False),
-                       sw_solve_loopblocking=False,
-                       hw_access_forwarding=False,
-                       hw_gbuf_sharing=False,
-                       partition_hybrid=False,
-                       partition_batch=False,
-                       partition_ifmaps=True,
-                       ntops=10,
-                       nprocesses=16,
-                       verbose=False
-                      )
+            _ = Option(partition_hybrid=False, partition_ifmaps=True)
 
     def test_option_list(self):
         ''' Accessor option_list. '''
-        options = Option(sw_gbuf_bypass=(False, False, False),
-                         sw_solve_loopblocking=False,
-                         hw_access_forwarding=False,
-                         hw_gbuf_sharing=False,
-                         partition_hybrid=True,
-                         partition_batch=False,
-                         partition_ifmaps=False,
-                         ntops=10,
-                         nprocesses=16,
-                         verbose=False
-                        )
+        options = Option()
         self.assertItemsEqual(options.option_list(), options._fields)
 

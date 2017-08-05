@@ -132,53 +132,27 @@ class TestLoopBlockingFixture(unittest.TestCase):
         # Options.
         self.options = {}
         # Basic.
-        self.options['BASE'] = Option(
-            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
-            hw_access_forwarding=False, hw_gbuf_sharing=False,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            ntops=2 ** 30, nprocesses=1, verbose=False)
+        self.options['BASE'] = Option(ntops=2 ** 30)
         # Multiprocessing.
-        self.options['MP'] = Option(
-            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
-            hw_access_forwarding=False, hw_gbuf_sharing=False,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            ntops=2 ** 30, nprocesses=8, verbose=False)
+        self.options['MP'] = Option(ntops=2 ** 30, nprocesses=8)
         # Limited top schemes.
-        self.options['NTOPS'] = Option(
-            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
-            hw_access_forwarding=False, hw_gbuf_sharing=False,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            ntops=10, nprocesses=1, verbose=False)
+        self.options['NTOPS'] = Option(ntops=10)
         # Bypass.
-        self.options['BYP'] = Option(
-            sw_gbuf_bypass=(True,) * 3, sw_solve_loopblocking=False,
-            hw_access_forwarding=False, hw_gbuf_sharing=False,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            ntops=2 ** 30, nprocesses=1, verbose=False)
+        self.options['BYP'] = Option(sw_gbuf_bypass=(True,) * 3, ntops=2 ** 30)
         # Bypass solver.
-        self.options['BYPSOL'] = Option(
-            sw_gbuf_bypass=(True,) * 3, sw_solve_loopblocking=True,
-            hw_access_forwarding=False, hw_gbuf_sharing=False,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            ntops=2 ** 30, nprocesses=1, verbose=False)
+        self.options['BYPSOL'] = Option(sw_gbuf_bypass=(True,) * 3,
+                                        sw_solve_loopblocking=True,
+                                        ntops=2 ** 30)
         # Access forwarding.
-        self.options['ACCFWD'] = Option(
-            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
-            hw_access_forwarding=True, hw_gbuf_sharing=False,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            ntops=2 ** 30, nprocesses=1, verbose=False)
+        self.options['ACCFWD'] = Option(hw_access_forwarding=True,
+                                        ntops=2 ** 30)
         # Buffer sharing.
-        self.options['BUFSHR'] = Option(
-            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
-            hw_access_forwarding=False, hw_gbuf_sharing=True,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            ntops=2 ** 30, nprocesses=1, verbose=False)
+        self.options['BUFSHR'] = Option(hw_gbuf_sharing=True,
+                                        ntops=2 ** 30)
         # Buffer sharing with bypassing.
-        self.options['BUFSHR-BYP'] = Option(
-            sw_gbuf_bypass=(True,) * 3, sw_solve_loopblocking=False,
-            hw_access_forwarding=False, hw_gbuf_sharing=True,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            ntops=2 ** 30, nprocesses=1, verbose=False)
+        self.options['BUFSHR-BYP'] = Option(sw_gbuf_bypass=(True,) * 3,
+                                            hw_gbuf_sharing=True,
+                                            ntops=2 ** 30)
 
         # Cost.
         self.cost = Cost(mac_op=1, mem_hier=(200, 6, 2, 1),
@@ -263,11 +237,10 @@ class TestLoopBlockingFixture(unittest.TestCase):
         '''
         Generate PartitionScheme.
         '''
-        options = Option(
-            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
-            hw_access_forwarding=False, hw_gbuf_sharing=False,
-            partition_hybrid=True, partition_batch=True, partition_ifmaps=True,
-            ntops=2 ** 30, nprocesses=1, verbose=False)
+        options = Option(partition_hybrid=True,
+                         partition_batch=True,
+                         partition_ifmaps=True,
+                         ntops=2 ** 30)
 
         for part in Partition.gen_partition(
                 self.layer[layerkey], self.batch_size,
