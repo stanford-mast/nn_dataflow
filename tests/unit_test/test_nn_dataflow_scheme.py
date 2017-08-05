@@ -48,7 +48,8 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.input_layout = Partition.get_ofmap_layout(
             self.network.input_layer(), self.batch_size,
             PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
-            NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(2, 1)))
+            NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(2, 1),
+                       type=NodeRegion.DATA))
 
         self.c1res = SchedulingResult(
             dict_loop=OrderedDict([('cost', 1.), ('time', 2.), ('ops', 4.),
@@ -60,7 +61,8 @@ class TestNNDataflowScheme(unittest.TestCase):
             ofmap_layout=Partition.get_ofmap_layout(
                 self.network['c1'], self.batch_size,
                 PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
-                NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2))))
+                NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
+                           type=NodeRegion.DATA)))
 
         self.pres = SchedulingResult(
             dict_loop=OrderedDict([('cost', 0.1), ('time', 0.05), ('ops', 0.1),
@@ -72,7 +74,8 @@ class TestNNDataflowScheme(unittest.TestCase):
             ofmap_layout=Partition.get_ofmap_layout(
                 self.network['p1'], self.batch_size,
                 PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
-                NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2))))
+                NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
+                           type=NodeRegion.DATA)))
 
         self.dtfl = NNDataflowScheme(self.network, self.input_layout)
         self.dtfl['c1'] = self.c1res

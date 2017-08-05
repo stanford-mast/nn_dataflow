@@ -133,12 +133,13 @@ class Scheduling(object):
         '''
         tops = []
 
-        mem_region_src = condition.resource.mem_region_src()
-        mem_region_dst = condition.resource.mem_region_dst()
+        proc_region = condition.resource.proc_region
+        src_data_region = condition.resource.src_data_region()
+        dst_data_region = condition.resource.dst_data_region()
 
         # Ifmap layout.
         ifmap_layout = condition.ifmap_layout
-        if not ifmap_layout.is_in_region(mem_region_src):
+        if not ifmap_layout.is_in_region(src_data_region):
             raise ValueError('Scheduling: ifmap layout contains invalid '
                              'source memory nodes.')
         cifrng = ifmap_layout.frmap.complete_fmap_range()
@@ -150,22 +151,24 @@ class Scheduling(object):
                              'input layer.')
 
         # Filter nodes. All memory nodes can store filters. Deduplicate.
-        filter_node_coord_list = [c for c in mem_region_src.node_iter()] \
-                               + [c for c in mem_region_dst.node_iter()]
+        filter_node_coord_list = [c for c in src_data_region.node_iter()] \
+                               + [c for c in dst_data_region.node_iter()]
         filter_node_coord_list = list(set(filter_node_coord_list))
 
         # Explore parallel partitioning schemes.
         for part in Partition.gen_partition(self.layer, self.batch_size,
-                                            condition.resource.dim_nodes,
-                                            options):
+                                            proc_region.dim, options):
             # Ofmap layout.
             ofmap_layout = Partition.get_ofmap_layout(
-                self.layer, self.batch_size, part, mem_region_dst)
+                self.layer, self.batch_size, part, dst_data_region)
 
             # Partition NoC hop cost.
+            # Layouts are viewed from the processing region origin.
             unit_nhops = Partition.part_layer_unit_nhops(
                 self.layer, self.batch_size, part, filter_node_coord_list,
-                ifmap_layout, ofmap_layout, options)
+                ifmap_layout.view(origin_diff=-proc_region.origin),
+                ofmap_layout.view(origin_diff=-proc_region.origin),
+                options)
 
             # Explore single-node schedules.
             for lbs in self.schedule_search_per_node(

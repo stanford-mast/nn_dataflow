@@ -341,11 +341,11 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
     return nhops
 
 
-def get_ofmap_layout(layer, batch_size, part, output_mem_region):
+def get_ofmap_layout(layer, batch_size, part, out_data_region):
     '''
     Decide the ofmap data layout as a DataLayout instance, given the
-    PartitionScheme `part` of the computation workloads and the memory
-    NodeRegion `output_mem_region`.
+    PartitionScheme `part` of the computation workloads and the output data
+    NodeRegion `out_data_region`.
 
     The ofmap partitioning is calculated by shrinking or extending the
     computation partitioning, while trying to maintain the same layout shape.
@@ -357,7 +357,7 @@ def get_ofmap_layout(layer, batch_size, part, output_mem_region):
                                   else PhyDim2(1, 1) for pae in range(pe.NUM)])
 
     dim_part = part.dim()
-    dim_omr = output_mem_region.dim
+    dim_omr = out_data_region.dim
 
     if dim_omr.size() == 0:
         raise ValueError('Partition ofmap: empty node region.')
@@ -394,7 +394,7 @@ def get_ofmap_layout(layer, batch_size, part, output_mem_region):
     ofmap_part = PartitionScheme(order=ofmap_order, pdims=ofmap_pdims)
     assert all(od <= omrd for od, omrd in zip(ofmap_part.dim(), dim_omr)), \
             'Partition ofmap: ofmap partitioning {} is invalid within ' \
-            'memory region {}.'.format(ofmap_part, str(output_mem_region))
+            'memory region {}.'.format(ofmap_part, str(out_data_region))
 
     # Make layout.
     ofmap_frmap = FmapRangeMap()
@@ -404,8 +404,8 @@ def get_ofmap_layout(layer, batch_size, part, output_mem_region):
         ofmap_frmap.add(frng, (coord,))
 
     ofmap_layout = DataLayout(frmap=ofmap_frmap,
-                              origin=output_mem_region.origin)
-    assert ofmap_layout.is_in_region(output_mem_region)
+                              origin=out_data_region.origin)
+    assert ofmap_layout.is_in_region(out_data_region)
 
     return ofmap_layout
 

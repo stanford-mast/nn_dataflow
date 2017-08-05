@@ -49,9 +49,11 @@ class TestScheduling(unittest.TestCase):
                          noc_hop=50, unit_static=50)
 
         self.resource = Resource(
-            dim_nodes=PhyDim2(4, 4), dim_array=PhyDim2(16, 16),
-            mem_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 1)),),
-            size_gbuf=65536, size_regf=64)
+            proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
+                                   type=NodeRegion.PROC),
+            data_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 1),
+                                     type=NodeRegion.DATA),),
+            dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64)
 
         self.options = Option(
             sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
@@ -65,7 +67,7 @@ class TestScheduling(unittest.TestCase):
         for wlkey in self.layers:
             self.ifmap_layouts[wlkey] = Partition.get_ofmap_layout(
                 self.layers[wlkey].input_layer(), self.batch_size, part,
-                self.resource.mem_region_src())
+                self.resource.src_data_region())
 
     def test_valid_args(self):
         ''' Valid arguments for constructor. '''
@@ -131,7 +133,7 @@ class TestScheduling(unittest.TestCase):
                                           in zip(r.dict_part['unit_nhops'],
                                                  r.dict_loop['fetch'][0])])
                 self.assertEqual(r.dict_part['num_nodes'],
-                                 self.resource.dim_nodes.size())
+                                 self.resource.proc_region.dim.size())
 
             # Ofmap layout.
             for r in res:

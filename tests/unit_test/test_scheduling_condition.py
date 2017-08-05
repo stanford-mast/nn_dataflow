@@ -33,9 +33,11 @@ class TestSchedulingCondition(unittest.TestCase):
     def setUp(self):
 
         self.resource = Resource(
-            dim_nodes=PhyDim2(1, 1), dim_array=PhyDim2(16, 16),
-            mem_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1)),),
-            size_gbuf=65536, size_regf=64)
+            proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                   type=NodeRegion.PROC),
+            data_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                     type=NodeRegion.DATA),),
+            dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64)
 
         frmap = FmapRangeMap()
         frmap.add(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)), (PhyDim2(0, 0),))

@@ -19,18 +19,23 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 import itertools
+from collections import namedtuple
 
 from . import ParallelEnum as pe
 from . import Util
 from .Layer import ConvLayer, LocalRegionLayer
 from .PhyDim2 import PhyDim2
 
-class PartitionScheme(Util.ContentHashClass):
+PARTITION_SCHEME_LIST = ['order',
+                         'pdims',
+                        ]
+
+class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
     '''
     A parallel processing partitioning scheme.
     '''
 
-    def __init__(self, order, pdims):
+    def __new__(cls, order, pdims):
         '''
         `order` is the order of partitioning hierarchy, from first to last
         is from top to bottom level on physical node array.
@@ -42,16 +47,21 @@ class PartitionScheme(Util.ContentHashClass):
         if len(order) != pe.NUM or set(order) != set(range(pe.NUM)):
             raise ValueError('PartitionScheme: order must be a permutation of '
                              '0 to {}.'.format(pe.NUM - 1))
-        self.order = tuple(order)
+        order_ = tuple(order)
 
         if len(pdims) != pe.NUM:
             raise ValueError('PartitionScheme: pdims must have length {}.'
                              .format(pe.NUM))
         try:
-            self.pdims = tuple(PhyDim2(*dim) for dim in pdims)
+            pdims_ = tuple(PhyDim2(*dim) for dim in pdims)
         except TypeError:
             raise ValueError('PartitionScheme: elements in pdims must have '
                              'length 2.')
+
+        ntp = super(PartitionScheme, cls).__new__(
+            cls, order=order_, pdims=pdims_)
+
+        return ntp
 
     def dim(self, *paes):
         '''
@@ -143,11 +153,4 @@ class PartitionScheme(Util.ContentHashClass):
         assert p_occ <= 1 + 1e-6
 
         return p_layer, p_batch_size, p_occ
-
-    def __repr__(self):
-        return '{}({})'.format(
-            self.__class__.__name__,
-            ', '.join([
-                'order={}'.format(repr(self.order)),
-                'pdims={}'.format(repr(self.pdims))]))
 

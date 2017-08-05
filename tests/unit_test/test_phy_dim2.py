@@ -50,6 +50,13 @@ class TestPhyDim2(unittest.TestCase):
         self.assertTupleEqual(dim1 - dim2, (9, 9), 'sub')
         self.assertTupleEqual(dim1 - 3, (11, 9), 'sub')
 
+    def test_neg(self):
+        ''' Operation neg. '''
+        dim1 = PhyDim2(14, 12)
+        dim2 = PhyDim2(5, 3)
+        self.assertTupleEqual(-dim1, (-14, -12), 'neg')
+        self.assertTupleEqual(-dim2, (-5, -3), 'neg')
+
     def test_mul(self):
         ''' Operation mul. '''
         dim1 = PhyDim2(14, 12)
