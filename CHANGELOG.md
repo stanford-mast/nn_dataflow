@@ -35,6 +35,8 @@ List of major changes and improvements
 
   - Add negative operation to `PhyDim2`.
 
+  - Add default arguments to `Option`.
+
 - Test.
 
   - Add unit tests.
