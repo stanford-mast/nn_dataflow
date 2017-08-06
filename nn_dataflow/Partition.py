@@ -368,7 +368,8 @@ def get_ofmap_layout(layer, batch_size, part, out_data_region):
         ofmap_frmap.add(frng, (coord,))
 
     ofmap_layout = DataLayout(frmap=ofmap_frmap,
-                              origin=out_data_region.origin)
+                              origin=out_data_region.origin,
+                              type=out_data_region.type)
     assert ofmap_layout.is_in_region(out_data_region)
 
     return ofmap_layout

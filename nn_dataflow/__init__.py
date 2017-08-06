@@ -47,5 +47,5 @@ from .SchedulingConstraint import SchedulingConstraint
 
 from .NNDataflow import NNDataflow
 
-__version__ = '1.5-rc.6'
+__version__ = '1.5-rc.7'
 

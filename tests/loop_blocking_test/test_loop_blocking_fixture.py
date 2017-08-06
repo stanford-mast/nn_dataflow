@@ -131,35 +131,17 @@ class TestLoopBlockingFixture(unittest.TestCase):
         # Options.
         self.options = {}
         # Basic.
-        self.options['BASE'] = Option(
-            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            partition_interlayer=None,
-            ntops=2 ** 30, nprocesses=1, verbose=False)
+        self.options['BASE'] = Option(ntops=2 ** 30)
         # Multiprocessing.
-        self.options['MP'] = Option(
-            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            partition_interlayer=None,
-            ntops=2 ** 30, nprocesses=8, verbose=False)
+        self.options['MP'] = Option(ntops=2 ** 30, nprocesses=8)
         # Limited top schemes.
-        self.options['NTOPS'] = Option(
-            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            partition_interlayer=None,
-            ntops=10, nprocesses=1, verbose=False)
+        self.options['NTOPS'] = Option(ntops=10)
         # Bypass.
-        self.options['BYP'] = Option(
-            sw_gbuf_bypass=(True,) * 3, sw_solve_loopblocking=False,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            partition_interlayer=None,
-            ntops=2 ** 30, nprocesses=1, verbose=False)
+        self.options['BYP'] = Option(sw_gbuf_bypass=(True,) * 3, ntops=2 ** 30)
         # Bypass solver.
-        self.options['BYPSOL'] = Option(
-            sw_gbuf_bypass=(True,) * 3, sw_solve_loopblocking=True,
-            partition_hybrid=None, partition_batch=None, partition_ifmaps=None,
-            partition_interlayer=None,
-            ntops=2 ** 30, nprocesses=1, verbose=False)
+        self.options['BYPSOL'] = Option(sw_gbuf_bypass=(True,) * 3,
+                                        sw_solve_loopblocking=True,
+                                        ntops=2 ** 30)
 
         # Constraint.
         self.none_cstr = SchedulingConstraint()

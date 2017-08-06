@@ -44,7 +44,8 @@ class TestSchedulingCondition(unittest.TestCase):
 
         frmap = FmapRangeMap()
         frmap.add(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)), (PhyDim2(0, 0),))
-        self.ifmap_layout = DataLayout(origin=PhyDim2(0, 0), frmap=frmap)
+        self.ifmap_layout = DataLayout(origin=PhyDim2(0, 0), frmap=frmap,
+                                       type=NodeRegion.DATA)
 
         self.sched_seq = (2, 0, 0)
 

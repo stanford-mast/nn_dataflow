@@ -60,11 +60,8 @@ class TestScheduling(unittest.TestCase):
                                      type=NodeRegion.DATA),),
             dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64)
 
-        self.options = Option(
-            sw_gbuf_bypass=(False,) * 3, sw_solve_loopblocking=False,
-            partition_hybrid=True, partition_batch=True, partition_ifmaps=True,
-            partition_interlayer=False,
-            ntops=10, nprocesses=1, verbose=False)
+        self.options = Option(partition_hybrid=True, partition_batch=True,
+                              partition_ifmaps=True, ntops=10)
 
         self.ifmap_layouts = {}
         part = PartitionScheme(order=(pe.INPP, pe.BATP, pe.OUTP, pe.OFMP),

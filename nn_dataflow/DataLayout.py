@@ -21,10 +21,12 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 from collections import namedtuple
 
 from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
+from .NodeRegion import NodeRegion
 from .PhyDim2 import PhyDim2
 
 DATA_LAYOUT_LIST = ['frmap',
                     'origin',
+                    'type',
                    ]
 
 class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
@@ -39,6 +41,9 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
             raise TypeError('DataLayout: frmap must be a FmapRangeMap object.')
         if not isinstance(ntp.origin, PhyDim2):
             raise TypeError('DataLayout: origin must be a PhyDim2 object.')
+        if ntp.type not in range(NodeRegion.NUM):
+            raise ValueError('DataLayout: type must be a valid NodeRegion '
+                             'type enum.')
 
         if not ntp.frmap.is_complete():
             raise ValueError('DataLayout: frmap must be a complete map.')
@@ -73,6 +78,8 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
         '''
         Whether the layout is in the given NodeRegion.
         '''
+        if self.type != node_region.type:
+            return False
         all_coords = []
         for coords in self.frmap.rget_counter(self.frmap.complete_fmap_range()):
             all_coords += coords
@@ -84,7 +91,8 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
         Another view of the layout by shifting the origin by the given
         `origin_diff`.
         '''
-        return DataLayout(frmap=self.frmap, origin=self.origin + origin_diff)
+        return DataLayout(frmap=self.frmap, origin=self.origin + origin_diff,
+                          type=self.type)
 
     def merge(self, merge_symbol, other):
         '''
@@ -98,6 +106,10 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
 
         if not isinstance(other, DataLayout):
             raise TypeError('DataLayout: other must be a DataLayout object.')
+
+        if self.type != other.type:
+            raise ValueError('DataLayout: layouts to be merged must have '
+                             'the same type.')
 
         scfrng = self.frmap.complete_fmap_range()
         ocfrng = other.frmap.complete_fmap_range()
@@ -153,5 +165,5 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
 
         assert frmap.is_complete()
 
-        return DataLayout(frmap=frmap, origin=self.origin)
+        return DataLayout(frmap=frmap, origin=self.origin, type=self.type)
 

@@ -23,6 +23,7 @@ from collections import OrderedDict
 
 from nn_dataflow import DataLayout
 from nn_dataflow import FmapRange, FmapRangeMap
+from nn_dataflow import NodeRegion
 from nn_dataflow import PhyDim2
 from nn_dataflow import SchedulingResult
 
@@ -45,7 +46,8 @@ class TestSchedulingResult(unittest.TestCase):
 
         frmap = FmapRangeMap()
         frmap.add(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)), (PhyDim2(0, 0),))
-        self.ofmap_layout = DataLayout(origin=PhyDim2(0, 0), frmap=frmap)
+        self.ofmap_layout = DataLayout(origin=PhyDim2(0, 0), frmap=frmap,
+                                       type=NodeRegion.DATA)
 
         self.sched_seq = (2, 0, 0)
 

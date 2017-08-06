@@ -32,7 +32,7 @@ List of major changes and improvements
   mapping small layers, e.g., with fmap temporal partitioning.
 
 
-## [v1.4 -- v1.5] -- 2017-08-01
+## [v1.4 -- v1.5] -- 2017-08-05
 
 ### Added
 
@@ -63,6 +63,8 @@ List of major changes and improvements
 
   - Add negative operation to `PhyDim2`.
 
+  - Add default arguments to `Option`.
+
 - Test.
 
   - Add unit tests.
@@ -83,6 +85,8 @@ List of major changes and improvements
 
   - Add `type` attribute to `NodeRegion` to differentiate processing and data
     node regions in `Resource`.
+
+  - Change default cost of the NoC hop traversal.
 
 - Software models:
 
@@ -118,6 +122,9 @@ List of major changes and improvements
   - Check ifmap layout against layer parameters in `Scheduling`.
 
   - Add number of nodes to scheduling result.
+
+  - Add `type` attribute to `DataLayout` to denote the type of the reside
+    region.
 
 - Software engineering.
 

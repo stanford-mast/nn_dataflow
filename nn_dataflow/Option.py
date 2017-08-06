@@ -39,7 +39,38 @@ class Option(namedtuple('Option', OPTION_LIST)):
     '''
 
     def __new__(cls, *args, **kwargs):
-        ntp = super(Option, cls).__new__(cls, *args, **kwargs)
+
+        if len(args) > len(OPTION_LIST):
+            raise TypeError('Option: can take at most {} arguments ({} given).'
+                            .format(len(OPTION_LIST), len(args)))
+
+        if not set(kwargs).issubset(OPTION_LIST):
+            raise TypeError('Option: got an unexpected keyword argument {}.'
+                            .format(next(k for k in kwargs
+                                         if k not in OPTION_LIST)))
+
+        # Combine args and kwargs.
+        kwdict = kwargs.copy()
+        for k, v in zip(OPTION_LIST, args):
+            if k in kwdict:
+                raise TypeError('Option: got multiple values for '
+                                'keyword argument {}.'
+                                .format(k))
+            kwdict[k] = v
+
+        kwdict.setdefault('sw_gbuf_bypass', (False,) * de.NUM)
+        kwdict.setdefault('sw_solve_loopblocking', False)
+        kwdict.setdefault('partition_hybrid', False)
+        kwdict.setdefault('partition_batch', False)
+        kwdict.setdefault('partition_ifmaps', False)
+        kwdict.setdefault('partition_interlayer', False)
+        kwdict.setdefault('ntops', 1)
+        kwdict.setdefault('nprocesses', 1)
+        kwdict.setdefault('verbose', False)
+
+        assert set(kwdict) == set(OPTION_LIST)
+
+        ntp = super(Option, cls).__new__(cls, **kwdict)
 
         if not isinstance(ntp.sw_gbuf_bypass, tuple):
             raise TypeError('Option: sw_gbuf_bypass must be a tuple')
