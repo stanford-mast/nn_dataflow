@@ -143,6 +143,7 @@ def do_scheduling(args):
     bypass[de.FIL] = 'f' not in args.disable_bypass
     options = Option(sw_gbuf_bypass=tuple(bypass),
                      sw_solve_loopblocking=args.solve_loopblocking,
+                     hw_gbuf_save_writeback=args.enable_save_writeback,
                      partition_hybrid=args.hybrid_partition,
                      partition_batch=args.batch_partition,
                      partition_ifmaps=args.ifmaps_partition,
@@ -239,6 +240,10 @@ def argparser():
     ap.add_argument('--solve-loopblocking', action='store_true',
                     help='Use analytical solver to choose loop blocking. '
                          'Otherwise use exhaustive search.')
+    ap.add_argument('--enable-save-writeback', action='store_true',
+                    help='Allow to save the writeback to memory for the '
+                         'intermediate data between layers if able to '
+                         'store the entire data set in on-chip buffers.')
 
     ap.add_argument('--hybrid-partition',
                     '--hybrid-partition2d',  # deprecated old name

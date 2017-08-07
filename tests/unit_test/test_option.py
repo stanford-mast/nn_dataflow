@@ -98,6 +98,13 @@ class TestOption(unittest.TestCase):
         with self.assertRaisesRegexp(ValueError, 'Option: .*sw_gbuf_bypass.*'):
             _ = Option(sw_gbuf_bypass=(False, False))
 
+    def test_invalid_swsol_hwswb(self):
+        ''' Invalid sw_solve_loopblocking and hw_gbuf_save_writeback comb. '''
+        with self.assertRaisesRegexp(ValueError,
+                                     'Option: .*sw_solve_loopblocking.*'
+                                     'hw_gbuf_save_writeback.*'):
+            _ = Option(sw_solve_loopblocking=True, hw_gbuf_save_writeback=True)
+
     def test_invalid_part_hybrid_ifmaps(self):
         ''' Invalid partition_hybrid and partition_ifmaps comb. '''
         with self.assertRaisesRegexp(ValueError,

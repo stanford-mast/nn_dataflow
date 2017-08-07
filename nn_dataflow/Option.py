@@ -24,6 +24,7 @@ from . import DataCategoryEnum as de
 
 OPTION_LIST = ['sw_gbuf_bypass',
                'sw_solve_loopblocking',
+               'hw_gbuf_save_writeback',
                'partition_hybrid',
                'partition_batch',
                'partition_ifmaps',
@@ -60,6 +61,7 @@ class Option(namedtuple('Option', OPTION_LIST)):
 
         kwdict.setdefault('sw_gbuf_bypass', (False,) * de.NUM)
         kwdict.setdefault('sw_solve_loopblocking', False)
+        kwdict.setdefault('hw_gbuf_save_writeback', False)
         kwdict.setdefault('partition_hybrid', False)
         kwdict.setdefault('partition_batch', False)
         kwdict.setdefault('partition_ifmaps', False)
@@ -77,6 +79,11 @@ class Option(namedtuple('Option', OPTION_LIST)):
         if len(ntp.sw_gbuf_bypass) != de.NUM:
             raise ValueError('Option: sw_gbuf_bypass must have length {}'
                              .format(de.NUM))
+
+        if ntp.sw_solve_loopblocking and ntp.hw_gbuf_save_writeback:
+            raise ValueError('Option: sw_solve_loopblocking and '
+                             'hw_gbuf_save_writeback cannot be simultaneously '
+                             'enabled.')
 
         if ntp.partition_ifmaps and not ntp.partition_hybrid:
             raise ValueError('Option: partition_ifmaps requires '
