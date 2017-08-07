@@ -18,13 +18,181 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+import itertools
 from collections import OrderedDict, MutableMapping
 
+from . import LoopEnum as le
 from . import MemHierEnum as me
 from . import Util
 from .DataLayout import DataLayout
+from .Layer import ConvLayer
 from .Network import Network
 from .Scheduling import SchedulingResult
+
+class SegmentScheduleTiming(object):
+    ''' Timing information of a segment schedule. '''
+
+    class SpatialScheduleTiming(object):
+        ''' Time information of a spatial schedule. '''
+
+        def __init__(self, head=0, tail=0, tail_split=float('inf')):
+            self.head = head
+            self.tail = tail
+            self.tail_split = tail_split
+
+        def reset_tail(self, tail, tail_split):
+            ''' Add current tail to head and reset tail. '''
+            self.head += self.tail
+            self.tail = tail
+            self.tail_split = tail_split
+
+        def incr_tail(self, tail):
+            ''' Increment tail. '''
+            self.tail += tail
+
+        def time(self):
+            ''' Total time. '''
+            return self.head + self.tail
+
+        def split_time(self, tbat_split):
+            ''' Time with split tail. '''
+            return self.head + self.tail / self.tail_split / tbat_split
+
+        def __repr__(self):
+            return '{}(head={}, tail={}, tail_split={})' \
+                    .format(self.__class__.__name__, self.head, self.tail,
+                            self.tail_split)
+
+
+    def __init__(self, seg_idx, sp_timing_list=None, tbat_split=float('inf'),
+                 last_sched_seq=None):
+
+        # Segment index.
+        self.seg_idx = seg_idx
+
+        # A list of spatial schedule timing info in this segment.
+        self.sp_timing_list = sp_timing_list if sp_timing_list else []
+
+        # The top BAT loop factor, shared by all layers in the segment.
+        self.tbat_split = tbat_split
+
+        # Schedule sequence number of the last added schedule.
+        self.last_sched_seq = last_sched_seq if last_sched_seq else tuple()
+
+    def time(self):
+        ''' The total time of the segment schedule. '''
+
+        # The longest spatial schedule in the segment.
+        max_idx, max_sp_timing = max(enumerate(self.sp_timing_list),
+                                     key=lambda tpl: tpl[1].time())
+
+        t = 0
+
+        # Segment pipeline filling/draining time.
+        t += sum(sp_timing.split_time(self.tbat_split)
+                 for sp_timing in self.sp_timing_list[:-1])
+        # Segment critical stage time (minus filling/draining time).
+        t += max_sp_timing.time()
+
+        if max_idx != len(self.sp_timing_list) - 1:
+            # Minus the double counted part.
+            t -= max_sp_timing.split_time(self.tbat_split)
+
+        return t
+
+    def add(self, layer, sched_result):
+        ''' Add the SchedulingResult of a new layer. '''
+
+        # Schedule sequence number.
+        sched_seq = sched_result.sched_seq
+
+        # Loop blocking scheme: blocking factors and orders.
+        lp_ts = [None] * le.NUM
+        lp_ts[le.IFM] = sched_result.dict_loop['ti']
+        lp_ts[le.OFM] = sched_result.dict_loop['to']
+        lp_ts[le.BAT] = sched_result.dict_loop['tb']
+        bl_ts = list(zip(*lp_ts))
+        bl_ords = sched_result.dict_loop['orders']
+
+        # Check sched_seq, and find the incremented dimension.
+        if sched_seq[0] != self.seg_idx:
+            raise ValueError('SegmentScheduleTiming: sched_seq {} does not '
+                             'belong to segment {}'
+                             .format(sched_seq, self.seg_idx))
+
+        if not self.last_sched_seq:
+            if sched_seq[1] != 0 or sched_seq[2] != 0:
+                raise ValueError('SegmentScheduleTiming: sched_seq {} cannot '
+                                 'be the first schedule in segment {}'
+                                 .format(sched_seq, self.seg_idx))
+            incr_pos = 1
+
+        else:
+            incr_pos = 1 if sched_seq[1] != self.last_sched_seq[1] else 2
+
+            if sched_seq[incr_pos] != self.last_sched_seq[incr_pos] + 1:
+                raise ValueError('SegmentScheduleTiming: sched_seq {} cannot '
+                                 'follow {}'
+                                 .format(sched_seq, self.last_sched_seq))
+
+        assert 1 <= incr_pos <= 2
+
+        if incr_pos == 1:
+            self.sp_timing_list.append(
+                SegmentScheduleTiming.SpatialScheduleTiming())
+        assert sched_seq[1] + 1 == len(self.sp_timing_list)
+
+        self.last_sched_seq = sched_seq
+
+        sp_timing = self.sp_timing_list[-1]
+
+        if isinstance(layer, ConvLayer):
+            # Conv layer.
+
+            # Ordered loops from outer to inner with LoopEnum values and
+            # blocking factors.
+            ord_loops = []
+            for bl_t, bl_ord in zip(bl_ts, bl_ords):
+                lps = [None] * le.NUM
+                for lpe in range(le.NUM):
+                    lps[le.NUM - 1 - bl_ord[lpe]] = (lpe, bl_t[lpe])
+                assert None not in lps
+                ord_loops += lps
+            # Skip trivial loops.
+            ord_loops = [(lpe, t) for lpe, t in ord_loops if t > 1]
+
+            # Top BAT split factor.
+            tbat_split = 1.
+            for lpe, t in ord_loops:
+                if lpe == le.BAT:
+                    tbat_split *= t
+                else:
+                    break
+
+            # Tail split factor.
+            tail_split = 1.
+            for lpe, t in itertools.dropwhile(lambda tpl: tpl[0] == le.BAT,
+                                              ord_loops):
+                if lpe == le.OFM:
+                    tail_split *= t
+                else:
+                    break
+
+            self.tbat_split = min(self.tbat_split, tbat_split)
+            sp_timing.reset_tail(sched_result.total_time, tail_split)
+
+        else:
+            # Not Conv layer, accumulate tail time.
+            sp_timing.incr_tail(sched_result.total_time)
+
+    def __repr__(self):
+        return '{}(seg_idx={}, sp_timing_list={}, tbat_split={}, ' \
+               'last_sched_seq={})'.format(self.__class__.__name__,
+                                           self.seg_idx,
+                                           self.sp_timing_list,
+                                           self.tbat_split,
+                                           self.last_sched_seq)
+
 
 class NNDataflowScheme(MutableMapping):
     '''
@@ -45,8 +213,15 @@ class NNDataflowScheme(MutableMapping):
         self.input_layout = input_layout
 
         self.res_dict = OrderedDict()
+
         self.total_cost = 0
-        self.total_time = 0
+
+        # A list of segment schedule timing information.
+        self.seg_timing_list = []
+        # A list of segment time.
+        self.seg_time_list = []
+
+        self.last_sched_seq = (-1, 0, 0)
 
     def __getitem__(self, layer_name):
         ''' Get the SchedulingResult of a scheduled layer. '''
@@ -76,7 +251,8 @@ class NNDataflowScheme(MutableMapping):
 
         self.res_dict[layer_name] = sched_result
         self.total_cost += sched_result.total_cost
-        self.total_time += sched_result.total_time
+        self._update_time(layer_name, sched_result)
+        self.last_sched_seq = sched_result.sched_seq
 
     def __delitem__(self, layer_name):
         ''' Not legal to call. '''
@@ -104,6 +280,11 @@ class NNDataflowScheme(MutableMapping):
         assert Util.isclose(df.total_cost, self.total_cost, rel_tol=1e-5)
         assert Util.isclose(df.total_time, self.total_time, rel_tol=1e-5)
         return df
+
+    @property
+    def total_time(self):
+        ''' Get the total time. '''
+        return sum(self.seg_time_list)
 
     @property
     def total_ops(self):
@@ -156,4 +337,27 @@ class NNDataflowScheme(MutableMapping):
         ''' Layer total DRAM bandwidth in elements per cycle. '''
         return 1. * sched_result.total_accesses[me.DRAM] \
                 / sched_result.total_time
+
+    def _update_time(self, layer_name, sched_result):
+        '''
+        Update the total time.
+        '''
+
+        seg_idx = sched_result.sched_seq[0]
+
+        try:
+            timing = self.seg_timing_list[seg_idx]
+        except IndexError:
+            # A new segment.
+            if seg_idx != len(self.seg_timing_list):
+                raise ValueError('NNDataflowScheme: segment {} cannot follow '
+                                 'segment {}'
+                                 .format(seg_idx, len(self.seg_timing_list)))
+            timing = SegmentScheduleTiming(seg_idx)
+            self.seg_timing_list.append(timing)
+            self.seg_time_list.append(0)
+
+        timing.add(self.network[layer_name], sched_result)
+
+        self.seg_time_list[-1] = timing.time()
 
