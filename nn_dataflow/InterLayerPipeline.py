@@ -61,7 +61,7 @@ class InterLayerPipeline(object):
         scheduled, and different layers in a sub-tuple is temporally scheduled.
         '''
 
-        if not options.partition_interlayer:
+        if not (options.partition_interlayer or options.hw_gbuf_save_writeback):
             # No inter-layer pipelining, each vertex sequentially occupies the
             # whole resource.
             for layer in self.network:
@@ -70,10 +70,18 @@ class InterLayerPipeline(object):
 
         for segment in self._gen_segment():
 
-            segalloc = self._allocate_segment(segment,
-                                              max_util_drop=max_util_drop)
-            if segalloc:
-                yield segalloc
+            if options.partition_interlayer:
+
+                segalloc = self._allocate_segment(segment,
+                                                  max_util_drop=max_util_drop)
+                if segalloc:
+                    yield segalloc
+
+            if options.hw_gbuf_save_writeback:
+
+                segalloc = self._allocate_segment(segment, temporal=True)
+                if segalloc:
+                    yield segalloc
 
     def _gen_segment(self, vertex_idx=0, done=None):
         '''
@@ -169,7 +177,7 @@ class InterLayerPipeline(object):
         assert vertex_idx not in self.seg_vertex_done
         self.seg_vertex_done.add(vertex_idx)
 
-    def _allocate_segment(self, segment, max_util_drop=0.05):
+    def _allocate_segment(self, segment, temporal=False, max_util_drop=0.05):
         '''
         Allocate resource to the vertices in the given `segment`.
 
@@ -177,6 +185,10 @@ class InterLayerPipeline(object):
         tuples contains sub-tuples, where different sub-tuples are spatially
         scheduled, and different layers in a sub-tuple is temporally scheduled.
         Return None if allocation failed.
+
+        If `temporal` is True, the resource is allocated temporally to the
+        vertices in the given `segment`. Each layer in the segment will
+        sequentially use all the resources.
 
         `max_util_drop` specifies the maximum utilization drop due to mismatch
         throughput between vertices.
@@ -190,12 +202,27 @@ class InterLayerPipeline(object):
         for vidx in segment:
             layer_list.append(self.dag_vertex_list[vidx])
 
+        if temporal:
+            # Reduce the spatial dimension.
+            layer_list = [sum(layer_list, tuple())]
+
+            # Check. The spatial allocation won't have multiple previous layers
+            # feed a single layer, but could have a single layer feed multiple
+            # next layers. The latter case is not valid for temporal
+            # allocation, as there is nowhere to keep the output.
+            for layer in layer_list[0]:
+                if sum(nl in layer_list[0]
+                       for nl in self.network.next_layers(layer)) > 1:
+                    return None
+
         # Spatial allocation.
         proc_region = self.resource.proc_region
         dim_nodes = proc_region.dim
         total_nodes = dim_nodes.size()
 
         ops = [self.dag_vertex_ops[vidx] for vidx in segment]
+        if temporal:
+            ops = [sum(ops)]
 
         # Enforce a common factor among the numbers of nodes allocated to all
         # vertices in the segment. Such common factor is likely to be the
@@ -245,6 +272,10 @@ class InterLayerPipeline(object):
         # Allocate in the processing region according to the number of nodes.
         subregions = proc_region.allocate(nodes)
         assert subregions
+
+        if temporal:
+            assert len(subregions) == 1
+            assert subregions[0] == proc_region
 
         # The resource allocation.
         resource_list = []
