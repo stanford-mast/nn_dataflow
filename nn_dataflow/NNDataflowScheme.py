@@ -100,6 +100,10 @@ class SegmentScheduleTiming(object):
 
         return t
 
+    def critical_time(self):
+        ''' The critical pipeline stage time of the segment schedule. '''
+        return max(sp_timing.time() for sp_timing in self.sp_timing_list)
+
     def add(self, layer, sched_result):
         ''' Add the SchedulingResult of a new layer. '''
 
@@ -323,11 +327,13 @@ class NNDataflowScheme(MutableMapping):
         '''
         Compare function, based on total cost within certain time overhead.
         '''
-        if nndf1.total_time > nndf2.total_time * (1 + time_overhead):
-            return 1
-        elif nndf1.total_time * (1 + time_overhead) < nndf2.total_time:
-            return -1
-        return cmp(nndf1.total_cost, nndf2.total_cost)
+        valid1 = all(st.time() <= st.critical_time() * (1 + time_overhead)
+                     for st in nndf1.seg_timing_list)
+        valid2 = all(st.time() <= st.critical_time() * (1 + time_overhead)
+                     for st in nndf2.seg_timing_list)
+        # Valid is better (smaller) than invalid.
+        return cmp((not valid1, nndf1.total_cost),
+                   (not valid2, nndf2.total_cost))
 
     @classmethod
     def compare_cost_time(cls, nndf1, nndf2):
