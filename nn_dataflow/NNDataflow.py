@@ -366,14 +366,19 @@ class NNDataflow(object):
               with either data category (IFM or OFM), and the afterward ones
               inherit the final requirement of their previous ones.
           - with all temporal scheduling in the same spatial scheduling:
-            - if there are multiple CONV layers, the layers before the first
-              CONV layer (including) inherit the fully buffered data category
-              from the previous spatial scheduling; the first CONV layer also
-              fully buffers its OFM; the layers between the first and last CONV
-              layers (excluding) fully buffer both IFM and OFM; the layers
-              after the last CONV layer (including) fully buffer IFM.
-            - if there is a single CONV layers, the fully buffered data
-              category alternates at this CONV layer.
+            - all local-region layers are merged with their previous CONV
+              layers, composing CONV layer groups.
+            - the fully buffering requirement only applies to the first (IFM)
+              or the last (OFM) layer in the group. Layers in between do not
+              need to fully buffer (can stream instead).
+            - if there are multiple CONV layer groups, the first group inherits
+              the fully buffered data category from the previous spatial
+              scheduling; all the groups need to fully buffer both IFM and OFM,
+              except that the first group does not need to fully buffer IFM
+              (unless inherit), and the last group does not need to fully
+              buffer OFM.
+            - if there is a single CONV layer group, the fully buffered data
+              category alternates.
             - if there is no CONV layer, no requirement on fully buffering.
         - top BAT loop factor. With > 1 spatial scheduling, all layers must
           share the same factor; with single spatial scheduling, each temporal
@@ -411,15 +416,12 @@ class NNDataflow(object):
             # Temporal scheduling.
             cnt_temp = len(ltpl)
 
-            # Find first and last temporal scheduling CONV layers.
-            first_conv_layer_idx = None
-            last_conv_layer_idx = None
+            # Find CONV layer groups, representing by the CONV layer index.
+            conv_idx_list = []
             for tm_idx, layer in enumerate(ltpl):
                 if isinstance(self.network[layer], ConvLayer):
-                    last_conv_layer_idx = tm_idx
-                    if first_conv_layer_idx is None:
-                        first_conv_layer_idx = tm_idx
-            assert first_conv_layer_idx <= last_conv_layer_idx
+                    conv_idx_list.append(tm_idx)
+            assert all(p < n for p, n in zip(conv_idx_list, conv_idx_list[1:]))
 
             # Constraints for top loop factors.
             ttpl = [[None] * le.NUM for _ in range(cnt_temp)]
@@ -427,49 +429,45 @@ class NNDataflow(object):
             for top_bl_t in ttpl:
                 top_bl_t[le.BAT] = top_tb
 
-            if last_conv_layer_idx is None:
-                assert first_conv_layer_idx is None
+            if not conv_idx_list:
                 # No CONV layers.
 
                 # All layers have no requirements.
-
-            elif first_conv_layer_idx == last_conv_layer_idx:
-                # Only one CONV layer.
-
-                for tm_idx, top_bl_t in enumerate(ttpl):
-                    try:
-                        top_bl_t[_fb_constrained_lpe(fb_dce)] = 1
-                    except TypeError:
-                        assert fb_dce is None
-
-                    # Fully-buffered data category alternates at this layer.
-                    if tm_idx == first_conv_layer_idx:
-                        fb_dce = _fb_alter(fb_dce)
+                pass
 
             else:
-                # Multiple CONV layers.
+                # Get the begin and end of each group.
+                groups = [(beg, beg2 - 1) for beg, beg2
+                          in zip(conv_idx_list,
+                                 conv_idx_list[1:] + [cnt_temp])]
+                assert len(groups) == len(conv_idx_list)
 
-                for tm_idx, top_bl_t in enumerate(ttpl):
-                    if tm_idx <= first_conv_layer_idx:
-                        # Layers before the first CONV layer. Inherit.
-                        try:
-                            top_bl_t[_fb_constrained_lpe(fb_dce)] = 1
-                        except TypeError:
-                            assert fb_dce is None
-                        if tm_idx == first_conv_layer_idx:
-                            top_bl_t[le.OFM] = 1
-                    elif tm_idx < last_conv_layer_idx:
-                        # Layers in-between. Both IFM and OFM.
-                        top_bl_t[le.IFM] = 1
-                        top_bl_t[le.OFM] = 1
-                    else:
-                        assert tm_idx >= last_conv_layer_idx
-                        # Layers after the last CONV layer. IFM.
-                        top_bl_t[le.IFM] = 1
-                        fb_dce = de.IFM
+                # All groups buffers both IFM and OFM.
+                for beg, end in groups:
+                    ttpl[beg][le.IFM] = 1
+                    ttpl[end][le.OFM] = 1
 
-                # Final state is IFM.
-                assert fb_dce == de.IFM
+                # Cancel the requirement of the first and last group.
+                ttpl[groups[0][0]][le.IFM] = None
+                ttpl[groups[-1][-1]][le.OFM] = None
+
+                # The first group inherits previous spatial schedule.
+                if fb_dce == de.IFM:
+                    ttpl[groups[0][0]][le.IFM] = 1
+
+                    if groups[0][0] > 0:
+                        # If there are layers before the first group, and the
+                        # first group fully buffers IFM, this semi-group needs
+                        # to fully buffer OFM (in the last layer only).
+                        ttpl[groups[0][0] - 1][le.OFM] = 1
+
+                if len(conv_idx_list) == 1:
+                    # Alternate fully-buffered data category.
+                    fb_dce = _fb_alter(fb_dce)
+                else:
+                    # End with fully buffering OFM for the next spatial
+                    # schedule.
+                    fb_dce = de.OFM
 
             top_bl_t_list.append(ttpl)
 
