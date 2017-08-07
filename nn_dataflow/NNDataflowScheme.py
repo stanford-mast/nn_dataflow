@@ -310,6 +310,33 @@ class NNDataflowScheme(MutableMapping):
         return sum(sr.total_time * sr.dict_part['num_nodes']
                    for sr in self.values())
 
+    @classmethod
+    def compare_cost(cls, nndf1, nndf2):
+        '''
+        Compare function, based on total cost.
+        '''
+        return cls.compare_cost_with_time_overhead(nndf1, nndf2,
+                                                   time_overhead=float('inf'))
+
+    @classmethod
+    def compare_cost_with_time_overhead(cls, nndf1, nndf2, time_overhead=0.1):
+        '''
+        Compare function, based on total cost within certain time overhead.
+        '''
+        if nndf1.total_time > nndf2.total_time * (1 + time_overhead):
+            return 1
+        elif nndf1.total_time * (1 + time_overhead) < nndf2.total_time:
+            return -1
+        return cmp(nndf1.total_cost, nndf2.total_cost)
+
+    @classmethod
+    def compare_cost_time(cls, nndf1, nndf2):
+        '''
+        Compare function, based on product of total cost and total time.
+        '''
+        return cmp(nndf1.total_cost * nndf1.total_time,
+                   nndf2.total_cost * nndf2.total_time)
+
     def perlayer_stats(self, stats_name):
         '''
         Get a dict of per-layer stats. Valid stats must be a static method.

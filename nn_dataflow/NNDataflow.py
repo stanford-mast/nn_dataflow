@@ -75,8 +75,8 @@ class NNDataflow(object):
         self.ilp = InterLayerPipeline(self.network, self.resource)
         self.ordered_layer_list = self.ilp.ordered_layer_list()
 
-        # The key function to sort and pick the top NNDataflowScheme instances.
-        self.key_func = lambda nndf: nndf.total_cost
+        # The cmp function to sort and pick the top NNDataflowScheme instances.
+        self.cmp_func = NNDataflowScheme.compare_cost_with_time_overhead
 
         # NNDataflowScheme tops.
         # The top schemes are organized by the ending layers, and keeping
@@ -120,7 +120,7 @@ class NNDataflow(object):
                 tops += self._segment_schedule_search(seg, alloc, options)
 
             # Always pick and keep top n.
-            tops = sorted(tops, key=self.key_func)[:options.ntops]
+            tops = sorted(tops, cmp=self.cmp_func)[:options.ntops]
 
             # Add to the top list.
             assert layer_name not in self.nndf_tops
@@ -241,7 +241,7 @@ class NNDataflow(object):
                 break
 
         # Always pick and keep top n.
-        nndf_tops = sorted(nndf_tops, key=self.key_func)[:options.ntops]
+        nndf_tops = sorted(nndf_tops, cmp=self.cmp_func)[:options.ntops]
 
         return nndf_tops
 
@@ -294,7 +294,7 @@ class NNDataflow(object):
                 nndf_tops.append(nndf)
 
         # Always pick and keep top n at each layer.
-        return sorted(nndf_tops, key=self.key_func)[:options.ntops]
+        return sorted(nndf_tops, cmp=self.cmp_func)[:options.ntops]
 
     def _gen_layer_ifmap_layout(self, layer_name, prev_nndf_tops):
         '''
