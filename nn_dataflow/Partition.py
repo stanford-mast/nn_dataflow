@@ -37,11 +37,18 @@ Partition among multiple copies of the PE arrays.
 For our case, only deal with up to 2D layout of PE arrays.
 '''
 
-def gen_partition(layer, batch_size, dim_nodes, options):
+def gen_partition(layer, batch_size, dim_nodes, options, guaranteed=False):
     '''
     Generator for all possible partitioning schemes that partition `layer` into
     2D `dim_nodes` nodes.
+
+    If `guaranteed` is True, we guarantee to yield at least one partitioning
+    scheme regardless of efficiency.
     '''
+    # pylint: disable=too-many-branches
+
+    yielded = False
+
     for ph, pw in itertools.product(Util.factorize(dim_nodes.h, pe.NUM),
                                     Util.factorize(dim_nodes.w, pe.NUM)):
 
@@ -131,6 +138,28 @@ def gen_partition(layer, batch_size, dim_nodes, options):
             assert part.dim() == dim_nodes
 
             yield part
+
+            yielded = True
+
+    if guaranteed and not yielded:
+        # None of the Partitioning schemes are valid. May be due to
+        # non-dividability. Return a single naive scheme, with only OFMP or
+        # only OUTP.
+
+        pdims = [PhyDim2(1, 1)] * pe.NUM
+        order = range(pe.NUM)
+
+        if layer.hofm == 1 and layer.wofm == 1:
+            # Only OUTP, no OFMP.
+            pdims[pe.OUTP] = dim_nodes
+        else:
+            # Only OFMP, no OUTP.
+            pdims[pe.OFMP] = dim_nodes
+
+        part = PartitionScheme(order, pdims)
+        assert part.dim() == dim_nodes
+
+        yield part
 
 
 def part_layer_ofmap_range(layer, batch_size, part, pidx):

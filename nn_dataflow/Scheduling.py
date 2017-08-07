@@ -157,7 +157,8 @@ class Scheduling(object):
 
         # Explore parallel partitioning schemes.
         for part in Partition.gen_partition(self.layer, self.batch_size,
-                                            proc_region.dim, options):
+                                            proc_region.dim, options,
+                                            guaranteed=True):
             # Ofmap layout.
             ofmap_layout = Partition.get_ofmap_layout(
                 self.layer, self.batch_size, part, dst_data_region)

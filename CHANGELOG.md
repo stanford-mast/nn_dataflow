@@ -98,6 +98,8 @@ List of major changes and improvements
   - Add `type` attribute to `DataLayout` to denote the type of the reside
     region.
 
+  - Add guarantee to generate `PartitionScheme`.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.
