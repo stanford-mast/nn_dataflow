@@ -24,6 +24,7 @@ import math
 import unittest
 
 from nn_dataflow import Layer, ConvLayer, PoolingLayer
+from nn_dataflow import NodeRegion
 from nn_dataflow import ParallelEnum as pe
 from nn_dataflow import PartitionScheme
 from nn_dataflow import PhyDim2
@@ -127,9 +128,14 @@ class TestPartitionScheme(unittest.TestCase):
 
     def test_coordinate(self):
         ''' Get coordinate. '''
-        for ps in [self.ps1, self.ps2]:
+        nr1 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps1.dim(),
+                         type=NodeRegion.PROC)
+        nr2 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps2.dim(),
+                         type=NodeRegion.PROC)
 
-            coord_list = [ps.coordinate(pidx) for pidx in ps.gen_pidx()]
+        for ps, nr in zip([self.ps1, self.ps2], [nr1, nr2]):
+
+            coord_list = [ps.coordinate(nr, pidx) for pidx in ps.gen_pidx()]
 
             self.assertEqual(len(coord_list), ps.size())
             self.assertEqual(len(set(coord_list)), ps.size())
@@ -143,11 +149,11 @@ class TestPartitionScheme(unittest.TestCase):
         pidx = [PhyDim2(0, 0)] * pe.NUM
         pidx[pe.OUTP] = PhyDim2(1, 1)
 
-        self.assertEqual(self.ps1.coordinate(pidx),
+        self.assertEqual(self.ps1.coordinate(nr1, pidx),
                          self.ps1.dim(pe.OFMP, pe.INPP)
                          * PhyDim2(1, 1))
 
-        self.assertEqual(self.ps2.coordinate(pidx),
+        self.assertEqual(self.ps2.coordinate(nr2, pidx),
                          self.ps2.dim(pe.OFMP, pe.BATP, pe.INPP)
                          * PhyDim2(1, 1))
 

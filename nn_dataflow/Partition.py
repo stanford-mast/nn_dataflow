@@ -37,11 +37,18 @@ Partition among multiple copies of the PE arrays.
 For our case, only deal with up to 2D layout of PE arrays.
 '''
 
-def gen_partition(layer, batch_size, dim_nodes, options):
+def gen_partition(layer, batch_size, dim_nodes, options, guaranteed=False):
     '''
     Generator for all possible partitioning schemes that partition `layer` into
     2D `dim_nodes` nodes.
+
+    If `guaranteed` is True, we guarantee to yield at least one partitioning
+    scheme regardless of efficiency.
     '''
+    # pylint: disable=too-many-branches
+
+    yielded = False
+
     for ph, pw in itertools.product(Util.factorize(dim_nodes.h, pe.NUM),
                                     Util.factorize(dim_nodes.w, pe.NUM)):
 
@@ -132,6 +139,28 @@ def gen_partition(layer, batch_size, dim_nodes, options):
 
             yield part
 
+            yielded = True
+
+    if guaranteed and not yielded:
+        # None of the Partitioning schemes are valid. May be due to
+        # non-dividability. Return a single naive scheme, with only OFMP or
+        # only OUTP.
+
+        pdims = [PhyDim2(1, 1)] * pe.NUM
+        order = range(pe.NUM)
+
+        if layer.hofm == 1 and layer.wofm == 1:
+            # Only OUTP, no OFMP.
+            pdims[pe.OUTP] = dim_nodes
+        else:
+            # Only OFMP, no OUTP.
+            pdims[pe.OFMP] = dim_nodes
+
+        part = PartitionScheme(order, pdims)
+        assert part.dim() == dim_nodes
+
+        yield part
+
 
 def part_layer_ofmap_range(layer, batch_size, part, pidx):
     '''
@@ -210,11 +239,12 @@ def part_layer_ifmap_range(layer, batch_size, part, pidx):
                      FmapPosition(b=b_end, n=n_end, h=h_end, w=w_end))
 
 
-def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
-                          ifmap_layout, ofmap_layout, options):
+def part_layer_unit_nhops(layer, batch_size, part, node_region,
+                          filter_nodes, ifmap_layout, ofmap_layout, options):
     '''
     Get total number of hops for each data category when partitioning the given
-    layer computation workload with PartitionScheme `part`.
+    layer computation workload with PartitionScheme `part` on NodeRegion
+    `node_region`.
 
     `ifmap_layout` and (optional) `ofmap_layout` specify the data layouts of
     the i/ofmaps in memory as FmapRangeMap instances, mapping FmapPosition to
@@ -223,8 +253,10 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
 
     Since the filters are read-only and independent of the previous layer
     computation, we can duplicate filters in multiple memory nodes given by
-    `filter_node_coord_list`, and assume the accesses can be forwarded to the
-    nearest memory.
+    `filter_nodes`, and assume the accesses can be forwarded to the nearest
+    memory.
+
+    All node coordinates are given as absolute coordinates.
 
     Return a tuple with each element being the number of hops for each data
     category.
@@ -236,19 +268,22 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
     ifm_dict = {}
 
     for pidx in part.gen_pidx():
-        coord = part.coordinate(pidx)
+        coord = part.coordinate(node_region, pidx)
 
         # Computation workload (as an ofmap range) of this node coordinate.
         ofrng = part_layer_ofmap_range(layer, batch_size, part, pidx)
-        ofm_dict.setdefault(ofrng, []).append(coord)
+        if ofrng.size() > 0:
+            ofm_dict.setdefault(ofrng, []).append(coord)
 
         # Required ifmap range.
         ifrng = part_layer_ifmap_range(layer, batch_size, part, pidx)
-        ifm_dict.setdefault(ifrng, []).append(coord)
+        if ifrng.size() > 0:
+            ifm_dict.setdefault(ifrng, []).append(coord)
 
         # Filters, as a tuple of ((i_beg, i_end), (o_beg, o_end)).
         filrng = tuple(ifrng.beg_end('n')) + tuple(ofrng.beg_end('n'))
-        fil_dict.setdefault(filrng, []).append(coord)
+        if filrng[0][1] > filrng[0][0] and filrng[1][1] > filrng[1][0]:
+            fil_dict.setdefault(filrng, []).append(coord)
 
     if isinstance(layer, ConvLayer):
         assert all(len(v) == part.size(pe.INPP) for v in ofm_dict.values()), \
@@ -315,7 +350,7 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
                     * (filrng[1][1] - filrng[1][0]) \
                     * layer.filter_size()
             # Min hops to each node across all memory nodes.
-            min_hops = [min(coord.hop_dist(c) for c in filter_node_coord_list)
+            min_hops = [min(coord.hop_dist(c) for c in filter_nodes)
                         for coord in coord_list]
 
             if use_accfwd:
@@ -400,11 +435,11 @@ def get_ofmap_layout(layer, batch_size, part, out_data_region):
     ofmap_frmap = FmapRangeMap()
     for pidx in ofmap_part.gen_pidx():
         frng = part_layer_ofmap_range(layer, batch_size, ofmap_part, pidx)
-        coord = ofmap_part.coordinate(pidx)
+        coord = ofmap_part.coordinate(out_data_region, pidx)
         ofmap_frmap.add(frng, (coord,))
 
     ofmap_layout = DataLayout(frmap=ofmap_frmap,
-                              origin=out_data_region.origin,
+                              origin=PhyDim2(0, 0),
                               type=out_data_region.type)
     assert ofmap_layout.is_in_region(out_data_region)
 

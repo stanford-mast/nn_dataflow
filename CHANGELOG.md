@@ -12,7 +12,7 @@ List of major changes and improvements
   - Buffer sharing scheme.
 
 
-## [v1.4 -- v1.5] -- 2017-08-05
+## [v1.4 -- v1.5] -- 2017-08-17
 
 ### Added
 
@@ -30,6 +30,8 @@ List of major changes and improvements
 
   - Add `DataDimLoops` class to denote loops that are dimensions of a data
     category.
+
+  - Add neural neworks: MLP-L/M/S from PRIME ISCA 2016.
 
 - Software models.
 
@@ -106,6 +108,8 @@ List of major changes and improvements
   - Add `type` attribute to `DataLayout` to denote the type of the reside
     region.
 
+  - Add guarantee to generate `PartitionScheme`.
+
 - Software engineering.
 
   - Lazily evaluate loop blocking stats.
@@ -136,6 +140,8 @@ List of major changes and improvements
 - Partitioned ifmap range for `LocalRegionLayer`.
 
 - Clarify ITCN accesses to be number of individual transfers to each REGF.
+
+- `Partition` unit number of hops calculation ignores zero-sized data ranges.
 
 
 ## [v1.3 -- v1.4] -- 2017-05-18

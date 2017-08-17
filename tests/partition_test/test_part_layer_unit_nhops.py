@@ -68,6 +68,9 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
         part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
                                pdims=((2, 1), (2, 2), (1, 2), (1, 1)))
 
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=part.dim(),
+                        type=NodeRegion.PROC)
+
         # (0, 0, 0, 0): (0, 0, 0, 0) -- (4, 6, 18, 9): (-2, -2)
         # (0, 0, 0, 1): (0, 0, 0, 9) -- (4, 6, 18, 18): (-2, -1)
         # (1, 0, 0, 0): (4, 0, 0, 0) -- (8, 6, 18, 9): (-1, -2)
@@ -84,7 +87,7 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(2, 2),
             (1, 2, 2, 1), PhyDim2(2, 2))
 
-        filter_node_coord_list = [PhyDim2(0, 0)]
+        filter_nodes = [PhyDim2(0, 0)]
 
         # filter: (0, 0) -> all, 6 * 4 * 3 * 3
 
@@ -114,8 +117,8 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
         #        (3, 3) -> (3, 0/1/2/3)
 
         nhops = Partition.part_layer_unit_nhops(
-            layer, self.batch_size, part, filter_node_coord_list,
-            ilayout, olayout, self.options['BASE'])
+            layer, self.batch_size, part, nr,
+            filter_nodes, ilayout, olayout, self.options['BASE'])
 
         self.assertEqual(nhops[de.FIL],
                          6 * 4 * 3 * 3
@@ -140,6 +143,9 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
         part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
                                pdims=((2, 1), (2, 4), (1, 2), (2, 1)))
 
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=part.dim(),
+                        type=NodeRegion.PROC)
+
         ilayout = self._make_data_layout(
             layer.nifm, layer.hifm, layer.wifm, PhyDim2(-3, -3),
             (2, 4, 2, 2), PhyDim2(8, 4))
@@ -148,14 +154,14 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(5, 5),
             (1, 2, 2, 2), PhyDim2(2, 4))
 
-        filter_node_coord_list = [PhyDim2(0, 0), PhyDim2(7, 7)]
+        filter_nodes = [PhyDim2(0, 0), PhyDim2(7, 7)]
 
         nhops = Partition.part_layer_unit_nhops(
-            layer, self.batch_size, part, filter_node_coord_list,
-            ilayout, olayout, self.options['BASE'])
+            layer, self.batch_size, part, nr,
+            filter_nodes, ilayout, olayout, self.options['BASE'])
 
         true_nhops = self._true_unit_nhops(
-            layer, part, filter_node_coord_list, ilayout, olayout)
+            layer, part, nr, filter_nodes, ilayout, olayout)
 
         self.assertListEqual(nhops, true_nhops)
 
@@ -166,6 +172,9 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
         part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
                                pdims=((8, 1), (1, 1), (1, 2), (1, 4)))
 
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=part.dim(),
+                        type=NodeRegion.PROC)
+
         ilayout = self._make_data_layout(
             layer.nifm, layer.hifm, layer.wifm, PhyDim2(-3, 10),
             (2, 4, 1, 2), PhyDim2(4, 4))
@@ -174,14 +183,14 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(1, 1),
             (2, 2, 1, 1), PhyDim2(2, 2))
 
-        filter_node_coord_list = [PhyDim2(0, 0), PhyDim2(0, 7)]
+        filter_nodes = [PhyDim2(0, 0), PhyDim2(0, 7)]
 
         nhops = Partition.part_layer_unit_nhops(
-            layer, self.batch_size, part, filter_node_coord_list,
-            ilayout, olayout, self.options['BASE'])
+            layer, self.batch_size, part, nr,
+            filter_nodes, ilayout, olayout, self.options['BASE'])
 
         true_nhops = self._true_unit_nhops(
-            layer, part, filter_node_coord_list, ilayout, olayout)
+            layer, part, nr, filter_nodes, ilayout, olayout)
 
         self.assertListEqual(nhops, true_nhops)
 
@@ -192,6 +201,9 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
         part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
                                pdims=((2, 1), (2, 4), (2, 2), (1, 1)))
 
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=part.dim(),
+                        type=NodeRegion.PROC)
+
         ilayout = self._make_data_layout(
             layer.nifm, layer.hifm, layer.wifm, PhyDim2(-3, -3),
             (2, 4, 2, 2), PhyDim2(8, 4))
@@ -200,14 +212,14 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(5, 5),
             (1, 2, 2, 2), PhyDim2(2, 4))
 
-        filter_node_coord_list = []
+        filter_nodes = []
 
         nhops = Partition.part_layer_unit_nhops(
-            layer, self.batch_size, part, filter_node_coord_list,
-            ilayout, olayout, self.options['BASE'])
+            layer, self.batch_size, part, nr,
+            filter_nodes, ilayout, olayout, self.options['BASE'])
 
         true_nhops = self._true_unit_nhops(
-            layer, part, filter_node_coord_list, ilayout, olayout)
+            layer, part, nr, filter_nodes, ilayout, olayout)
 
         self.assertListEqual(nhops, true_nhops)
 
@@ -218,6 +230,9 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
         part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
                                pdims=((2, 1), (2, 4), (2, 2), (1, 1)))
 
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=part.dim(),
+                        type=NodeRegion.PROC)
+
         ilayout = self._make_data_layout(
             layer.nifm, layer.hifm, layer.wifm, PhyDim2(-3, -3),
             (2, 4, 2, 2), PhyDim2(8, 4))
@@ -226,14 +241,14 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(5, 5),
             (1, 2, 2, 2), PhyDim2(2, 4))
 
-        filter_node_coord_list = []
+        filter_nodes = []
 
         nhops = Partition.part_layer_unit_nhops(
-            layer, self.batch_size, part, filter_node_coord_list,
-            ilayout, olayout, self.options['BASE'])
+            layer, self.batch_size, part, nr,
+            filter_nodes, ilayout, olayout, self.options['BASE'])
 
         true_nhops = self._true_unit_nhops(
-            layer, part, filter_node_coord_list, ilayout, olayout)
+            layer, part, nr, filter_nodes, ilayout, olayout)
 
         self.assertListEqual(nhops, true_nhops)
 
@@ -244,6 +259,9 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
         part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
                                pdims=((1, 1), (1, 1), (1, 1), (1, 1)))
 
+        nr = NodeRegion(origin=PhyDim2(3, 3), dim=part.dim(),
+                        type=NodeRegion.PROC)
+
         ilayout = self._make_data_layout(
             layer.nifm, layer.hifm, layer.wifm, PhyDim2(-3, -3),
             (1, 1, 1, 1), PhyDim2(1, 1))
@@ -252,11 +270,14 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(3, 3),
             (1, 1, 1, 1), PhyDim2(1, 1))
 
-        filter_node_coord_list = [PhyDim2(3, -3)]
+        filter_nodes = [PhyDim2(3, -3)]
 
         nhops_1 = Partition.part_layer_unit_nhops(
-            layer, self.batch_size, part, filter_node_coord_list,
-            ilayout, olayout, self.options['BASE'])
+            layer, self.batch_size, part, nr,
+            filter_nodes, ilayout, olayout, self.options['BASE'])
+
+        nr = NodeRegion(origin=PhyDim2(6, 6), dim=part.dim(),
+                        type=NodeRegion.PROC)
 
         ilayout = self._make_data_layout(
             layer.nifm, layer.hifm, layer.wifm, PhyDim2(-6, -6),
@@ -266,11 +287,11 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(6, 6),
             (1, 1, 1, 1), PhyDim2(1, 1))
 
-        filter_node_coord_list = [PhyDim2(6, -6)]
+        filter_nodes = [PhyDim2(6, -6)]
 
         nhops_2 = Partition.part_layer_unit_nhops(
-            layer, self.batch_size, part, filter_node_coord_list,
-            ilayout, olayout, self.options['BASE'])
+            layer, self.batch_size, part, nr,
+            filter_nodes, ilayout, olayout, self.options['BASE'])
 
         self.assertListEqual(nhops_2, [n * 2 for n in nhops_1])
 
@@ -280,6 +301,9 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
 
         part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
                                pdims=((2, 1), (2, 4), (1, 2), (2, 1)))
+
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=part.dim(),
+                        type=NodeRegion.PROC)
 
         far_dist = 1000
 
@@ -294,13 +318,13 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
         filter_nodes = [PhyDim2(far_dist, 0), PhyDim2(0, far_dist)]
 
         nhops_base = Partition.part_layer_unit_nhops(
-            layer, self.batch_size, part,
+            layer, self.batch_size, part, nr,
             filter_nodes, ilayout, olayout, self.options['BASE'])
         nhops_accfwd = Partition.part_layer_unit_nhops(
-            layer, self.batch_size, part,
+            layer, self.batch_size, part, nr,
             filter_nodes, ilayout, olayout, self.options['ACCFWD'])
         nhops_bufshr = Partition.part_layer_unit_nhops(
-            layer, self.batch_size, part,
+            layer, self.batch_size, part, nr,
             filter_nodes, ilayout, olayout, self.options['BUFSHR'])
 
         for dce in range(de.NUM):
@@ -321,15 +345,15 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
         self.assertLess(nhops_accfwd[de.FIL],
                         p_layer.total_filter_size()
                         * part.size(pe.INPP, pe.OUTP)
-                        * (far_dist + part.size()))
+                        * (far_dist + nr.dim.size()))
         self.assertLess(nhops_accfwd[de.IFM],
                         p_layer.total_ifmap_size(p_batch_size)
                         * part.size(pe.INPP, pe.OFMP, pe.BATP)
-                        * (far_dist + part.size()))
+                        * (far_dist + nr.dim.size()))
         self.assertLess(nhops_accfwd[de.OFM],
                         p_layer.total_ofmap_size(p_batch_size)
                         * part.size(pe.OUTP, pe.OFMP, pe.BATP)
-                        * (far_dist + part.size()))
+                        * (far_dist + nr.dim.size()))
 
     def _make_data_layout(self, nfm, hfm, wfm, origin, nums, dims):
         ''' Make a DataLayout instance. '''
@@ -359,7 +383,7 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
 
         return dl
 
-    def _true_unit_nhops(self, layer, part, filnodes, ilayout, olayout):
+    def _true_unit_nhops(self, layer, part, region, filnodes, ilayout, olayout):
         '''
         Calculate the unit number of hops for i/ofmaps.
         '''
@@ -367,12 +391,12 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
 
         for pidx in part.gen_pidx():
 
-            coord = part.coordinate(pidx)
+            coord = part.coordinate(region, pidx)
             # Middle node of INPP.
             midpidx = list(pidx)
             midpidx[pe.INPP] = divmod(part.size(pe.INPP) // 2,
                                       part.dim(pe.INPP).w)
-            midcoord = part.coordinate(midpidx)
+            midcoord = part.coordinate(region, midpidx)
 
             # Ifmaps.
             ifr = Partition.part_layer_ifmap_range(

@@ -43,6 +43,10 @@ class TestPartitionFixture(unittest.TestCase):
         self.layers['IRR'] = ConvLayer(255, 383, 13, 3)
         # With small numbers of fmaps.
         self.layers['SM'] = ConvLayer(5, 3, 13, 3)
+        # Super small networks. No partitioning schemes.
+        self.layers['SSM1'] = ConvLayer(1, 1, 2, 3)
+        self.layers['SSM2'] = FCLayer(2, 2)
+        self.layers['SSM3'] = PoolingLayer(1, 2, 2)
 
         self.batch_size = 8
 
@@ -81,12 +85,14 @@ class TestPartitionFixture(unittest.TestCase):
                                         hw_gbuf_sharing=True,
                                         **optdict)
 
-    def _gen_partition(self, wlkey='BASE', dnkey='BASE', optkey='BASE'):
+    def _gen_partition(self, wlkey='BASE', dnkey='BASE', optkey='BASE',
+                       guaranteed=False):
         ''' Generate PartitionScheme. '''
         for part in Partition.gen_partition(self.layers[wlkey],
                                             self.batch_size,
                                             self.dim_nodes[dnkey],
-                                            self.options[optkey]):
+                                            self.options[optkey],
+                                            guaranteed=guaranteed):
             yield part
 
     def _gen_partition_full(self, wlkey='BASE', dnkey='BASE'):

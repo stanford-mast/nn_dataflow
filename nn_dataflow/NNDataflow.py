@@ -179,7 +179,8 @@ class NNDataflow(object):
         input_region = self.resource.dst_data_region()
 
         for part in Partition.gen_partition(input_layer, self.batch_size,
-                                            input_region.dim, options):
+                                            input_region.dim, options,
+                                            guaranteed=True):
             input_layout = Partition.get_ofmap_layout(
                 input_layer, self.batch_size, part, input_region)
 

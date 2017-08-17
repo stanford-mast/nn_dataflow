@@ -18,6 +18,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from nn_dataflow import NodeRegion
 from nn_dataflow import ParallelEnum as pe
 from nn_dataflow import PhyDim2
 from nn_dataflow import Util
@@ -201,11 +202,34 @@ class TestGenPartition(TestPartitionFixture):
                 / len(list(self._gen_partition_full()))
         self.assertLessEqual(r, 0.15)
 
+    def test_guaranteed(self):
+        ''' Guaranteed. '''
+        optkey = 'NOBATP'
+
+        for wlkey in self.layers:
+            if wlkey.startswith('SSM'):
+                print wlkey
+                self.assertEqual(len(list(self._gen_partition(wlkey=wlkey,
+                                                              optkey=optkey))),
+                                 0)
+
+                part_list = list(self._gen_partition(wlkey=wlkey,
+                                                     optkey=optkey,
+                                                     guaranteed=True))
+                self.assertEqual(len(part_list), 1)
+                part = part_list[0]
+                self.assertEqual(part.size(pe.BATP), 1)
+                self.assertEqual(part.size(pe.INPP), 1)
+                self.assertTrue(part.size(pe.OUTP) == 1
+                                or part.size(pe.OFMP) == 1)
+
     def _part_index_to_coord(self, part):
         ''' Get the mapping from partition index to coordinate. '''
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=part.dim(),
+                        type=NodeRegion.PROC)
         mapping = {}
         for pidx in part.gen_pidx():
-            coord = part.coordinate(pidx)
+            coord = part.coordinate(nr, pidx)
 
             assert len(pidx) == 4
             pindex = (pidx[pe.OFMP].h, pidx[pe.OFMP].w,
