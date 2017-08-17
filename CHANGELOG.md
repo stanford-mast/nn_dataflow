@@ -23,6 +23,8 @@ List of major changes and improvements
   - Add `DataDimLoops` class to denote loops that are dimensions of a data
     category.
 
+  - Add neural neworks: MLP-L/M/S from PRIME ISCA 2016.
+
 - Software models.
 
   - Add statistic properties to `SchedulingResult`.

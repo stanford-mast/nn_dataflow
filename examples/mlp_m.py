@@ -22,7 +22,7 @@ from nn_dataflow import Network
 from nn_dataflow import InputLayer, FCLayer
 
 '''
-MLP-S
+MLP-M
 
 PRIME, 2016
 '''
