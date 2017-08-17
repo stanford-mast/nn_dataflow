@@ -133,6 +133,8 @@ List of major changes and improvements
 
 - Clarify ITCN accesses to be number of individual transfers to each REGF.
 
+- `Partition` unit number of hops calculation ignores zero-sized data ranges.
+
 
 ## [v1.3 -- v1.4] -- 2017-05-18
 

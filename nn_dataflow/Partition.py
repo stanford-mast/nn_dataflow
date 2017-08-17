@@ -274,15 +274,18 @@ def part_layer_unit_nhops(layer, batch_size, part, node_region,
 
         # Computation workload (as an ofmap range) of this node coordinate.
         ofrng = part_layer_ofmap_range(layer, batch_size, part, pidx)
-        ofm_dict.setdefault(ofrng, []).append(coord)
+        if ofrng.size() > 0:
+            ofm_dict.setdefault(ofrng, []).append(coord)
 
         # Required ifmap range.
         ifrng = part_layer_ifmap_range(layer, batch_size, part, pidx)
-        ifm_dict.setdefault(ifrng, []).append(coord)
+        if ifrng.size() > 0:
+            ifm_dict.setdefault(ifrng, []).append(coord)
 
         # Filters, as a tuple of ((i_beg, i_end), (o_beg, o_end)).
         filrng = tuple(ifrng.beg_end('n')) + tuple(ofrng.beg_end('n'))
-        fil_dict.setdefault(filrng, []).append(coord)
+        if filrng[0][1] > filrng[0][0] and filrng[1][1] > filrng[1][0]:
+            fil_dict.setdefault(filrng, []).append(coord)
 
     if isinstance(layer, ConvLayer):
         assert all(len(v) == part.size(pe.INPP) for v in ofm_dict.values()), \
