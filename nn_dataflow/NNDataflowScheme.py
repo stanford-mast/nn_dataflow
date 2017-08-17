@@ -83,20 +83,15 @@ class SegmentScheduleTiming(object):
         ''' The total time of the segment schedule. '''
 
         # The longest spatial schedule in the segment.
-        max_idx, max_sp_timing = max(enumerate(self.sp_timing_list),
-                                     key=lambda tpl: tpl[1].time())
+        max_sp_timing = max(self.sp_timing_list, key=lambda spt: spt.time())
 
         t = 0
 
         # Segment pipeline filling/draining time.
         t += sum(sp_timing.split_time(self.tbat_split)
-                 for sp_timing in self.sp_timing_list[:-1])
+                 for sp_timing in self.sp_timing_list)
         # Segment critical stage time (minus filling/draining time).
-        t += max_sp_timing.time()
-
-        if max_idx != len(self.sp_timing_list) - 1:
-            # Minus the double counted part.
-            t -= max_sp_timing.split_time(self.tbat_split)
+        t += max_sp_timing.time() - max_sp_timing.split_time(self.tbat_split)
 
         return t
 
