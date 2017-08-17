@@ -97,15 +97,16 @@ class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
         for pidx in itertools.product(*gens):
             yield tuple(PhyDim2(*idx) for idx in pidx)
 
-    def coordinate(self, pidx):
+    def coordinate(self, node_region, pidx):
         '''
-        Get physical 2D coordinate from the given partition index.
+        Get the physical absolute 2D coordinate from the given partition index
+        in the given node region.
         '''
         coord = [0, 0]
         for penum in self.order:
             coord = [c * d + i for c, d, i
                      in zip(coord, self.pdims[penum], pidx[penum])]
-        return PhyDim2(*coord)
+        return node_region.rel2abs(PhyDim2(*coord))
 
     def part_layer(self, layer, batch_size):
         '''

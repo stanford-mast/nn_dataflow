@@ -239,11 +239,12 @@ def part_layer_ifmap_range(layer, batch_size, part, pidx):
                      FmapPosition(b=b_end, n=n_end, h=h_end, w=w_end))
 
 
-def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
-                          ifmap_layout, ofmap_layout, options):
+def part_layer_unit_nhops(layer, batch_size, part, node_region,
+                          filter_nodes, ifmap_layout, ofmap_layout, options):
     '''
     Get total number of hops for each data category when partitioning the given
-    layer computation workload with PartitionScheme `part`.
+    layer computation workload with PartitionScheme `part` on NodeRegion
+    `node_region`.
 
     `ifmap_layout` and (optional) `ofmap_layout` specify the data layouts of
     the i/ofmaps in memory as FmapRangeMap instances, mapping FmapPosition to
@@ -252,8 +253,10 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
 
     Since the filters are read-only and independent of the previous layer
     computation, we can duplicate filters in multiple memory nodes given by
-    `filter_node_coord_list`, and assume the accesses can be forwarded to the
-    nearest memory.
+    `filter_nodes`, and assume the accesses can be forwarded to the nearest
+    memory.
+
+    All node coordinates are given as absolute coordinates.
 
     Return a tuple with each element being the number of hops for each data
     category.
@@ -267,7 +270,7 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
     ifm_dict = {}
 
     for pidx in part.gen_pidx():
-        coord = part.coordinate(pidx)
+        coord = part.coordinate(node_region, pidx)
 
         # Computation workload (as an ofmap range) of this node coordinate.
         ofrng = part_layer_ofmap_range(layer, batch_size, part, pidx)
@@ -328,7 +331,7 @@ def part_layer_unit_nhops(layer, batch_size, part, filter_node_coord_list,
                     * layer.filter_size()
             for coord in coord_list:
                 min_hops = min(coord.hop_dist(c)
-                               for c in filter_node_coord_list)
+                               for c in filter_nodes)
                 nhops[de.FIL] += fil_size * min_hops
 
     return nhops
@@ -393,11 +396,11 @@ def get_ofmap_layout(layer, batch_size, part, out_data_region):
     ofmap_frmap = FmapRangeMap()
     for pidx in ofmap_part.gen_pidx():
         frng = part_layer_ofmap_range(layer, batch_size, ofmap_part, pidx)
-        coord = ofmap_part.coordinate(pidx)
+        coord = ofmap_part.coordinate(out_data_region, pidx)
         ofmap_frmap.add(frng, (coord,))
 
     ofmap_layout = DataLayout(frmap=ofmap_frmap,
-                              origin=out_data_region.origin,
+                              origin=PhyDim2(0, 0),
                               type=out_data_region.type)
     assert ofmap_layout.is_in_region(out_data_region)
 

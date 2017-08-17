@@ -18,6 +18,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+import itertools
 from collections import OrderedDict, namedtuple
 
 from . import LoopBlocking
@@ -151,9 +152,8 @@ class Scheduling(object):
                              'input layer.')
 
         # Filter nodes. All memory nodes can store filters. Deduplicate.
-        filter_node_coord_list = [c for c in src_data_region.node_iter()] \
-                               + [c for c in dst_data_region.node_iter()]
-        filter_node_coord_list = list(set(filter_node_coord_list))
+        filter_nodes = set(itertools.chain(src_data_region.node_iter(),
+                                           dst_data_region.node_iter()))
 
         # Explore parallel partitioning schemes.
         for part in Partition.gen_partition(self.layer, self.batch_size,
@@ -164,12 +164,9 @@ class Scheduling(object):
                 self.layer, self.batch_size, part, dst_data_region)
 
             # Partition NoC hop cost.
-            # Layouts are viewed from the processing region origin.
             unit_nhops = Partition.part_layer_unit_nhops(
-                self.layer, self.batch_size, part, filter_node_coord_list,
-                ifmap_layout.view(origin_diff=-proc_region.origin),
-                ofmap_layout.view(origin_diff=-proc_region.origin),
-                options)
+                self.layer, self.batch_size, part, proc_region,
+                filter_nodes, ifmap_layout, ofmap_layout, options)
 
             # Explore single-node schedules.
             for lbs in self.schedule_search_per_node(

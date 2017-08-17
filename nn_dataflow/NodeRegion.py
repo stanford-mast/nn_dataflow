@@ -76,3 +76,14 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
             cnt += 1
             yield coord
 
+    def rel2abs(self, rel_coordinate):
+        ''' Convert relative node coordinate to absolute node coordinate. '''
+        if not isinstance(rel_coordinate, PhyDim2):
+            raise TypeError('NodeRegion: relative coordinate must be '
+                            'a PhyDim2 object.')
+        abs_coordinate = self.origin + rel_coordinate
+        if not self.contains_node(abs_coordinate):
+            raise ValueError('NodeRegion: relative coordinate {} is not '
+                             'in node region {}'.format(rel_coordinate, self))
+        return abs_coordinate
+

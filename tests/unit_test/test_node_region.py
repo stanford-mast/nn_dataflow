@@ -82,3 +82,41 @@ class TestNodeRegion(unittest.TestCase):
         for c in nr.node_iter():
             self.assertTrue(nr.contains_node(c))
 
+    def test_rel2abs(self):
+        ''' Get rel2abs. '''
+        nr = NodeRegion(dim=PhyDim2(4, 4),
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC)
+
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(0, 3)), (1, 6))
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(2, 1)), (3, 4))
+
+        self.assertSetEqual(set(nr.rel2abs(PhyDim2(h, w))
+                                for h in range(nr.dim.h)
+                                for w in range(nr.dim.w)),
+                            set(nr.node_iter()))
+
+    def test_rel2abs_invalid_type(self):
+        ''' Get rel2abs invalid type. '''
+        nr = NodeRegion(dim=PhyDim2(4, 4),
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC)
+
+        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*PhyDim2.*'):
+            _ = nr.rel2abs((0, 0))
+
+        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*PhyDim2.*'):
+            _ = nr.rel2abs(1)
+
+    def test_rel2abs_not_in(self):
+        ''' Get rel2abs not in. '''
+        nr = NodeRegion(dim=PhyDim2(4, 4),
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC)
+
+        with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*not in.*'):
+            _ = nr.rel2abs(PhyDim2(-1, 0))
+
+        with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*not in.*'):
+            _ = nr.rel2abs(PhyDim2(0, 4))
+
