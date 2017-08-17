@@ -70,6 +70,16 @@ class TestPartitionFixture(unittest.TestCase):
                                        partition_batch=True,
                                        partition_ifmaps=False,
                                        **optdict)
+        self.options['ACCFWD'] = Option(partition_hybrid=True,
+                                        partition_batch=True,
+                                        partition_ifmaps=True,
+                                        hw_access_forwarding=True,
+                                        **optdict)
+        self.options['BUFSHR'] = Option(partition_hybrid=True,
+                                        partition_batch=True,
+                                        partition_ifmaps=True,
+                                        hw_gbuf_sharing=True,
+                                        **optdict)
 
     def _gen_partition(self, wlkey='BASE', dnkey='BASE', optkey='BASE'):
         ''' Generate PartitionScheme. '''
