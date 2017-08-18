@@ -184,14 +184,6 @@ def do_scheduling(args):
     return res_map
 
 
-def main(args):
-    ''' Main function. '''
-    json.dump(do_scheduling(args), sys.stdout, indent=2,
-              default=lambda _: None)
-    sys.stdout.write('\n')
-    return 0
-
-
 def argparser():
     ''' Argument parser. '''
 
@@ -265,6 +257,15 @@ def argparser():
     return ap
 
 
+def main():
+    ''' Main function. '''
+    args = argparser().parse_args()
+    json.dump(do_scheduling(args), sys.stdout, indent=2,
+              default=lambda _: None)
+    sys.stdout.write('\n')
+    return 0
+
+
 if __name__ == '__main__':
-    sys.exit(main(argparser().parse_args()))
+    sys.exit(main())
 
