@@ -36,6 +36,7 @@ from nn_dataflow.core import Option
 from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import Resource
 
+from nn_dataflow.nns import all_networks
 from nn_dataflow.nns import import_network
 
 def stats_dict(dfsch, cost):
@@ -197,7 +198,8 @@ def argparser():
     ap = argparse.ArgumentParser()
 
     ap.add_argument('net',
-                    help='network name, should be a .py file under "nns"')
+                    help='network name, should be a .py file under "nns". '
+                         'Choices: {}.'.format(', '.join(all_networks())))
 
     ap.add_argument('--batch', type=int, required=True,
                     help='batch size')

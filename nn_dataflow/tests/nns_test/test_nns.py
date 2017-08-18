@@ -18,27 +18,29 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-def import_network(name):
-    '''
-    Import an example network.
-    '''
-    import importlib
+import unittest
 
-    if name not in all_networks():
-        raise ImportError('nns: NN {} has not been defined!'.format(name))
-    netmod = importlib.import_module('.' + name, 'nn_dataflow.nns')
-    network = netmod.NN
-    return network
+from nn_dataflow.core import Network
 
+import nn_dataflow.nns as nns
 
-def all_networks():
-    '''
-    Get all defined networks.
-    '''
-    import os
+class TestNNs(unittest.TestCase):
+    ''' Tests for NN definitions. '''
 
-    nns_dir = os.path.dirname(os.path.abspath(__file__))
-    nns = [f[:-len('.py')] for f in os.listdir(nns_dir)
-           if f.endswith('.py') and not f.startswith('__')]
-    return list(sorted(nns))
+    def test_all_networks(self):
+        ''' Get all_networks. '''
+        self.assertIn('alex_net', nns.all_networks())
+        self.assertIn('vgg_net', nns.all_networks())
+        self.assertGreater(len(nns.all_networks()), 5)
+
+    def test_import_network(self):
+        ''' Get import_network. '''
+        for name in nns.all_networks():
+            network = nns.import_network(name)
+            self.assertIsInstance(network, Network)
+
+    def test_import_network_invalid(self):
+        ''' Get import_network invalid. '''
+        with self.assertRaisesRegexp(ImportError, 'nns: .*defined.*'):
+            _ = nns.import_network('aaa')
 
