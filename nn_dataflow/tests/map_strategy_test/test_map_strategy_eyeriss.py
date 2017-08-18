@@ -18,13 +18,13 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from nn_dataflow import DataDimLoops
-from nn_dataflow import DataCategoryEnum as de
-from nn_dataflow import Layer, ConvLayer
-from nn_dataflow import LoopEnum as le
-from nn_dataflow import MapStrategyEyeriss
-from nn_dataflow import MemHierEnum as me
-from nn_dataflow import Util
+from nn_dataflow.core import DataDimLoops
+from nn_dataflow.core import DataCategoryEnum as de
+from nn_dataflow.core import Layer, ConvLayer
+from nn_dataflow.core import LoopEnum as le
+from nn_dataflow.core import MapStrategyEyeriss
+from nn_dataflow.core import MemHierEnum as me
+from nn_dataflow import util
 
 from . import TestMapStrategyFixture
 
@@ -63,7 +63,7 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
                 # Total and unit ops.
                 self.assertAlmostEqual(nld.total_ops(),
                                        layer.total_ops(batch_size))
-                self.assertAlmostEqual(nld.unit_ops * Util.prod(nld.loopcnt),
+                self.assertAlmostEqual(nld.unit_ops * util.prod(nld.loopcnt),
                                        layer.total_ops(batch_size))
 
                 # Unit time and unit ops.
@@ -86,14 +86,14 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
 
                 # Unit access to REGF.
                 self.assertAlmostEqual(nld.unit_access[me.REGF][de.FIL]
-                                       * Util.prod(nld.loopcnt),
+                                       * util.prod(nld.loopcnt),
                                        layer.total_ops(batch_size)
                                        if isinstance(layer, ConvLayer) else 0)
                 self.assertAlmostEqual(nld.unit_access[me.REGF][de.IFM]
-                                       * Util.prod(nld.loopcnt),
+                                       * util.prod(nld.loopcnt),
                                        layer.total_ops(batch_size))
                 self.assertAlmostEqual(nld.unit_access[me.REGF][de.OFM]
-                                       * Util.prod(nld.loopcnt),
+                                       * util.prod(nld.loopcnt),
                                        layer.total_ops(batch_size))
 
                 # Unit GBUF size and unit access to DRAM.
@@ -144,7 +144,7 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
         # Fold to batch size.
         fold_w = ms.fold.w
         folded_layer = ConvLayer(layer.nifm, layer.nofm,
-                                 (Util.idivc(layer.hofm, fold_w), layer.wofm),
+                                 (util.idivc(layer.hofm, fold_w), layer.wofm),
                                  (layer.hfil, layer.wfil),
                                  strd=(layer.htrd, layer.wtrd))
         folded_batch_size = batch_size * fold_w

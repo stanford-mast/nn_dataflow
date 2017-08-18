@@ -20,16 +20,16 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import itertools
 
-from nn_dataflow import ConvLayer
-from nn_dataflow import DataCategoryEnum as de
-from nn_dataflow import DataLayout
-from nn_dataflow import FmapRange, FmapRangeMap
-from nn_dataflow import NodeRegion
-from nn_dataflow import ParallelEnum as pe
-from nn_dataflow import Partition
-from nn_dataflow import PartitionScheme
-from nn_dataflow import PhyDim2
-from nn_dataflow import Util
+from nn_dataflow.core import partition
+from nn_dataflow.core import ConvLayer
+from nn_dataflow.core import DataCategoryEnum as de
+from nn_dataflow.core import DataLayout
+from nn_dataflow.core import FmapRange, FmapRangeMap
+from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import ParallelEnum as pe
+from nn_dataflow.core import PartitionScheme
+from nn_dataflow.core import PhyDim2
+from nn_dataflow import util
 
 from . import TestPartitionFixture
 
@@ -116,7 +116,7 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
         #        (3, 2) -> (2, 0/1/2/3)
         #        (3, 3) -> (3, 0/1/2/3)
 
-        nhops = Partition.part_layer_unit_nhops(
+        nhops = partition.part_layer_unit_nhops(
             layer, self.batch_size, part, nr,
             filter_nodes, ilayout, olayout, self.options['BASE'])
 
@@ -156,7 +156,7 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
 
         filter_nodes = [PhyDim2(0, 0), PhyDim2(7, 7)]
 
-        nhops = Partition.part_layer_unit_nhops(
+        nhops = partition.part_layer_unit_nhops(
             layer, self.batch_size, part, nr,
             filter_nodes, ilayout, olayout, self.options['BASE'])
 
@@ -185,7 +185,7 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
 
         filter_nodes = [PhyDim2(0, 0), PhyDim2(0, 7)]
 
-        nhops = Partition.part_layer_unit_nhops(
+        nhops = partition.part_layer_unit_nhops(
             layer, self.batch_size, part, nr,
             filter_nodes, ilayout, olayout, self.options['BASE'])
 
@@ -214,7 +214,7 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
 
         filter_nodes = []
 
-        nhops = Partition.part_layer_unit_nhops(
+        nhops = partition.part_layer_unit_nhops(
             layer, self.batch_size, part, nr,
             filter_nodes, ilayout, olayout, self.options['BASE'])
 
@@ -243,7 +243,7 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
 
         filter_nodes = []
 
-        nhops = Partition.part_layer_unit_nhops(
+        nhops = partition.part_layer_unit_nhops(
             layer, self.batch_size, part, nr,
             filter_nodes, ilayout, olayout, self.options['BASE'])
 
@@ -272,7 +272,7 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
 
         filter_nodes = [PhyDim2(3, -3)]
 
-        nhops_1 = Partition.part_layer_unit_nhops(
+        nhops_1 = partition.part_layer_unit_nhops(
             layer, self.batch_size, part, nr,
             filter_nodes, ilayout, olayout, self.options['BASE'])
 
@@ -289,7 +289,7 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
 
         filter_nodes = [PhyDim2(6, -6)]
 
-        nhops_2 = Partition.part_layer_unit_nhops(
+        nhops_2 = partition.part_layer_unit_nhops(
             layer, self.batch_size, part, nr,
             filter_nodes, ilayout, olayout, self.options['BASE'])
 
@@ -297,7 +297,7 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
 
     def _make_data_layout(self, nfm, hfm, wfm, origin, nums, dims):
         ''' Make a DataLayout instance. '''
-        assert Util.prod(nums) == dims.size()
+        assert util.prod(nums) == dims.size()
 
         def _coord(idxs):
             # In the order of n, b, w, h, i.e., 1, 0, 3, 2.
@@ -319,7 +319,7 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
             frmap.add(FmapRange(begs, ends), (_coord(idxs),))
 
         dl = DataLayout(frmap=frmap, origin=origin, type=NodeRegion.DATA)
-        assert dl.frmap.complete_fmap_range().size() == Util.prod(sizes)
+        assert dl.frmap.complete_fmap_range().size() == util.prod(sizes)
 
         return dl
 
@@ -339,14 +339,14 @@ class TestPartLayerUnitNhops(TestPartitionFixture):
             midcoord = part.coordinate(region, midpidx)
 
             # Ifmaps.
-            ifr = Partition.part_layer_ifmap_range(
+            ifr = partition.part_layer_ifmap_range(
                 layer, self.batch_size, part, pidx)
             for srcs, size in ilayout.frmap.rget_counter(ifr).items():
                 nhops[de.IFM] += sum(coord.hop_dist(s + ilayout.origin)
                                      for s in srcs) * size
 
             # Ofmaps.
-            ofr = Partition.part_layer_ofmap_range(
+            ofr = partition.part_layer_ofmap_range(
                 layer, self.batch_size, part, pidx)
             if coord == midcoord:
                 # From/to sources.

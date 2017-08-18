@@ -21,10 +21,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 from collections import OrderedDict
 import itertools
 
-from . import DataCategoryEnum as de
-from . import LoopEnum as le
-from . import MemHierEnum as me
-from . import Util
+from . import data_category_enum as de
+from . import loop_enum as le
+from . import mem_hier_enum as me
+from .. import util
 
 class LoopBlockingScheme(object):
     '''
@@ -104,7 +104,7 @@ class LoopBlockingScheme(object):
                     'LoopBlockingScheme: invalid blocking LP {}: {} for {}.' \
                     .format(lpe, self.bl_ts, self.nld.loopcnt)
 
-        self.lcnt = Util.prod(bl_tp)
+        self.lcnt = util.prod(bl_tp)
 
         # Buffer data size for one unit.
         self.unit_size = [tuple() for _ in range(BL.NUM)]
@@ -442,7 +442,7 @@ class LoopBlockingScheme(object):
         `bl_lvls`.
         '''
         assert isinstance(bl_lvls, slice)
-        return [Util.prod(ts[bl_lvls]) for ts in zip(*self.bl_ts)]
+        return [util.prod(ts[bl_lvls]) for ts in zip(*self.bl_ts)]
 
     def _t_data_cnt(self, bl_t):
         '''

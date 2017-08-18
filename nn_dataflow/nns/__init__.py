@@ -25,11 +25,10 @@ def import_network(name):
     import os
     import importlib
 
-    example_dir = os.path.dirname(os.path.abspath(__file__))
-    top_dir = os.path.join(example_dir, '..')
-    if not os.path.isfile(os.path.join(example_dir, '__init__.py')):
-        raise ImportError
-    nets = importlib.import_module('examples.' + name, top_dir)
-    network = nets.NN
+    nns_dir = os.path.dirname(os.path.abspath(__file__))
+    if not os.path.isfile(os.path.join(nns_dir, '{}.py'.format(name))):
+        raise ImportError('nns: NN {} has not been defined!'.format(name))
+    netmod = importlib.import_module('.' + name, 'nn_dataflow.nns')
+    network = netmod.NN
     return network
 

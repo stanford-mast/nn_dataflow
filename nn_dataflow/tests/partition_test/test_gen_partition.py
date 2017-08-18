@@ -18,10 +18,10 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from nn_dataflow import NodeRegion
-from nn_dataflow import ParallelEnum as pe
-from nn_dataflow import PhyDim2
-from nn_dataflow import Util
+from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import ParallelEnum as pe
+from nn_dataflow.core import PhyDim2
+from nn_dataflow import util
 
 from . import TestPartitionFixture
 
@@ -52,12 +52,12 @@ class TestGenPartition(TestPartitionFixture):
                     sz_outp = part.size(pe.OUTP)
                     sz_inpp = part.size(pe.INPP)
 
-                    self.assertTrue(Util.approx_dividable(layer.hofm,
+                    self.assertTrue(util.approx_dividable(layer.hofm,
                                                           dim_ofmp.h))
-                    self.assertTrue(Util.approx_dividable(layer.wofm,
+                    self.assertTrue(util.approx_dividable(layer.wofm,
                                                           dim_ofmp.w))
-                    self.assertTrue(Util.approx_dividable(layer.nofm, sz_outp))
-                    self.assertTrue(Util.approx_dividable(layer.nifm, sz_inpp))
+                    self.assertTrue(util.approx_dividable(layer.nofm, sz_outp))
+                    self.assertTrue(util.approx_dividable(layer.nifm, sz_inpp))
 
     def test_part_batch_div(self):
         ''' BATP dividable. '''

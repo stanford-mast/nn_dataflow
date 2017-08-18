@@ -25,17 +25,18 @@ import sys
 from collections import OrderedDict
 
 from nn_dataflow import __version__ as VERSION
-from nn_dataflow import NNDataflow
-from nn_dataflow import Cost
-from nn_dataflow import DataCategoryEnum as de
-from nn_dataflow import MapStrategyEyeriss
-from nn_dataflow import MemHierEnum as me
-from nn_dataflow import NodeRegion
-from nn_dataflow import Option
-from nn_dataflow import PhyDim2
-from nn_dataflow import Resource
 
-from examples import import_network
+from nn_dataflow.core import NNDataflow
+from nn_dataflow.core import Cost
+from nn_dataflow.core import DataCategoryEnum as de
+from nn_dataflow.core import MapStrategyEyeriss
+from nn_dataflow.core import MemHierEnum as me
+from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import Option
+from nn_dataflow.core import PhyDim2
+from nn_dataflow.core import Resource
+
+from nn_dataflow.nns import import_network
 
 def stats_dict(dfsch, cost):
     '''
@@ -196,7 +197,7 @@ def argparser():
     ap = argparse.ArgumentParser()
 
     ap.add_argument('net',
-                    help='network name, should be a .py file under examples')
+                    help='network name, should be a .py file under "nns"')
 
     ap.add_argument('--batch', type=int, required=True,
                     help='batch size')

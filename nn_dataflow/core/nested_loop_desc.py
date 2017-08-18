@@ -20,11 +20,11 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import namedtuple
 
-from . import DataDimLoops
-from . import DataCategoryEnum as de
-from . import LoopEnum as le
-from . import MemHierEnum as me
-from . import Util
+from . import data_category_enum as de
+from . import loop_enum as le
+from . import mem_hier_enum as me
+from .. import util
+from .data_dim_loops import DataDimLoops
 
 NESTED_LOOP_DESC_LIST = ['loopcnt',
                          'usize_gbuf',
@@ -114,7 +114,7 @@ class NestedLoopDesc(namedtuple('NestedLoopDesc', NESTED_LOOP_DESC_LIST)):
         '''
         Get the total number of ops for all loops.
         '''
-        return self.unit_ops * Util.prod(self.loopcnt)
+        return self.unit_ops * util.prod(self.loopcnt)
 
     def total_access_at_of(self, mhe, dce=None):
         '''

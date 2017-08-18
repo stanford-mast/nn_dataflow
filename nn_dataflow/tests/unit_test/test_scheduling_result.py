@@ -21,11 +21,11 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import unittest
 from collections import OrderedDict
 
-from nn_dataflow import DataLayout
-from nn_dataflow import FmapRange, FmapRangeMap
-from nn_dataflow import NodeRegion
-from nn_dataflow import PhyDim2
-from nn_dataflow import SchedulingResult
+from nn_dataflow.core import DataLayout
+from nn_dataflow.core import FmapRange, FmapRangeMap
+from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import PhyDim2
+from nn_dataflow.core import SchedulingResult
 
 class TestSchedulingResult(unittest.TestCase):
     ''' Tests for SchedulingResult. '''

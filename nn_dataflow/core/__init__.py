@@ -18,30 +18,30 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from . import DataCategoryEnum
-from . import LoopBlocking
-from . import LoopBlockingSolver
-from . import LoopEnum
-from . import MemHierEnum
-from . import ParallelEnum
-from . import Partition
-from .Cost import Cost
-from .DataDimLoops import DataDimLoops
-from .DataLayout import DataLayout
-from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
-from .Layer import Layer, InputLayer, ConvLayer, FCLayer, \
+from . import loop_blocking
+from . import loop_blocking_solver
+from . import partition
+from . import data_category_enum as DataCategoryEnum
+from . import loop_enum as LoopEnum
+from . import mem_hier_enum as MemHierEnum
+from . import parallel_enum as ParallelEnum
+from .cost import Cost
+from .data_dim_loops import DataDimLoops
+from .data_layout import DataLayout
+from .fmap_range import FmapPosition, FmapRange, FmapRangeMap
+from .layer import Layer, InputLayer, ConvLayer, FCLayer, \
         LocalRegionLayer, PoolingLayer
-from .LoopBlockingScheme import LoopBlockingScheme
-from .MapStrategy import MapStrategy, MapStrategyEyeriss
-from .NestedLoopDesc import NestedLoopDesc
-from .Network import Network
-from .NodeRegion import NodeRegion
-from .NNDataflowScheme import NNDataflowScheme
-from .Option import Option
-from .PartitionScheme import PartitionScheme
-from .PhyDim2 import PhyDim2
-from .Resource import Resource
-from .Scheduling import SchedulingCondition, SchedulingResult, Scheduling
+from .loop_blocking_scheme import LoopBlockingScheme
+from .map_strategy import MapStrategy, MapStrategyEyeriss
+from .nested_loop_desc import NestedLoopDesc
+from .network import Network
+from .node_region import NodeRegion
+from .nn_dataflow_scheme import NNDataflowScheme
+from .option import Option
+from .partition_scheme import PartitionScheme
+from .phy_dim2 import PhyDim2
+from .resource import Resource
+from .scheduling import SchedulingCondition, SchedulingResult, Scheduling
 
-from .NNDataflow import NNDataflow
+from .nn_dataflow import NNDataflow
 

@@ -18,15 +18,15 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from nn_dataflow import DataCategoryEnum as de
-from nn_dataflow import LoopBlockingSolver
-from nn_dataflow import MemHierEnum as me
-from nn_dataflow import Option
+from nn_dataflow.core import DataCategoryEnum as de
+from nn_dataflow.core import loop_blocking_solver
+from nn_dataflow.core import MemHierEnum as me
+from nn_dataflow.core import Option
 
 from . import TestLoopBlockingFixture
 
 class TestLoopBlockingSolver(TestLoopBlockingFixture):
-    ''' Tests for LoopBlockingSolver module. '''
+    ''' Tests for loop_blocking_solver module. '''
 
     def setUp(self):
 
@@ -51,7 +51,7 @@ class TestLoopBlockingSolver(TestLoopBlockingFixture):
             optkey = self.optkeys_bypsol[reside_dce]
 
             for bl_ts, bl_ords \
-                    in LoopBlockingSolver.gen_loopblocking_gbuf_reside(
+                    in loop_blocking_solver.gen_loopblocking_gbuf_reside(
                             self.nld['BASE'], self.resource['BASE'],
                             self.options[optkey]):
 
@@ -100,7 +100,7 @@ class TestLoopBlockingSolver(TestLoopBlockingFixture):
             optkey = self.optkeys_bypsol[reside_dce]
 
             for bl_ts, bl_ords \
-                    in LoopBlockingSolver.gen_loopblocking_gbuf_reside(
+                    in loop_blocking_solver.gen_loopblocking_gbuf_reside(
                             self.nld[wlkey], self.resource[rsrckey],
                             self.options[optkey]):
 
@@ -140,7 +140,7 @@ class TestLoopBlockingSolver(TestLoopBlockingFixture):
     def test_reside_sol_opt_pool(self):
         ''' Data reside solution optimal with PoolingLayer. '''
 
-        with self.assertRaisesRegexp(ValueError, 'LoopBlockingSolver: .*'):
+        with self.assertRaisesRegexp(ValueError, 'loop_blocking_solver: .*'):
             self.test_reside_sol_opt(wlkey='POOL')
 
     def test_reside_sol_opt_zero(self):
@@ -153,7 +153,7 @@ class TestLoopBlockingSolver(TestLoopBlockingFixture):
     def test_reside_sol_cnt(self):
         ''' Data reside solution count. '''
 
-        all_set = set(LoopBlockingSolver.gen_loopblocking_gbuf_reside(
+        all_set = set(loop_blocking_solver.gen_loopblocking_gbuf_reside(
             self.nld['BASE'], self.resource['BASE'], self.options['BYPSOL']))
 
         union_set = set()
@@ -163,7 +163,7 @@ class TestLoopBlockingSolver(TestLoopBlockingFixture):
 
             optkey = self.optkeys_bypsol[reside_dce]
 
-            s = set(LoopBlockingSolver.gen_loopblocking_gbuf_reside(
+            s = set(loop_blocking_solver.gen_loopblocking_gbuf_reside(
                 self.nld['BASE'], self.resource['BASE'], self.options[optkey]))
 
             reside_set_list.append(s)

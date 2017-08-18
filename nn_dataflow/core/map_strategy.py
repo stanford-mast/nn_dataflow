@@ -18,14 +18,14 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from . import DataCategoryEnum as de
-from . import DataDimLoops
-from . import LoopEnum as le
-from . import MemHierEnum as me
-from . import Util
-from .Layer import Layer, ConvLayer, LocalRegionLayer
-from .NestedLoopDesc import NestedLoopDesc
-from .PhyDim2 import PhyDim2
+from . import data_category_enum as de
+from . import loop_enum as le
+from . import mem_hier_enum as me
+from .. import util
+from .data_dim_loops import DataDimLoops
+from .layer import Layer, ConvLayer, LocalRegionLayer
+from .nested_loop_desc import NestedLoopDesc
+from .phy_dim2 import PhyDim2
 
 class MapStrategy(object):
     '''
@@ -180,7 +180,7 @@ class MapStrategyEyeriss(MapStrategy):
 
             # Number of ops.
             # Replicate to procpass. Also consider loop occupations.
-            unit_ops = ops_unitpass * self.repl.size() * Util.prod(locc)
+            unit_ops = ops_unitpass * self.repl.size() * util.prod(locc)
 
             # Time does not change with replication, and is not affected by
             # loop occupation.
@@ -204,7 +204,7 @@ class MapStrategyEyeriss(MapStrategy):
                                      in zip(access_unitpass[mhe], rcnt, aocc))
             # Replication uses different PEs. regf scales with op replication,
             # i.e., affected by all loop occupations.
-            uaccess[me.REGF] = tuple(a * self.repl.size() * Util.prod(locc)
+            uaccess[me.REGF] = tuple(a * self.repl.size() * util.prod(locc)
                                      for a in access_unitpass[me.REGF])
             # Finalize.
             unit_access = tuple(uaccess)
@@ -216,41 +216,41 @@ class MapStrategyEyeriss(MapStrategy):
                                  data_loops=self.data_loops)
 
             # Check num of ops.
-            Util.assert_float_eq_int(
+            util.assert_float_eq_int(
                 nld.total_ops(), self.layer.total_ops(self.batch_size),
                 'MapEyeriss: total number of physical ops is incorrect.')
 
             # Check unit access.
-            Util.assert_float_eq_int(
+            util.assert_float_eq_int(
                 nld.total_access_at_of(me.DRAM, de.FIL),
                 self.layer.total_filter_size()
                 if isinstance(self.layer, ConvLayer) else 0,
                 'MapEyeriss: total access at DRAM for FIL {} is incorrect.'
                 .format(nld.total_access_at_of(me.DRAM, de.FIL)))
-            Util.assert_float_eq_int(
+            util.assert_float_eq_int(
                 # Need to consider amplified access for IFM.
                 nld.total_access_at_of(me.DRAM, de.IFM) / amp_acc_ifm,
                 self.layer.total_ifmap_size(self.batch_size),
                 'MapEyeriss: total access at DRAM for IFM {} is incorrect.'
                 .format(nld.total_access_at_of(me.DRAM, de.IFM)))
-            Util.assert_float_eq_int(
+            util.assert_float_eq_int(
                 nld.total_access_at_of(me.DRAM, de.OFM),
                 self.layer.total_ofmap_size(self.batch_size),
                 'MapEyeriss: total access at DRAM for OFM {} is incorrect.'
                 .format(nld.total_access_at_of(me.DRAM, de.OFM)))
-            Util.assert_float_eq_int(
-                nld.unit_access_at_of(me.REGF, de.FIL) * Util.prod(nld.loopcnt),
+            util.assert_float_eq_int(
+                nld.unit_access_at_of(me.REGF, de.FIL) * util.prod(nld.loopcnt),
                 self.layer.total_ops(self.batch_size)
                 if isinstance(self.layer, ConvLayer) else 0,
                 'MapEyeriss: unit access at REGF for FIL {} is incorrect.'
                 .format(nld.unit_access_at_of(me.REGF)))
-            Util.assert_float_eq_int(
-                nld.unit_access_at_of(me.REGF, de.IFM) * Util.prod(nld.loopcnt),
+            util.assert_float_eq_int(
+                nld.unit_access_at_of(me.REGF, de.IFM) * util.prod(nld.loopcnt),
                 self.layer.total_ops(self.batch_size),
                 'MapEyeriss: unit access at REGF for IFM {} is incorrect.'
                 .format(nld.unit_access_at_of(me.REGF)))
-            Util.assert_float_eq_int(
-                nld.unit_access_at_of(me.REGF, de.OFM) * Util.prod(nld.loopcnt),
+            util.assert_float_eq_int(
+                nld.unit_access_at_of(me.REGF, de.OFM) * util.prod(nld.loopcnt),
                 self.layer.total_ops(self.batch_size),
                 'MapEyeriss: unit access at REGF for OFM {} is incorrect.'
                 .format(nld.unit_access_at_of(me.REGF)))
@@ -269,13 +269,13 @@ class MapStrategyEyeriss(MapStrategy):
 
         if self.dim_lpeset.h > self.dim_array.h:
             # Fold on height.
-            fold_h = Util.idivc(self.dim_lpeset.h, self.dim_array.h)
+            fold_h = util.idivc(self.dim_lpeset.h, self.dim_array.h)
         else:
             # Replicate on height.
             repl_h = self.dim_array.h // self.dim_lpeset.h
         if self.dim_lpeset.w > self.dim_array.w:
             # Fold on width.
-            fold_w = Util.idivc(self.dim_lpeset.w, self.dim_array.w)
+            fold_w = util.idivc(self.dim_lpeset.w, self.dim_array.w)
         else:
             # Replicate on with.
             repl_w = self.dim_array.w // self.dim_lpeset.w
@@ -285,7 +285,7 @@ class MapStrategyEyeriss(MapStrategy):
         # two. Either repl_h cannot accommodate all fold_w, still fold_w; or
         # repl_h has accommodated all fold_w, remain repl_h.
         f_w2h = min(repl_h, fold_w)
-        fold_w = Util.idivc(fold_w, f_w2h)
+        fold_w = util.idivc(fold_w, f_w2h)
         repl_h = repl_h // f_w2h
 
         # The replication and folding factors for lpeset, considering the
@@ -296,12 +296,12 @@ class MapStrategyEyeriss(MapStrategy):
         # The folded lpeset size on the ppeset after adjustment. The width may
         # be larger than the array width, but it is actually broken into the
         # height replication.
-        self.dim_flpeset = PhyDim2(Util.idivc(self.dim_lpeset.h, self.fold.h),
-                                   Util.idivc(self.dim_lpeset.w, self.fold.w))
+        self.dim_flpeset = PhyDim2(util.idivc(self.dim_lpeset.h, self.fold.h),
+                                   util.idivc(self.dim_lpeset.w, self.fold.w))
 
         # The physical ppeset size, should fit in the array.
         self.dim_ppeset = PhyDim2(self.dim_flpeset.h * self.repl.h * f_w2h,
-                                  Util.idivc(self.dim_flpeset.w * self.repl.w,
+                                  util.idivc(self.dim_flpeset.w * self.repl.w,
                                              f_w2h))
 
         assert (self.dim_ppeset.h <= self.dim_array.h
@@ -363,7 +363,7 @@ class MapStrategyEyeriss(MapStrategy):
                 strd=(self.layer.htrd, self.layer.wtrd))
             buflayer = ConvLayer(
                 1, 1,
-                (Util.idivc(self.layer.hofm, self.fold.w), self.layer.wofm),
+                (util.idivc(self.layer.hofm, self.fold.w), self.layer.wofm),
                 (self.layer.hfil, self.layer.wfil),
                 strd=(self.layer.htrd, self.layer.wtrd))
 
@@ -425,7 +425,7 @@ class MapStrategyEyeriss(MapStrategy):
 
             buflayer = LocalRegionLayer(
                 1,
-                (Util.idivc(self.layer.hofm, self.fold.w), self.layer.wofm),
+                (util.idivc(self.layer.hofm, self.fold.w), self.layer.wofm),
                 self.layer.nreg, (self.layer.hreg, self.layer.wreg),
                 strd=(self.layer.htrd, self.layer.wtrd))
 
@@ -468,7 +468,7 @@ class MapStrategyEyeriss(MapStrategy):
             sz_regf[de.OFM] = 1
 
         # All utilized PEs run `time` to execute replicated `ops`
-        assert Util.isclose(time * self.dim_array.size() * self.util,
+        assert util.isclose(time * self.dim_array.size() * self.util,
                             ops * self.repl.size(),
                             abs_tol=1e-3)
 
@@ -496,19 +496,19 @@ class MapStrategyEyeriss(MapStrategy):
             # pick the smallest total number of loops.
             min_cnt_loops = float('inf')
 
-            for t_repl_h in Util.factorize(self.repl.h, 2):
+            for t_repl_h in util.factorize(self.repl.h, 2):
 
                 ifms = t_repl_h[0]
                 ofms = t_repl_h[1] * self.repl.w
 
                 # Loop trip counts.
                 lcnt = [float('nan')] * le.NUM
-                lcnt[le.IFM] = Util.idivc(self.layer.nifm, ifms)
-                lcnt[le.OFM] = Util.idivc(self.layer.nofm, ofms)
+                lcnt[le.IFM] = util.idivc(self.layer.nifm, ifms)
+                lcnt[le.OFM] = util.idivc(self.layer.nofm, ofms)
                 # fold.w is equivalent to increasing batch size.
                 lcnt[le.BAT] = self.batch_size * self.fold.w
 
-                cnt_loops = Util.prod(lcnt)
+                cnt_loops = util.prod(lcnt)
                 if cnt_loops < min_cnt_loops:
                     min_cnt_loops = cnt_loops
                 elif cnt_loops > min_cnt_loops:
@@ -537,7 +537,7 @@ class MapStrategyEyeriss(MapStrategy):
             lcnt = [float('nan')] * le.NUM
             # Loop ifm is corresponding to loop ofm, so always 1.
             lcnt[le.IFM] = 1
-            lcnt[le.OFM] = Util.idivc(self.layer.nofm, ofms)
+            lcnt[le.OFM] = util.idivc(self.layer.nofm, ofms)
             # fold.w is equivalent to increasing batch size.
             lcnt[le.BAT] = self.batch_size * self.fold.w
 

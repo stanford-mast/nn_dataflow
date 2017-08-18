@@ -20,10 +20,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import Counter
 
-from nn_dataflow import ConvLayer, LocalRegionLayer
-from nn_dataflow import FmapRange, FmapRangeMap
-from nn_dataflow import Partition
-from nn_dataflow import ParallelEnum as pe
+from nn_dataflow.core import partition
+from nn_dataflow.core import ConvLayer, LocalRegionLayer
+from nn_dataflow.core import FmapRange, FmapRangeMap
+from nn_dataflow.core import ParallelEnum as pe
 
 from . import TestPartitionFixture
 
@@ -39,7 +39,7 @@ class TestPartLayerFmapRange(TestPartitionFixture):
 
                 for part in self._gen_partition(wlkey=wlkey, dnkey=dnkey):
 
-                    cnts = Counter(Partition.part_layer_ofmap_range(
+                    cnts = Counter(partition.part_layer_ofmap_range(
                         layer, self.batch_size, part, pidx)
                                    for pidx in part.gen_pidx())
 
@@ -62,7 +62,7 @@ class TestPartLayerFmapRange(TestPartitionFixture):
 
                     for pidx in part.gen_pidx():
 
-                        fr = Partition.part_layer_ofmap_range(
+                        fr = partition.part_layer_ofmap_range(
                             layer, self.batch_size, part, pidx)
 
                         for fr2 in fr_list:
@@ -87,7 +87,7 @@ class TestPartLayerFmapRange(TestPartitionFixture):
 
                     for pidx in part.gen_pidx():
 
-                        fr = Partition.part_layer_ofmap_range(
+                        fr = partition.part_layer_ofmap_range(
                             layer, self.batch_size, part, pidx)
                         frmap.add(fr, 0)
 
@@ -113,7 +113,7 @@ class TestPartLayerFmapRange(TestPartitionFixture):
 
                     for pidx in part.gen_pidx():
 
-                        fr = Partition.part_layer_ofmap_range(
+                        fr = partition.part_layer_ofmap_range(
                             layer, self.batch_size, part, pidx)
 
                         size_list.append([fr.size(d) for d in 'bnhw'])
@@ -137,7 +137,7 @@ class TestPartLayerFmapRange(TestPartitionFixture):
 
                 for part in self._gen_partition(wlkey=wlkey, dnkey=dnkey):
 
-                    cnts = Counter(Partition.part_layer_ifmap_range(
+                    cnts = Counter(partition.part_layer_ifmap_range(
                         layer, self.batch_size, part, pidx)
                                    for pidx in part.gen_pidx())
 
@@ -166,7 +166,7 @@ class TestPartLayerFmapRange(TestPartitionFixture):
 
                 for pidx in part.gen_pidx():
 
-                    fr = Partition.part_layer_ifmap_range(
+                    fr = partition.part_layer_ifmap_range(
                         layer, self.batch_size, part, pidx)
 
                     for fp in fr.range():
@@ -188,7 +188,7 @@ class TestPartLayerFmapRange(TestPartitionFixture):
 
                     for pidx in part.gen_pidx():
 
-                        fr = Partition.part_layer_ifmap_range(
+                        fr = partition.part_layer_ifmap_range(
                             layer, self.batch_size, part, pidx)
                         fr_list.append(fr)
 
@@ -225,9 +225,9 @@ class TestPartLayerFmapRange(TestPartitionFixture):
 
                     for pidx in part.gen_pidx():
 
-                        ofr = Partition.part_layer_ofmap_range(
+                        ofr = partition.part_layer_ofmap_range(
                             layer, self.batch_size, part, pidx)
-                        ifr = Partition.part_layer_ifmap_range(
+                        ifr = partition.part_layer_ifmap_range(
                             layer, self.batch_size, part, pidx)
 
                         self.assertEqual(ofr.size('b'), ifr.size('b'))

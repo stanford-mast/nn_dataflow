@@ -21,10 +21,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import itertools
 from collections import namedtuple
 
-from . import ParallelEnum as pe
-from . import Util
-from .Layer import ConvLayer, LocalRegionLayer
-from .PhyDim2 import PhyDim2
+from . import parallel_enum as pe
+from .. import util
+from .layer import ConvLayer, LocalRegionLayer
+from .phy_dim2 import PhyDim2
 
 PARTITION_SCHEME_LIST = ['order',
                          'pdims',
@@ -114,10 +114,10 @@ class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
         layer, partitioned batch size, and partitioning op occupation.
         '''
 
-        p_nifm = Util.idivc(layer.nifm, self.pdims[pe.INPP].size())
-        p_nofm = Util.idivc(layer.nofm, self.pdims[pe.OUTP].size())
-        p_hofm = Util.idivc(layer.hofm, self.pdims[pe.OFMP].h)
-        p_wofm = Util.idivc(layer.wofm, self.pdims[pe.OFMP].w)
+        p_nifm = util.idivc(layer.nifm, self.pdims[pe.INPP].size())
+        p_nofm = util.idivc(layer.nofm, self.pdims[pe.OUTP].size())
+        p_hofm = util.idivc(layer.hofm, self.pdims[pe.OFMP].h)
+        p_wofm = util.idivc(layer.wofm, self.pdims[pe.OFMP].w)
 
         if isinstance(layer, ConvLayer):
             p_layer = ConvLayer(p_nifm, p_nofm, (p_hofm, p_wofm),
@@ -133,7 +133,7 @@ class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
         else:
             raise TypeError('PartitionScheme: unrecognized layer type.')
 
-        p_batch_size = Util.idivc(batch_size, self.pdims[pe.BATP].size())
+        p_batch_size = util.idivc(batch_size, self.pdims[pe.BATP].size())
 
         p_occ = 1. * layer.total_ops(batch_size) \
                 / (p_layer.total_ops(p_batch_size) * self.size())

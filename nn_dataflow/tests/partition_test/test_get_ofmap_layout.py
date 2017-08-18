@@ -18,11 +18,11 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from nn_dataflow import NodeRegion
-from nn_dataflow import ParallelEnum as pe
-from nn_dataflow import Partition
-from nn_dataflow import PartitionScheme
-from nn_dataflow import PhyDim2
+from nn_dataflow.core import partition
+from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import ParallelEnum as pe
+from nn_dataflow.core import PartitionScheme
+from nn_dataflow.core import PhyDim2
 
 from . import TestPartitionFixture
 
@@ -38,7 +38,7 @@ class TestGetOfmapLayout(TestPartitionFixture):
 
         omr = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 30),
                          type=NodeRegion.DATA)
-        dl = Partition.get_ofmap_layout(layer, self.batch_size, part, omr)
+        dl = partition.get_ofmap_layout(layer, self.batch_size, part, omr)
 
         self._general_assert(dl, omr, layer)
 
@@ -54,7 +54,7 @@ class TestGetOfmapLayout(TestPartitionFixture):
 
         omr = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(2, 2),
                          type=NodeRegion.DATA)
-        dl = Partition.get_ofmap_layout(layer, self.batch_size, part, omr)
+        dl = partition.get_ofmap_layout(layer, self.batch_size, part, omr)
 
         self._general_assert(dl, omr, layer)
 
@@ -70,7 +70,7 @@ class TestGetOfmapLayout(TestPartitionFixture):
 
         omr = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(3, 54),
                          type=NodeRegion.DATA)
-        dl = Partition.get_ofmap_layout(layer, self.batch_size, part, omr)
+        dl = partition.get_ofmap_layout(layer, self.batch_size, part, omr)
 
         self._general_assert(dl, omr, layer)
 
@@ -88,7 +88,7 @@ class TestGetOfmapLayout(TestPartitionFixture):
 
         omr = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 30),
                          type=NodeRegion.DATA)
-        dl = Partition.get_ofmap_layout(layer, self.batch_size, part, omr)
+        dl = partition.get_ofmap_layout(layer, self.batch_size, part, omr)
 
         self._general_assert(dl, omr, layer)
 
@@ -104,7 +104,7 @@ class TestGetOfmapLayout(TestPartitionFixture):
 
         omr = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                          type=NodeRegion.DATA)
-        dl = Partition.get_ofmap_layout(layer, self.batch_size, part, omr)
+        dl = partition.get_ofmap_layout(layer, self.batch_size, part, omr)
 
         self._general_assert(dl, omr, layer)
 
@@ -119,7 +119,7 @@ class TestGetOfmapLayout(TestPartitionFixture):
 
         omr = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 30),
                          type=NodeRegion.DATA)
-        dl = Partition.get_ofmap_layout(layer, self.batch_size, part, omr)
+        dl = partition.get_ofmap_layout(layer, self.batch_size, part, omr)
 
         self._general_assert(dl, omr, layer)
 
@@ -135,7 +135,7 @@ class TestGetOfmapLayout(TestPartitionFixture):
 
         omr = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(5, 40),
                          type=NodeRegion.DATA)
-        dl = Partition.get_ofmap_layout(layer, self.batch_size, part, omr)
+        dl = partition.get_ofmap_layout(layer, self.batch_size, part, omr)
 
         self._general_assert(dl, omr, layer)
 
@@ -153,7 +153,7 @@ class TestGetOfmapLayout(TestPartitionFixture):
 
         omr = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 30),
                          type=NodeRegion.DATA)
-        dl = Partition.get_ofmap_layout(layer, self.batch_size, part, omr)
+        dl = partition.get_ofmap_layout(layer, self.batch_size, part, omr)
 
         self._general_assert(dl, omr, layer)
 
@@ -168,7 +168,7 @@ class TestGetOfmapLayout(TestPartitionFixture):
 
         omr = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(16, 16),
                          type=NodeRegion.DATA)
-        dl = Partition.get_ofmap_layout(layer, self.batch_size, part, omr)
+        dl = partition.get_ofmap_layout(layer, self.batch_size, part, omr)
 
         self._general_assert(dl, omr, layer)
 
@@ -184,8 +184,8 @@ class TestGetOfmapLayout(TestPartitionFixture):
         omr = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(0, 0),
                          type=NodeRegion.DATA)
 
-        with self.assertRaisesRegexp(ValueError, 'Partition .*empty.*'):
-            _ = Partition.get_ofmap_layout(layer, self.batch_size, part, omr)
+        with self.assertRaisesRegexp(ValueError, 'partition .*empty.*'):
+            _ = partition.get_ofmap_layout(layer, self.batch_size, part, omr)
 
     def test_origin(self):
         ''' Same dim but different origins. '''
@@ -195,12 +195,12 @@ class TestGetOfmapLayout(TestPartitionFixture):
                                pdims=((2, 3), (1, 5), (4, 4), (1, 1)))
 
         omr1 = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(16, 16),
-                         type=NodeRegion.DATA)
-        dl1 = Partition.get_ofmap_layout(layer, self.batch_size, part, omr1)
+                          type=NodeRegion.DATA)
+        dl1 = partition.get_ofmap_layout(layer, self.batch_size, part, omr1)
 
         omr2 = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(16, 16),
-                         type=NodeRegion.DATA)
-        dl2 = Partition.get_ofmap_layout(layer, self.batch_size, part, omr2)
+                          type=NodeRegion.DATA)
+        dl2 = partition.get_ofmap_layout(layer, self.batch_size, part, omr2)
 
         self._general_assert(dl1, omr1, layer)
         self._general_assert(dl2, omr2, layer)

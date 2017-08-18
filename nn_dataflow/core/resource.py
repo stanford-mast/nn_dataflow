@@ -20,8 +20,8 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import namedtuple
 
-from .NodeRegion import NodeRegion
-from .PhyDim2 import PhyDim2
+from .node_region import NodeRegion
+from .phy_dim2 import PhyDim2
 
 RESOURCE_LIST = ['proc_region',
                  'data_regions',

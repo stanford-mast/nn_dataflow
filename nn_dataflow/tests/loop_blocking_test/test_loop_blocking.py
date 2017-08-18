@@ -18,19 +18,19 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from nn_dataflow import LoopBlocking
+from nn_dataflow.core import loop_blocking
 
 from . import TestLoopBlockingFixture
 
 class TestLoopBlocking(TestLoopBlockingFixture):
-    ''' Tests for LoopBlocking module. '''
+    ''' Tests for loop_blocking module. '''
 
     def test_skip_not_reg(self):
         ''' skip non-regularized. '''
 
         for sch in self._gen_loopblocking_all():
 
-            skip = LoopBlocking.skip_conv(*sch)
+            skip = loop_blocking.skip_conv(*sch)
             reg_sch = self._regularized_scheme(*sch)
 
             if not skip:
@@ -43,7 +43,7 @@ class TestLoopBlocking(TestLoopBlockingFixture):
             lbs = self._lbs(*sch, rsrckey='LG')
             reg_lbs = self._lbs(*reg_sch, rsrckey='LG')
 
-            self.assertFalse(LoopBlocking.skip_conv(*reg_sch),
+            self.assertFalse(loop_blocking.skip_conv(*reg_sch),
                              'test_skip_not_reg: regularized {} is skipped.'
                              .format(reg_sch))
             self.assertAlmostEqual(lbs.get_cost(self.cost),
@@ -70,7 +70,7 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         for bl_ts, bl_ords in self._gen_loopblocking_all():
 
-            skip = LoopBlocking.skip_conv(bl_ts, bl_ords)
+            skip = loop_blocking.skip_conv(bl_ts, bl_ords)
             cnts[skip] += 1
 
         skip_ratio = 1. * cnts[True] / sum(cnts)
@@ -83,10 +83,10 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         exp_cnt = 0
         for bl_ts, bl_ords in self._gen_loopblocking_all():
-            exp_cnt += 1 if not LoopBlocking.skip_conv(bl_ts, bl_ords) else 0
+            exp_cnt += 1 if not loop_blocking.skip_conv(bl_ts, bl_ords) else 0
 
         cnt = 0
-        for _ in LoopBlocking.gen_loopblocking(
+        for _ in loop_blocking.gen_loopblocking(
                 self.nld['BASE'], self.resource['LG'], self.cost, 1,
                 self.options['BASE']):
             cnt += 1
@@ -97,13 +97,13 @@ class TestLoopBlocking(TestLoopBlockingFixture):
         ''' gen_loopblocking multiprocessing. '''
 
         cnt1 = 0
-        for _ in LoopBlocking.gen_loopblocking(
+        for _ in loop_blocking.gen_loopblocking(
                 self.nld['BASE'], self.resource['LG'], self.cost, 1,
                 self.options['BASE']):
             cnt1 += 1
 
         cnt8 = 0
-        for _ in LoopBlocking.gen_loopblocking(
+        for _ in loop_blocking.gen_loopblocking(
                 self.nld['BASE'], self.resource['LG'], self.cost, 1,
                 self.options['MP']):
             cnt8 += 1
@@ -115,7 +115,7 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         acc_dict = {}
 
-        for lbs in LoopBlocking.gen_loopblocking(
+        for lbs in loop_blocking.gen_loopblocking(
                 self.nld['BASE'], self.resource['LG'], self.cost, 1,
                 self.options['BASE']):
 
@@ -140,14 +140,14 @@ class TestLoopBlocking(TestLoopBlockingFixture):
     def test_gen_loopblocking_ntops(self):
         ''' gen_loopblocking ntops. '''
 
-        tops = list(LoopBlocking.gen_loopblocking(self.nld['BASE'],
-                                                  self.resource['LG'],
-                                                  self.cost, 1,
-                                                  self.options['NTOPS']))
+        tops = list(loop_blocking.gen_loopblocking(self.nld['BASE'],
+                                                   self.resource['LG'],
+                                                   self.cost, 1,
+                                                   self.options['NTOPS']))
 
         cost_prev = -float('inf')
 
-        for lbs in LoopBlocking.gen_loopblocking(
+        for lbs in loop_blocking.gen_loopblocking(
                 self.nld['BASE'], self.resource['LG'], self.cost, 1,
                 self.options['BASE']):
 
@@ -167,7 +167,7 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         cnt = 0
 
-        for lbs in LoopBlocking.gen_loopblocking(
+        for lbs in loop_blocking.gen_loopblocking(
                 self.nld['BASE'], self.resource['BASE'], self.cost, 1,
                 self.options['BYPSOL']):
 

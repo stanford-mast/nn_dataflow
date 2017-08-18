@@ -20,7 +20,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import OrderedDict
 
-from .Layer import Layer, InputLayer
+from .layer import Layer, InputLayer
 
 class Network(object):
     '''

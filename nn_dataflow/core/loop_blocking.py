@@ -22,12 +22,12 @@ import heapq
 import itertools
 from multiprocessing import Pool
 
-from . import DataCategoryEnum as de
-from . import LoopBlockingSolver
-from . import LoopEnum as le
-from . import Util
-from .DataDimLoops import DataDimLoops
-from .LoopBlockingScheme import LoopBlockingScheme
+from . import data_category_enum as de
+from . import loop_blocking_solver
+from . import loop_enum as le
+from .. import util
+from .data_dim_loops import DataDimLoops
+from .loop_blocking_scheme import LoopBlockingScheme
 
 '''
 Loop blocking optimization.
@@ -153,7 +153,7 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
 
     # Solver only works for CONV layer.
     if options.sw_solve_loopblocking and _is_conv_loops(nested_loop_desc):
-        gen = LoopBlockingSolver.gen_loopblocking_gbuf_reside
+        gen = loop_blocking_solver.gen_loopblocking_gbuf_reside
 
         for bl_ts, bl_ords in gen(nested_loop_desc, resource, options):
             lbs = LoopBlockingScheme(nested_loop_desc, bl_ts, bl_ords,
@@ -187,9 +187,9 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
         retrieve_func = retrieve_result_st()
 
     # Exhaustive generators.
-    gen_tifm = Util.factorize(nested_loop_desc.loopcnt[le.IFM], 3)
-    gen_tofm = Util.factorize(nested_loop_desc.loopcnt[le.OFM], 3)
-    gen_tbat = Util.factorize(nested_loop_desc.loopcnt[le.BAT], 3)
+    gen_tifm = util.factorize(nested_loop_desc.loopcnt[le.IFM], 3)
+    gen_tofm = util.factorize(nested_loop_desc.loopcnt[le.OFM], 3)
+    gen_tbat = util.factorize(nested_loop_desc.loopcnt[le.BAT], 3)
     gen_ords = itertools.product(itertools.permutations(range(le.NUM)),
                                  itertools.permutations(range(le.NUM)))
 

@@ -20,10 +20,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import math
 
-from . import DataCategoryEnum as de
-from . import LoopEnum as le
-from . import Util
-from .DataDimLoops import DataDimLoops
+from . import data_category_enum as de
+from . import loop_enum as le
+from .. import util
+from .data_dim_loops import DataDimLoops
 
 '''
 Analytical solvers for loop blocking.
@@ -127,7 +127,7 @@ def _solve_gbuf_reside(nested_loop_desc, resource, reside_dce):
         ''' Opt I goal function. min goal(). '''
         lnumloops = [lnum[0] * lnum[1], lnum[1] * lnum[2], lnum[0] * lnum[2]]
         ltloops = [1, tx0, ty0]
-        return sum(Util.prod(tpl) for tpl
+        return sum(util.prod(tpl) for tpl
                    in zip(lnumloops, lsgbuf, lfacc, ltloops))
 
     def constraints_opt1(tx0, ty0):
@@ -142,8 +142,8 @@ def _solve_gbuf_reside(nested_loop_desc, resource, reside_dce):
 
     # Exhaustive search for opt I.
     min_goal = float('inf')
-    for tx0_, _ in Util.factorize(lnum[0], 2):
-        for ty0_, _ in Util.factorize(lnum[1], 2):
+    for tx0_, _ in util.factorize(lnum[0], 2):
+        for ty0_, _ in util.factorize(lnum[1], 2):
             # Satisfy constraints.
             if not constraints_opt1(tx0_, ty0_):
                 continue
@@ -159,7 +159,7 @@ def _solve_gbuf_reside(nested_loop_desc, resource, reside_dce):
                 / (ty2 * lsregf[1] + tx2 * lsregf[2])
         if tz2 < 0:
             return -float('inf')
-        tz2_adj = Util.closest_factor(lnum[2], tz2)
+        tz2_adj = util.closest_factor(lnum[2], tz2)
         if tz2_adj[0] <= tz2:
             return tz2_adj[0]
         return -float('inf')
@@ -224,7 +224,7 @@ def gen_loopblocking_gbuf_reside(nested_loop_desc, resource, options):
                     != DataDimLoops(le.IFM, le.BAT)
             or nested_loop_desc.data_loops[de.OFM] \
                     != DataDimLoops(le.OFM, le.BAT)):
-        raise ValueError('LoopBlockingSolver: solver only applies to '
+        raise ValueError('loop_blocking_solver: solver only applies to '
                          'CONV layer nested loops')
 
     reside_dce_list = []

@@ -20,7 +20,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import namedtuple
 
-from . import MemHierEnum as me
+from . import mem_hier_enum as me
 
 COST_LIST = ['mac_op',
              'mem_hier',

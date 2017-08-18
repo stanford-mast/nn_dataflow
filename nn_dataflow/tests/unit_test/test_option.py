@@ -20,7 +20,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import unittest
 
-from nn_dataflow import Option
+from nn_dataflow.core import Option
 
 class TestOption(unittest.TestCase):
     ''' Tests for Option. '''

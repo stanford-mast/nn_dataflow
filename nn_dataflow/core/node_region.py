@@ -21,7 +21,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import itertools
 from collections import namedtuple
 
-from .PhyDim2 import PhyDim2
+from .phy_dim2 import PhyDim2
 
 NODE_REGION_LIST = ['dim',
                     'origin',

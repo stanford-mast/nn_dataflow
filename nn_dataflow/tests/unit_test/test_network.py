@@ -20,8 +20,8 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import unittest
 
-from nn_dataflow import Network
-from nn_dataflow import Layer, InputLayer, ConvLayer, FCLayer, PoolingLayer
+from nn_dataflow.core import Network
+from nn_dataflow.core import Layer, InputLayer, ConvLayer, FCLayer, PoolingLayer
 
 class TestNetwork(unittest.TestCase):
     ''' Tests for Network. '''

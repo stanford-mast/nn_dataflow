@@ -21,10 +21,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import unittest
 from collections import OrderedDict
 
-from nn_dataflow import ConvLayer, FCLayer, LocalRegionLayer, PoolingLayer
-from nn_dataflow import NodeRegion
-from nn_dataflow import PhyDim2
-from nn_dataflow import Resource
+from nn_dataflow.core import ConvLayer, FCLayer, LocalRegionLayer, PoolingLayer
+from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import PhyDim2
+from nn_dataflow.core import Resource
 
 class TestMapStrategyFixture(unittest.TestCase):
     ''' Base fixture class for MapStrategy tests. '''

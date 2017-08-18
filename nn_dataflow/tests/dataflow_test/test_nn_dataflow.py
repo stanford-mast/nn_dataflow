@@ -22,16 +22,16 @@ import unittest
 import sys
 import StringIO
 
-from nn_dataflow import Cost
-from nn_dataflow import MapStrategy, MapStrategyEyeriss
-from nn_dataflow import MemHierEnum as me
-from nn_dataflow import NodeRegion
-from nn_dataflow import NNDataflow
-from nn_dataflow import Option
-from nn_dataflow import PhyDim2
-from nn_dataflow import Resource
+from nn_dataflow.core import Cost
+from nn_dataflow.core import MapStrategy, MapStrategyEyeriss
+from nn_dataflow.core import MemHierEnum as me
+from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import NNDataflow
+from nn_dataflow.core import Option
+from nn_dataflow.core import PhyDim2
+from nn_dataflow.core import Resource
 
-from examples import import_network
+from nn_dataflow.nns import import_network
 
 class TestNNDataflow(unittest.TestCase):
     ''' Tests for NNDataflow module. '''

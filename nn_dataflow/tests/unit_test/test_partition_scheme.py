@@ -22,11 +22,11 @@ import collections
 import itertools
 import unittest
 
-from nn_dataflow import Layer, ConvLayer, PoolingLayer
-from nn_dataflow import NodeRegion
-from nn_dataflow import ParallelEnum as pe
-from nn_dataflow import PartitionScheme
-from nn_dataflow import PhyDim2
+from nn_dataflow.core import Layer, ConvLayer, PoolingLayer
+from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import ParallelEnum as pe
+from nn_dataflow.core import PartitionScheme
+from nn_dataflow.core import PhyDim2
 
 class TestPartitionScheme(unittest.TestCase):
     ''' Tests for PartitionScheme. '''

@@ -20,11 +20,11 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import unittest
 
-from nn_dataflow import NestedLoopDesc
-from nn_dataflow import DataDimLoops
-from nn_dataflow import DataCategoryEnum as de
-from nn_dataflow import MemHierEnum as me
-from nn_dataflow import LoopEnum as le
+from nn_dataflow.core import NestedLoopDesc
+from nn_dataflow.core import DataDimLoops
+from nn_dataflow.core import DataCategoryEnum as de
+from nn_dataflow.core import MemHierEnum as me
+from nn_dataflow.core import LoopEnum as le
 
 class TestNestedLoopDesc(unittest.TestCase):
     ''' Tests for NestedLoopDesc. '''

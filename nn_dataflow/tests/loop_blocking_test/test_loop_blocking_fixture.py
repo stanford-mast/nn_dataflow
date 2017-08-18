@@ -21,20 +21,20 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import itertools
 import unittest
 
-from nn_dataflow import ConvLayer, PoolingLayer
-from nn_dataflow import Cost
-from nn_dataflow import DataDimLoops
-from nn_dataflow import DataCategoryEnum as de
-from nn_dataflow import LoopBlockingScheme
-from nn_dataflow import LoopEnum as le
-from nn_dataflow import MapStrategyEyeriss
-from nn_dataflow import MemHierEnum as me
-from nn_dataflow import NestedLoopDesc
-from nn_dataflow import NodeRegion
-from nn_dataflow import Option
-from nn_dataflow import PhyDim2
-from nn_dataflow import Resource
-from nn_dataflow import Util
+from nn_dataflow.core import ConvLayer, PoolingLayer
+from nn_dataflow.core import Cost
+from nn_dataflow.core import DataDimLoops
+from nn_dataflow.core import DataCategoryEnum as de
+from nn_dataflow.core import LoopBlockingScheme
+from nn_dataflow.core import LoopEnum as le
+from nn_dataflow.core import MapStrategyEyeriss
+from nn_dataflow.core import MemHierEnum as me
+from nn_dataflow.core import NestedLoopDesc
+from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import Option
+from nn_dataflow.core import PhyDim2
+from nn_dataflow.core import Resource
+from nn_dataflow import util
 
 class TestLoopBlockingFixture(unittest.TestCase):
     ''' Base fixture class for LoopBlocking tests. '''
@@ -145,9 +145,9 @@ class TestLoopBlockingFixture(unittest.TestCase):
     def _gen_loopblocking_all(self, wlkey='BASE'):
         ''' Generate all combinations of loop blocking factors and orders. '''
         for ti, to, tb, orders in itertools.product(
-                Util.factorize(self.nld[wlkey].loopcnt[le.IFM], 3),
-                Util.factorize(self.nld[wlkey].loopcnt[le.OFM], 3),
-                Util.factorize(self.nld[wlkey].loopcnt[le.BAT], 3),
+                util.factorize(self.nld[wlkey].loopcnt[le.IFM], 3),
+                util.factorize(self.nld[wlkey].loopcnt[le.OFM], 3),
+                util.factorize(self.nld[wlkey].loopcnt[le.BAT], 3),
                 itertools.product(
                     itertools.permutations(range(le.NUM)),
                     itertools.permutations(range(le.NUM)))):
@@ -168,8 +168,8 @@ class TestLoopBlockingFixture(unittest.TestCase):
             ti = ti_part
         else:
             ti = [ti_part[x] if x != idx
-                  else Util.idivc(self.nld[wlkey].loopcnt[le.IFM],
-                                  Util.prod(ti_part[:idx] + ti_part[idx+1:]))
+                  else util.idivc(self.nld[wlkey].loopcnt[le.IFM],
+                                  util.prod(ti_part[:idx] + ti_part[idx+1:]))
                   for x in range(3)]
         try:
             idx = to_part.index(0)
@@ -177,8 +177,8 @@ class TestLoopBlockingFixture(unittest.TestCase):
             to = to_part
         else:
             to = [to_part[x] if x != idx
-                  else Util.idivc(self.nld[wlkey].loopcnt[le.OFM],
-                                  Util.prod(to_part[:idx] + to_part[idx+1:]))
+                  else util.idivc(self.nld[wlkey].loopcnt[le.OFM],
+                                  util.prod(to_part[:idx] + to_part[idx+1:]))
                   for x in range(3)]
         try:
             idx = tb_part.index(0)
@@ -186,8 +186,8 @@ class TestLoopBlockingFixture(unittest.TestCase):
             tb = tb_part
         else:
             tb = [tb_part[x] if x != idx
-                  else Util.idivc(self.nld[wlkey].loopcnt[le.BAT],
-                                  Util.prod(tb_part[:idx] + tb_part[idx+1:]))
+                  else util.idivc(self.nld[wlkey].loopcnt[le.BAT],
+                                  util.prod(tb_part[:idx] + tb_part[idx+1:]))
                   for x in range(3)]
         lp_ts = [None] * le.NUM
         lp_ts[le.IFM] = ti
@@ -242,7 +242,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
                             in zip(idx_pr, self.buf_cnt_pr))
 
             # Access.
-            self.access += Util.prod(cnt_pr) * (read + write)
+            self.access += util.prod(cnt_pr) * (read + write)
 
             if ridx_pr == self.data:
                 # Hit.
@@ -264,13 +264,13 @@ class TestLoopBlockingFixture(unittest.TestCase):
         lpts = zip(*lbs.bl_ts)
 
         # Get buffered unit counts at each level.
-        dram_buf_cnt_pr_list = [tuple(Util.prod(lpts[lpe])
+        dram_buf_cnt_pr_list = [tuple(util.prod(lpts[lpe])
                                       for lpe in data_loops[dce].loops())
                                 for dce in range(de.NUM)]
-        gbuf_buf_cnt_pr_list = [tuple(Util.prod(lpts[lpe][1:])
+        gbuf_buf_cnt_pr_list = [tuple(util.prod(lpts[lpe][1:])
                                       for lpe in data_loops[dce].loops())
                                 for dce in range(de.NUM)]
-        regf_buf_cnt_pr_list = [tuple(Util.prod(lpts[lpe][2:])
+        regf_buf_cnt_pr_list = [tuple(util.prod(lpts[lpe][2:])
                                       for lpe in data_loops[dce].loops())
                                 for dce in range(de.NUM)]
 

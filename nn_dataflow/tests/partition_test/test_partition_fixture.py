@@ -21,13 +21,13 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import itertools
 import unittest
 
-from nn_dataflow import ConvLayer, FCLayer, LocalRegionLayer, PoolingLayer
-from nn_dataflow import Option
-from nn_dataflow import Partition
-from nn_dataflow import PartitionScheme
-from nn_dataflow import ParallelEnum as pe
-from nn_dataflow import PhyDim2
-from nn_dataflow import Util
+from nn_dataflow.core import partition
+from nn_dataflow.core import ConvLayer, FCLayer, LocalRegionLayer, PoolingLayer
+from nn_dataflow.core import Option
+from nn_dataflow.core import PartitionScheme
+from nn_dataflow.core import ParallelEnum as pe
+from nn_dataflow.core import PhyDim2
+from nn_dataflow import util
 
 class TestPartitionFixture(unittest.TestCase):
     ''' Base fixture class for Partition tests. '''
@@ -78,7 +78,7 @@ class TestPartitionFixture(unittest.TestCase):
     def _gen_partition(self, wlkey='BASE', dnkey='BASE', optkey='BASE',
                        guaranteed=False):
         ''' Generate PartitionScheme. '''
-        for part in Partition.gen_partition(self.layers[wlkey],
+        for part in partition.gen_partition(self.layers[wlkey],
                                             self.batch_size,
                                             self.dim_nodes[dnkey],
                                             self.options[optkey],
@@ -91,8 +91,8 @@ class TestPartitionFixture(unittest.TestCase):
         layer = self.layers[wlkey]
         dim_nodes = self.dim_nodes[dnkey]
 
-        for ph, pw in itertools.product(Util.factorize(dim_nodes.h, pe.NUM),
-                                        Util.factorize(dim_nodes.w, pe.NUM)):
+        for ph, pw in itertools.product(util.factorize(dim_nodes.h, pe.NUM),
+                                        util.factorize(dim_nodes.w, pe.NUM)):
 
             pdims = [PhyDim2(h, w) for h, w in zip(ph, pw)]
 
@@ -101,17 +101,17 @@ class TestPartitionFixture(unittest.TestCase):
                 continue
 
             # OUTP.
-            if not Util.approx_dividable(layer.nofm, pdims[pe.OUTP].size()):
+            if not util.approx_dividable(layer.nofm, pdims[pe.OUTP].size()):
                 continue
 
             # OFMP.
-            if not Util.approx_dividable(layer.hofm, pdims[pe.OFMP].h) \
-                    or not Util.approx_dividable(layer.wofm, pdims[pe.OFMP].w):
+            if not util.approx_dividable(layer.hofm, pdims[pe.OFMP].h) \
+                    or not util.approx_dividable(layer.wofm, pdims[pe.OFMP].w):
                 continue
 
             # INPP.
             if isinstance(layer, ConvLayer):
-                if not Util.approx_dividable(layer.nifm,
+                if not util.approx_dividable(layer.nifm,
                                              pdims[pe.INPP].size()):
                     continue
             elif isinstance(layer, LocalRegionLayer):

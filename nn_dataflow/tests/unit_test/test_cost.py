@@ -20,8 +20,8 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import unittest
 
-from nn_dataflow import Cost
-from nn_dataflow import MemHierEnum as me
+from nn_dataflow.core import Cost
+from nn_dataflow.core import MemHierEnum as me
 
 class TestCost(unittest.TestCase):
     ''' Tests for Cost. '''

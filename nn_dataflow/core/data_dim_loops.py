@@ -18,10 +18,10 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from . import LoopEnum as le
-from . import Util
+from . import loop_enum as le
+from .. import util
 
-class DataDimLoops(Util.ContentHashClass):
+class DataDimLoops(util.ContentHashClass):
     '''
     A tuple of loops that are the dimensions of the data.
     '''
@@ -58,7 +58,7 @@ class DataDimLoops(Util.ContentHashClass):
         '''
         Get the data unit count from the given loop counts.
         '''
-        return Util.prod(self.take(loop_cnt))
+        return util.prod(self.take(loop_cnt))
 
     def __repr__(self):
         return '{}({})'.format(

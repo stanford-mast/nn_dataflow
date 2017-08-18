@@ -22,11 +22,11 @@ import copy
 import itertools
 import math
 
-from nn_dataflow import Cost
-from nn_dataflow import DataCategoryEnum as de
-from nn_dataflow import LoopEnum as le
-from nn_dataflow import MemHierEnum as me
-from nn_dataflow import Util
+from nn_dataflow.core import Cost
+from nn_dataflow.core import DataCategoryEnum as de
+from nn_dataflow.core import LoopEnum as le
+from nn_dataflow.core import MemHierEnum as me
+from nn_dataflow import util
 
 from . import TestLoopBlockingFixture
 
@@ -359,11 +359,11 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
 
             self.assertAlmostEqual(sdict['part_occ'], self.part_occ)
 
-            self.assertEqual(Util.prod(sdict['ti']),
+            self.assertEqual(util.prod(sdict['ti']),
                              self.nld['BASE'].loopcnt[le.IFM])
-            self.assertEqual(Util.prod(sdict['to']),
+            self.assertEqual(util.prod(sdict['to']),
                              self.nld['BASE'].loopcnt[le.OFM])
-            self.assertEqual(Util.prod(sdict['tb']),
+            self.assertEqual(util.prod(sdict['tb']),
                              self.nld['BASE'].loopcnt[le.BAT])
 
     def test_scheme_dict_eval_order(self):

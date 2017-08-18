@@ -21,14 +21,14 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import itertools
 from collections import OrderedDict, namedtuple
 
-from . import LoopBlocking
-from . import Partition
-from . import Util
-from .Cost import Cost
-from .DataLayout import DataLayout
-from .Layer import Layer
-from .MapStrategy import MapStrategy
-from .Resource import Resource
+from . import loop_blocking
+from . import partition
+from .. import util
+from .cost import Cost
+from .data_layout import DataLayout
+from .layer import Layer
+from .map_strategy import MapStrategy
+from .resource import Resource
 
 class SchedulingCondition(namedtuple('SchedulingCondition',
                                      ['resource',
@@ -156,15 +156,15 @@ class Scheduling(object):
                                            dst_data_region.node_iter()))
 
         # Explore parallel partitioning schemes.
-        for part in Partition.gen_partition(self.layer, self.batch_size,
+        for part in partition.gen_partition(self.layer, self.batch_size,
                                             proc_region.dim, options,
                                             guaranteed=True):
             # Ofmap layout.
-            ofmap_layout = Partition.get_ofmap_layout(
+            ofmap_layout = partition.get_ofmap_layout(
                 self.layer, self.batch_size, part, dst_data_region)
 
             # Partition NoC hop cost.
-            unit_nhops = Partition.part_layer_unit_nhops(
+            unit_nhops = partition.part_layer_unit_nhops(
                 self.layer, self.batch_size, part, proc_region,
                 filter_nodes, ifmap_layout, ofmap_layout, options)
 
@@ -184,7 +184,7 @@ class Scheduling(object):
         total_layer_ops = self.layer.total_ops(self.batch_size)
         for t in tops:
             actual_layer_ops = t.dict_loop['ops']
-            assert Util.isclose(total_layer_ops, actual_layer_ops, rel_tol=1e-4)
+            assert util.isclose(total_layer_ops, actual_layer_ops, rel_tol=1e-4)
 
         # Check ofmap layout matches the layer.
         for t in tops:
@@ -239,7 +239,7 @@ class Scheduling(object):
         for nested_loop_desc in map_strategy.gen_nested_loop_desc():
 
             # Explore loop blocking schemes.
-            for lbs in LoopBlocking.gen_loopblocking(
+            for lbs in loop_blocking.gen_loopblocking(
                     nested_loop_desc, resource, self.cost, p_occ, options):
 
                 if lbs.is_valid():

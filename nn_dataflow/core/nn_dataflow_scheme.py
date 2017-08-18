@@ -20,11 +20,11 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import OrderedDict, MutableMapping
 
-from . import MemHierEnum as me
-from . import Util
-from .DataLayout import DataLayout
-from .Network import Network
-from .Scheduling import SchedulingResult
+from . import mem_hier_enum as me
+from .. import util
+from .data_layout import DataLayout
+from .network import Network
+from .scheduling import SchedulingResult
 
 class NNDataflowScheme(MutableMapping):
     '''
@@ -101,8 +101,8 @@ class NNDataflowScheme(MutableMapping):
         df = NNDataflowScheme(self.network, self.input_layout)
         for layer_name in self.res_dict:
             df[layer_name] = self.res_dict[layer_name]
-        assert Util.isclose(df.total_cost, self.total_cost, rel_tol=1e-5)
-        assert Util.isclose(df.total_time, self.total_time, rel_tol=1e-5)
+        assert util.isclose(df.total_cost, self.total_cost, rel_tol=1e-5)
+        assert util.isclose(df.total_time, self.total_time, rel_tol=1e-5)
         return df
 
     @property

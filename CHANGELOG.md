@@ -114,6 +114,10 @@ List of major changes and improvements
 
   - Move map strategy class into `NNDataflow` constructor.
 
+  - Reorganize package structure.
+
+  - Use lower-case name for all modules.
+
 
 ### Fixed
 

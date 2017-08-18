@@ -20,7 +20,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import unittest
 
-from nn_dataflow import PhyDim2
+from nn_dataflow.core import PhyDim2
 
 class TestPhyDim2(unittest.TestCase):
     ''' Tests for PhyDim2. '''

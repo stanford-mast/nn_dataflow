@@ -21,7 +21,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 from collections import namedtuple, Counter
 import itertools
 
-from . import Util
+from .. import util
 
 _FMAP_POSITION_ATTRS = ['b', 'n', 'h', 'w']
 
@@ -31,7 +31,7 @@ A position in a batched fmap.
 FmapPosition = namedtuple('FmapPosition', _FMAP_POSITION_ATTRS)
 
 
-class FmapRange(Util.ContentHashClass):
+class FmapRange(util.ContentHashClass):
     '''
     A range of a batched fmap.
     '''
@@ -87,7 +87,7 @@ class FmapRange(Util.ContentHashClass):
 
         lens = [e - b for b, e in zip(begs, ends)]
 
-        return Util.prod(lens)
+        return util.prod(lens)
 
     def overlap(self, other):
         '''

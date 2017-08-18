@@ -20,13 +20,13 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import sys
 
-from . import Partition
-from .Cost import Cost
-from .MapStrategy import MapStrategy
-from .Network import Network
-from .NNDataflowScheme import NNDataflowScheme
-from .Resource import Resource
-from .Scheduling import SchedulingCondition, Scheduling
+from . import partition
+from .cost import Cost
+from .map_strategy import MapStrategy
+from .network import Network
+from .nn_dataflow_scheme import NNDataflowScheme
+from .resource import Resource
+from .scheduling import SchedulingCondition, Scheduling
 
 class NNDataflow(object):
     '''
@@ -178,10 +178,10 @@ class NNDataflow(object):
 
         input_region = self.resource.dst_data_region()
 
-        for part in Partition.gen_partition(input_layer, self.batch_size,
+        for part in partition.gen_partition(input_layer, self.batch_size,
                                             input_region.dim, options,
                                             guaranteed=True):
-            input_layout = Partition.get_ofmap_layout(
+            input_layout = partition.get_ofmap_layout(
                 input_layer, self.batch_size, part, input_region)
 
             yield input_layout

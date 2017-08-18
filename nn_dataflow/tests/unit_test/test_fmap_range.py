@@ -21,9 +21,9 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import itertools
 import unittest
 
-from nn_dataflow import FmapPosition
-from nn_dataflow import FmapRange
-from nn_dataflow import FmapRangeMap
+from nn_dataflow.core import FmapPosition
+from nn_dataflow.core import FmapRange
+from nn_dataflow.core import FmapRangeMap
 
 class TestFmapRange(unittest.TestCase):
     ''' Tests for FmapRange. '''

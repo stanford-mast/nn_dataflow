@@ -20,18 +20,18 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import unittest
 
-from nn_dataflow import ConvLayer, LocalRegionLayer, PoolingLayer
-from nn_dataflow import Cost
-from nn_dataflow import MapStrategyEyeriss
-from nn_dataflow import NodeRegion
-from nn_dataflow import Option
-from nn_dataflow import ParallelEnum as pe
-from nn_dataflow import Partition
-from nn_dataflow import PartitionScheme
-from nn_dataflow import PhyDim2
-from nn_dataflow import Resource
-from nn_dataflow import Scheduling
-from nn_dataflow import SchedulingCondition, SchedulingResult
+from nn_dataflow.core import partition
+from nn_dataflow.core import ConvLayer, LocalRegionLayer, PoolingLayer
+from nn_dataflow.core import Cost
+from nn_dataflow.core import MapStrategyEyeriss
+from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import Option
+from nn_dataflow.core import ParallelEnum as pe
+from nn_dataflow.core import PartitionScheme
+from nn_dataflow.core import PhyDim2
+from nn_dataflow.core import Resource
+from nn_dataflow.core import Scheduling
+from nn_dataflow.core import SchedulingCondition, SchedulingResult
 
 class TestScheduling(unittest.TestCase):
     ''' Tests for Scheduling module. '''
@@ -62,7 +62,7 @@ class TestScheduling(unittest.TestCase):
         part = PartitionScheme(order=(pe.INPP, pe.BATP, pe.OUTP, pe.OFMP),
                                pdims=((1, 2), (2, 1), (1, 2), (2, 1)))
         for wlkey in self.layers:
-            self.ifmap_layouts[wlkey] = Partition.get_ofmap_layout(
+            self.ifmap_layouts[wlkey] = partition.get_ofmap_layout(
                 self.layers[wlkey].input_layer(), self.batch_size, part,
                 self.resource.src_data_region())
 

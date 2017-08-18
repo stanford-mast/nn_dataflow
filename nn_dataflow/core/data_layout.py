@@ -20,9 +20,9 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import namedtuple
 
-from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
-from .NodeRegion import NodeRegion
-from .PhyDim2 import PhyDim2
+from .fmap_range import FmapPosition, FmapRange, FmapRangeMap
+from .node_region import NodeRegion
+from .phy_dim2 import PhyDim2
 
 DATA_LAYOUT_LIST = ['frmap',
                     'origin',

@@ -21,16 +21,16 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import unittest
 from collections import OrderedDict
 
-from nn_dataflow import InputLayer, ConvLayer, FCLayer, PoolingLayer
-from nn_dataflow import MemHierEnum as me
-from nn_dataflow import Network
-from nn_dataflow import NodeRegion
-from nn_dataflow import NNDataflowScheme
-from nn_dataflow import ParallelEnum as pe
-from nn_dataflow import Partition
-from nn_dataflow import PartitionScheme
-from nn_dataflow import PhyDim2
-from nn_dataflow import SchedulingResult
+from nn_dataflow.core import partition
+from nn_dataflow.core import InputLayer, ConvLayer, FCLayer, PoolingLayer
+from nn_dataflow.core import MemHierEnum as me
+from nn_dataflow.core import Network
+from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import NNDataflowScheme
+from nn_dataflow.core import ParallelEnum as pe
+from nn_dataflow.core import PartitionScheme
+from nn_dataflow.core import PhyDim2
+from nn_dataflow.core import SchedulingResult
 
 class TestNNDataflowScheme(unittest.TestCase):
     ''' Tests for NNDataflowScheme. '''
@@ -45,7 +45,7 @@ class TestNNDataflowScheme(unittest.TestCase):
 
         self.batch_size = 4
 
-        self.input_layout = Partition.get_ofmap_layout(
+        self.input_layout = partition.get_ofmap_layout(
             self.network.input_layer(), self.batch_size,
             PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
             NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(2, 1),
@@ -58,7 +58,7 @@ class TestNNDataflowScheme(unittest.TestCase):
             dict_part=OrderedDict([('cost', 0.5), ('total_nhops', [4, 5, 6]),
                                    ('num_nodes', 4),
                                   ]),
-            ofmap_layout=Partition.get_ofmap_layout(
+            ofmap_layout=partition.get_ofmap_layout(
                 self.network['c1'], self.batch_size,
                 PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
                 NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
@@ -71,7 +71,7 @@ class TestNNDataflowScheme(unittest.TestCase):
             dict_part=OrderedDict([('cost', 0.5), ('total_nhops', [.4, .5, .6]),
                                    ('num_nodes', 2),
                                   ]),
-            ofmap_layout=Partition.get_ofmap_layout(
+            ofmap_layout=partition.get_ofmap_layout(
                 self.network['p1'], self.batch_size,
                 PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
                 NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),

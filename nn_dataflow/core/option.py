@@ -20,7 +20,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import namedtuple
 
-from . import DataCategoryEnum as de
+from . import data_category_enum as de
 
 OPTION_LIST = ['sw_gbuf_bypass',
                'sw_solve_loopblocking',

@@ -20,10 +20,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import unittest
 
-from nn_dataflow import Layer
-from nn_dataflow import InputLayer
-from nn_dataflow import ConvLayer, FCLayer
-from nn_dataflow import LocalRegionLayer, PoolingLayer
+from nn_dataflow.core import Layer
+from nn_dataflow.core import InputLayer
+from nn_dataflow.core import ConvLayer, FCLayer
+from nn_dataflow.core import LocalRegionLayer, PoolingLayer
 
 class TestLayer(unittest.TestCase):
     ''' Tests for Layer. '''

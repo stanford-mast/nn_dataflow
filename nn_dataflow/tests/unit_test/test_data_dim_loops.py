@@ -21,8 +21,8 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import itertools
 import unittest
 
-from nn_dataflow import DataDimLoops
-from nn_dataflow import LoopEnum as le
+from nn_dataflow.core import DataDimLoops
+from nn_dataflow.core import LoopEnum as le
 
 class TestDataDimLoops(unittest.TestCase):
     ''' Tests for DataDimLoops. '''

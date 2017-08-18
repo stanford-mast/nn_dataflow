@@ -20,14 +20,14 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import itertools
 
-from . import DataCategoryEnum as de
-from . import ParallelEnum as pe
-from . import Util
-from .DataLayout import DataLayout
-from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
-from .Layer import ConvLayer, LocalRegionLayer
-from .PartitionScheme import PartitionScheme
-from .PhyDim2 import PhyDim2
+from . import data_category_enum as de
+from . import parallel_enum as pe
+from .. import util
+from .data_layout import DataLayout
+from .fmap_range import FmapPosition, FmapRange, FmapRangeMap
+from .layer import ConvLayer, LocalRegionLayer
+from .partition_scheme import PartitionScheme
+from .phy_dim2 import PhyDim2
 
 '''
 Parallel process partitioning.
@@ -49,8 +49,8 @@ def gen_partition(layer, batch_size, dim_nodes, options, guaranteed=False):
 
     yielded = False
 
-    for ph, pw in itertools.product(Util.factorize(dim_nodes.h, pe.NUM),
-                                    Util.factorize(dim_nodes.w, pe.NUM)):
+    for ph, pw in itertools.product(util.factorize(dim_nodes.h, pe.NUM),
+                                    util.factorize(dim_nodes.w, pe.NUM)):
 
         pdims = [PhyDim2(h, w) for h, w in zip(ph, pw)]
 
@@ -62,17 +62,17 @@ def gen_partition(layer, batch_size, dim_nodes, options, guaranteed=False):
 
         if options.partition_hybrid:
             # Require partition is approximately dividable of total size.
-            if not Util.approx_dividable(layer.nofm, pdims[pe.OUTP].size()):
+            if not util.approx_dividable(layer.nofm, pdims[pe.OUTP].size()):
                 continue
-            if not Util.approx_dividable(layer.hofm, pdims[pe.OFMP].h) \
-                    or not Util.approx_dividable(layer.wofm, pdims[pe.OFMP].w):
+            if not util.approx_dividable(layer.hofm, pdims[pe.OFMP].h) \
+                    or not util.approx_dividable(layer.wofm, pdims[pe.OFMP].w):
                 continue
 
             if (not options.partition_ifmaps) and pdims[pe.INPP].size() > 1:
                 continue
             else:
                 if isinstance(layer, ConvLayer):
-                    if not Util.approx_dividable(layer.nifm,
+                    if not util.approx_dividable(layer.nifm,
                                                  pdims[pe.INPP].size()):
                         continue
                 elif isinstance(layer, LocalRegionLayer):
@@ -169,20 +169,20 @@ def part_layer_ofmap_range(layer, batch_size, part, pidx):
     '''
     # Batch partition.
     idx_bat = pidx[pe.BATP].h * part.dim(pe.BATP).w + pidx[pe.BATP].w
-    b_beg, b_end = Util.get_ith_range((0, batch_size),
+    b_beg, b_end = util.get_ith_range((0, batch_size),
                                       idx_bat, part.size(pe.BATP))
 
     # Ofmap channel partition.
     idx_ofm = pidx[pe.OUTP].h * part.dim(pe.OUTP).w + pidx[pe.OUTP].w
-    n_beg, n_end = Util.get_ith_range((0, layer.nofm),
+    n_beg, n_end = util.get_ith_range((0, layer.nofm),
                                       idx_ofm, part.size(pe.OUTP))
 
     # Fmap height tiling.
-    h_beg, h_end = Util.get_ith_range((0, layer.hofm),
+    h_beg, h_end = util.get_ith_range((0, layer.hofm),
                                       pidx[pe.OFMP].h, part.dim(pe.OFMP).h)
 
     # Fmap width tiling.
-    w_beg, w_end = Util.get_ith_range((0, layer.wofm),
+    w_beg, w_end = util.get_ith_range((0, layer.wofm),
                                       pidx[pe.OFMP].w, part.dim(pe.OFMP).w)
 
     return FmapRange(FmapPosition(b=b_beg, n=n_beg, h=h_beg, w=w_beg),
@@ -204,7 +204,7 @@ def part_layer_ifmap_range(layer, batch_size, part, pidx):
     if isinstance(layer, ConvLayer):
         # Ifmap channel partition.
         idx_ifm = pidx[pe.INPP].h * part.dim(pe.INPP).w + pidx[pe.INPP].w
-        n_beg, n_end = Util.get_ith_range((0, layer.nifm),
+        n_beg, n_end = util.get_ith_range((0, layer.nifm),
                                           idx_ifm, part.size(pe.INPP))
         # Fmap height tiling.
         h_beg, h_end = h_orng
@@ -359,7 +359,7 @@ def get_ofmap_layout(layer, batch_size, part, out_data_region):
     dim_omr = out_data_region.dim
 
     if dim_omr.size() == 0:
-        raise ValueError('Partition ofmap: empty node region.')
+        raise ValueError('partition ofmap: empty node region.')
 
     # Start with the same as computation partitioning.
     ofmap_order = part.order
@@ -392,7 +392,7 @@ def get_ofmap_layout(layer, batch_size, part, out_data_region):
 
     ofmap_part = PartitionScheme(order=ofmap_order, pdims=ofmap_pdims)
     assert all(od <= omrd for od, omrd in zip(ofmap_part.dim(), dim_omr)), \
-            'Partition ofmap: ofmap partitioning {} is invalid within ' \
+            'partition ofmap: ofmap partitioning {} is invalid within ' \
             'memory region {}.'.format(ofmap_part, str(out_data_region))
 
     # Make layout.
