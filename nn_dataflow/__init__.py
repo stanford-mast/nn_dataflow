@@ -18,32 +18,5 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from . import DataCategoryEnum
-from . import LoopBlocking
-from . import LoopBlockingSolver
-from . import LoopEnum
-from . import MemHierEnum
-from . import ParallelEnum
-from . import Partition
-from .Cost import Cost
-from .DataDimLoops import DataDimLoops
-from .DataLayout import DataLayout
-from .FmapRange import FmapPosition, FmapRange, FmapRangeMap
-from .Layer import Layer, InputLayer, ConvLayer, FCLayer, \
-        LocalRegionLayer, PoolingLayer
-from .LoopBlockingScheme import LoopBlockingScheme
-from .MapStrategy import MapStrategy, MapStrategyEyeriss
-from .NestedLoopDesc import NestedLoopDesc
-from .Network import Network
-from .NodeRegion import NodeRegion
-from .NNDataflowScheme import NNDataflowScheme
-from .Option import Option
-from .PartitionScheme import PartitionScheme
-from .PhyDim2 import PhyDim2
-from .Resource import Resource
-from .Scheduling import SchedulingCondition, SchedulingResult, Scheduling
-
-from .NNDataflow import NNDataflow
-
 __version__ = '1.5-rc.8'
 
