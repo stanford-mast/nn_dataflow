@@ -118,6 +118,8 @@ List of major changes and improvements
 
   - Use lower-case name for all modules.
 
+  - Add local version number to output.
+
 
 ### Fixed
 

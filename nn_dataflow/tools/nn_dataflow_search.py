@@ -24,8 +24,6 @@ import multiprocessing
 import sys
 from collections import OrderedDict
 
-from nn_dataflow import __version__ as VERSION
-
 from nn_dataflow.core import NNDataflow
 from nn_dataflow.core import Cost
 from nn_dataflow.core import DataCategoryEnum as de
@@ -38,6 +36,8 @@ from nn_dataflow.core import Resource
 
 from nn_dataflow.nns import all_networks
 from nn_dataflow.nns import import_network
+
+from nn_dataflow.version import get_version
 
 def stats_dict(dfsch, cost):
     '''
@@ -166,7 +166,7 @@ def do_scheduling(args):
 
     res_map = OrderedDict()
 
-    res_map['version'] = VERSION
+    res_map['version'] = get_version(with_local=True)
 
     res_map['net'] = args.net
     res_map['batch'] = args.batch
