@@ -12,7 +12,7 @@ List of major changes and improvements
   - Buffer sharing scheme.
 
 
-## [v1.4 -- v1.5] -- 2017-08-17
+## [v1.4 -- v1.5] -- 2017-08-18
 
 ### Added
 
@@ -121,6 +121,12 @@ List of major changes and improvements
   - Define `__repr__` for class stringify, and remove `StringifyClass`.
 
   - Move map strategy class into `NNDataflow` constructor.
+
+  - Reorganize package structure.
+
+  - Use lower-case name for all modules.
+
+  - Add local version number to output.
 
 
 ### Fixed

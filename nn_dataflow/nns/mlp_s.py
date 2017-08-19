@@ -18,5 +18,20 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-__version__ = '1.5'
+from nn_dataflow.core import Network
+from nn_dataflow.core import InputLayer, FCLayer
+
+'''
+MLP-S
+
+PRIME, 2016
+'''
+
+NN = Network('MLP-S')
+
+NN.set_input(InputLayer(784, 1))
+
+NN.add('fc1', FCLayer(784, 500))
+NN.add('fc2', FCLayer(500, 250))
+NN.add('fc3', FCLayer(250, 10))
 
