@@ -10,6 +10,20 @@ List of major changes and improvements
   - Access forwarding.
 
   - Buffer sharing scheme.
+    - Use `BufShrScheme` class to represent and calculate NoC transfers.
+
+
+### Changed
+
+- Software models.
+
+  - `LoopBlockingScheme` supports access forwarding and buffer sharing.
+
+  - `partition` unit number of hops calculation supports access forwarding and
+    buffer sharing.
+
+  - `DataLayout` supports closest-first forwarding data transfer for access
+    forwarding and buffer sharing.
 
 
 ## [v1.4 -- v1.5] -- 2017-08-18
