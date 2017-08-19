@@ -4,6 +4,144 @@ List of major changes and improvements
 ## [Unreleased]
 
 
+## [v1.4 -- v1.5] -- 2017-08-18
+
+### Added
+
+- Workload models.
+
+  - `Network` method to return next layers.
+
+  - `Network` uses `None` in previous/next layers for the input/output layers.
+
+  - `Network` methods to return the first/last layers.
+
+  - Add batch size argument to layer fmap size methods.
+
+  - Add default filter size to `FCLayer`.
+
+  - Add `DataDimLoops` class to denote loops that are dimensions of a data
+    category.
+
+  - Add neural neworks: MLP-L/M/S from PRIME ISCA 2016.
+
+- Software models.
+
+  - Add statistic properties to `SchedulingResult`.
+
+  - Add `NNDataflowScheme` class for overall NN dataflow.
+
+- Software engineering.
+
+  - Add utilities to `LoopBlockingScheme` class.
+
+  - Add negative operation to `PhyDim2`.
+
+  - Add default arguments to `Option`.
+
+- Test.
+
+  - Add unit tests.
+
+
+### Changed
+
+- Workload models.
+
+  - Relax `__len__` of `Network` to work before setting input layer.
+
+  - Allow different height and width for filters in `ConvLayer`.
+
+- Hardware models:
+
+  - Upgrade node dimensions to node region in `Resource`. The origins of node
+    region and memory regions are all absolute.
+
+  - Add `type` attribute to `NodeRegion` to differentiate processing and data
+    node regions in `Resource`.
+
+  - Change default cost of the NoC hop traversal.
+
+- Software models:
+
+  - Add loop index generator to `LoopBlockingScheme` class.
+
+  - PE array mapping for `LocalRegionLayer` reduces regfile size.
+
+  - Loop blocking scheme result stats change from one node to all nodes.
+
+  - Move partition occupation into `LoopBlockingScheme` constructor.
+
+  - Move `LoopBlockingScheme` verification to tests.
+
+  - Improve the workload partitioning for loop blocking exhaustive search.
+
+  - Merge `loopcnt` attribute of `NestedLoopDesc` to a tuple.
+
+  - Change `LoopBlockingScheme` interface for blocking factors and loop orders.
+
+  - Loop blocking exhaustive search introduces regularized schemes and
+    suboptimal schemes, to enable more skips. Also restrict the skips to CONV
+    layer.
+
+  - Refactor loop blocking bypass solvers, and restrict it to CONV layer.
+
+  - Use row-stationary mapping to `LocalRegionLayer`, and merge with that of
+    `ConvLayer`.
+
+  - Generalize `LoopBlockingScheme` access model for arbitrary data loops.
+
+  - Skip equivalence when generating `PartitionScheme`.
+
+  - Check ifmap layout against layer parameters in `Scheduling`.
+
+  - Add number of nodes to scheduling result.
+
+  - Add `type` attribute to `DataLayout` to denote the type of the reside
+    region.
+
+  - Add guarantee to generate `PartitionScheme`.
+
+- Software engineering.
+
+  - Lazily evaluate loop blocking stats.
+
+  - Use rich comparison instead of `__cmp__`.
+
+  - Convert `RuntimeError` exceptions to assertions.
+
+  - Define `__repr__` for class stringify, and remove `StringifyClass`.
+
+  - Move map strategy class into `NNDataflow` constructor.
+
+  - Reorganize package structure.
+
+  - Use lower-case name for all modules.
+
+  - Add local version number to output.
+
+
+### Fixed
+
+- Output data fetch count.
+
+- Error types and message typos.
+
+- `FmapRange` comparison: overlapping ranges cannot compare.
+
+- Multiple bugs fixed in `Util`.
+
+- Multiple bugs fixed in `PartitionScheme`.
+
+- Use GBUF unit access for DRAM when bypassing GBUF.
+
+- Partitioned ifmap range for `LocalRegionLayer`.
+
+- Clarify ITCN accesses to be number of individual transfers to each REGF.
+
+- `Partition` unit number of hops calculation ignores zero-sized data ranges.
+
+
 ## [v1.3 -- v1.4] -- 2017-05-18
 
 ### Added
