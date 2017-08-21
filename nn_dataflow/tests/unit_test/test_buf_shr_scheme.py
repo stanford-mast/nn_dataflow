@@ -272,6 +272,38 @@ class TestBufShrScheme(unittest.TestCase):
                                                         rotation_unit_cnt),
                                 nhops)
 
+    def test_nhops_rotate_all_cache(self):
+        ''' Get nhops_rotate_all using cache. '''
+
+        bufshr = self.bufshr3
+        dce = de.FIL
+
+        self.assertFalse(bufshr.nhops_cache)
+
+        nhops_8 = bufshr.nhops_rotate_all(dce, 8)
+        nhops_4 = bufshr.nhops_rotate_all(dce, 4)
+        nhops_1 = bufshr.nhops_rotate_all(dce, 1)
+        self.assertEqual(len(bufshr.nhops_cache), 3)
+        self.assertEqual(nhops_8, bufshr.nhops_rotate_all(dce, 8))
+        self.assertEqual(nhops_4, bufshr.nhops_rotate_all(dce, 4))
+        self.assertEqual(nhops_1, bufshr.nhops_rotate_all(dce, 1))
+        self.assertEqual(len(bufshr.nhops_cache), 3)
+
+        dce = de.IFM
+
+        nhops_3 = bufshr.nhops_rotate_all(dce, 3)
+        nhops_2 = bufshr.nhops_rotate_all(dce, 2)
+        self.assertEqual(len(bufshr.nhops_cache), 5)
+        self.assertEqual(nhops_3, bufshr.nhops_rotate_all(dce, 3))
+        self.assertEqual(nhops_2, bufshr.nhops_rotate_all(dce, 2))
+        self.assertEqual(len(bufshr.nhops_cache), 5)
+
+        nhops_rot_unit = bufshr.nhops_rotate_all(dce, 3, 2)
+
+        self.assertEqual(len(bufshr.nhops_cache), 6)
+        self.assertEqual(nhops_rot_unit, bufshr.nhops_rotate_all(dce, 3, 2))
+        self.assertEqual(len(bufshr.nhops_cache), 6)
+
     def test_nhops_wide_fetch_once(self):
         ''' Get nhops_wide_fetch_once. '''
         # With `self.bufshr3` and FIL, the dimension is 4 by 2, with neighbor

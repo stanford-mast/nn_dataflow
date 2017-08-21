@@ -130,6 +130,9 @@ class BufShrScheme(object):
         self.part = part
         self.data_loops = data_loops
 
+        # Cache for nhops_rotate_all().
+        self.nhops_cache = {}
+
     def dim(self, dce):
         ''' Get the buffer sharing node group dimensions. '''
         return self.dims[dce]
@@ -203,6 +206,12 @@ class BufShrScheme(object):
         than M, i.e., equal to M.
         '''
 
+        # Check cache.
+        cache_key = (dce, subgrp_size, rotation_unit_cnt)
+        res = self.nhops_cache.get(cache_key, None)
+        if res is not None:
+            return res
+
         subgrp_dim, idx_pr = self._subgrp_dim(dce, subgrp_size)
 
         if rotation_unit_cnt is None:
@@ -236,6 +245,10 @@ class BufShrScheme(object):
                 * (1. / subgrp_size) \
                 * (self.size(dce) // subgrp_size)
         assert not math.isinf(nhops) and not math.isnan(nhops)
+
+        # Update cache.
+        assert cache_key not in self.nhops_cache
+        self.nhops_cache[cache_key] = nhops
 
         return nhops
 
