@@ -86,6 +86,9 @@ class LoopBlockingScheme(object):
 
         # Loop structure.
         self.nld = nested_loop_desc
+        # Cache values.
+        self.total_access_gbuf = [self.nld.total_access_at_of(me.GBUF, dce)
+                                  for dce in range(de.NUM)]
 
         # Check lengths and values.
         assert len(bl_ts) == BL.NUM + 1, \
@@ -784,13 +787,19 @@ class LoopBlockingScheme(object):
                 t_bs_tot = [t_x[lpe] if lpe in flex_loops else 1
                             for lpe in range(le.NUM)]
 
-                for loops_bs, loops_bot in itertools.product(
-                        itertools.permutations(flex_loops),
-                        itertools.permutations(flex_loops)):
+                for t_bs_frac in itertools.product(
+                        *[util.factorize(t, 2) for t in t_bs_tot]):
+                    t_bs = tuple(t[0] for t in t_bs_frac)
 
-                    for t_bs_frac in itertools.product(
-                            *[util.factorize(t, 2) for t in t_bs_tot]):
-                        t_bs = tuple(t[0] for t in t_bs_frac)
+                    loops_bs_trivial = tuple(lpe for lpe in flex_loops
+                                             if t_bs[lpe] == 1)
+
+                    for loops_bs_nontrivial, loops_bot in itertools.product(
+                            itertools.permutations([lpe for lpe in flex_loops
+                                                    if t_bs[lpe] > 1]),
+                            itertools.permutations(flex_loops)):
+
+                        loops_bs = loops_bs_trivial + loops_bs_nontrivial
 
                         yield subgrp_size, t_bs, loops_bs, loops_bot
 
@@ -988,7 +997,7 @@ class LoopBlockingScheme(object):
     def _calc_bufshr_rotation_access(self, bufshr_rot_fetch):
         ''' Calculate the BS rotation NoC accesses, over all nodes. '''
         # All-node access needs to multiply number of groups.
-        return [self.nld.total_access_at_of(me.GBUF, dce)
+        return [self.total_access_gbuf[dce]
                 * bufshr_rot_fetch[dce]
                 * (self.num_nodes // self.bufshr_grp_size[dce])
                 for dce in range(de.NUM)]
@@ -996,7 +1005,7 @@ class LoopBlockingScheme(object):
     def _calc_bufshr_widefetch_access(self, bufshr_wide_fetch):
         ''' Calculate the BS wide fetch NoC accesses, over all nodes. '''
         # All-node access needs to multiply number of groups.
-        return [self.nld.total_access_at_of(me.GBUF, dce)
+        return [self.total_access_gbuf[dce]
                 * bufshr_wide_fetch[dce]
                 * (self.num_nodes // self.bufshr_grp_size[dce])
                 for dce in range(de.NUM)]
