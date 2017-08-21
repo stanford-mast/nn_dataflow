@@ -19,6 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 import itertools
+import math
 import unittest
 
 from nn_dataflow.core import partition
@@ -127,7 +128,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.part = PartitionScheme(range(pe.NUM), ((1, 1),) * pe.NUM)
 
         # Fake buffer sharing scheme.
-        self.bufshr = BufShrScheme(self.part)
+        self.bufshr = BufShrScheme(proc_region, self.part)
 
         # Options.
         self.options = {}
@@ -801,14 +802,17 @@ class TestLoopBlockingFixture(unittest.TestCase):
 
             d_pr = subgrp_dim[idx_pr]
             d_npr = subgrp_dim[1 - idx_pr]
-            dist_pr = nbr_dist[idx_pr]
-            dist_npr = nbr_dist[1 - idx_pr]
-            nhops_nbr = (d_pr - 1) * d_npr * dist_pr + (d_npr - 1) * dist_npr
+            n_pr = (d_pr - 1) * d_npr
+            n_npr = d_npr - 1
+            nhops_nbr = bufshr._nhops_with_neighbor_dist(
+                dce,
+                PhyDim2(*[tpl[1] for tpl
+                          in sorted([(idx_pr, n_pr), (1 - idx_pr, n_npr)])]))
 
             nhops_nbr /= 1. * subgrp_size[dce]
 
             coord = bufshr._coordinate(subgrp_size[dce] - 1, subgrp_dim, idx_pr)
-            nhops_lpbk = sum(coord * nbr_dist)
+            nhops_lpbk = bufshr._nhops_with_neighbor_dist(dce, coord)
 
             nhops_lpbk /= 1. * subgrp_size[dce]
 
@@ -827,6 +831,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
                                         idx_pr, nbr_dist,
                                         nhops, nhops_nbr, nhops_lpbk))
 
+            assert not math.isnan(nhops) and not math.isinf(nhops)
             avg_nbr_nhops.append(nhops)
 
         return avg_nbr_nhops

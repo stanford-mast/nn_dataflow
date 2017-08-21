@@ -154,7 +154,8 @@ def gen_loopblocking(nested_loop_desc, resource, part, cost, part_occ, options):
     '''
 
     # Buffer sharing scheme.
-    bufshr = BufShrScheme(part, nested_loop_desc.data_loops)
+    bufshr = BufShrScheme(resource.proc_region, part,
+                          nested_loop_desc.data_loops)
 
     # Solver only works for CONV layer.
     if options.sw_solve_loopblocking and _is_conv_loops(nested_loop_desc):

@@ -25,8 +25,10 @@ from nn_dataflow.core import BufShrScheme
 from nn_dataflow.core import DataCategoryEnum as de
 from nn_dataflow.core import DataDimLoops
 from nn_dataflow.core import LoopEnum as le
+from nn_dataflow.core import NodeRegion
 from nn_dataflow.core import ParallelEnum as pe
 from nn_dataflow.core import PartitionScheme
+from nn_dataflow.core import PhyDim2
 
 class TestBufShrScheme(unittest.TestCase):
     ''' Tests for BufShrScheme. '''
@@ -39,9 +41,16 @@ class TestBufShrScheme(unittest.TestCase):
         self.ps3 = PartitionScheme(order=range(pe.NUM),
                                    pdims=[(1, 6), (1, 2), (4, 1), (3, 5)])
 
-        self.bufshr1 = BufShrScheme(self.ps1)
-        self.bufshr2 = BufShrScheme(self.ps2)
-        self.bufshr3 = BufShrScheme(self.ps3)
+        self.nr1 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps1.dim(),
+                              type=NodeRegion.PROC)
+        self.nr2 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps2.dim(),
+                              type=NodeRegion.PROC)
+        self.nr3 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps3.dim(),
+                              type=NodeRegion.PROC)
+
+        self.bufshr1 = BufShrScheme(self.nr1, self.ps1)
+        self.bufshr2 = BufShrScheme(self.nr2, self.ps2)
+        self.bufshr3 = BufShrScheme(self.nr3, self.ps3)
 
     def test_dim(self):
         ''' Accessor dim. '''
@@ -67,29 +76,41 @@ class TestBufShrScheme(unittest.TestCase):
         # Adjacent, BATP upon OFMP.
         ps = PartitionScheme(order=[pe.INPP, pe.OUTP, pe.BATP, pe.OFMP],
                              pdims=[(2, 2), (5, 5), (3, 3), (7, 7)])
-        self.assertTupleEqual(BufShrScheme(ps).dim(de.FIL), (15,) * 2)
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=ps.dim(),
+                        type=NodeRegion.PROC)
+        self.assertTupleEqual(BufShrScheme(nr, ps).dim(de.FIL), (15,) * 2)
         # Adjacent, OFMP upon BATP.
         ps = PartitionScheme(order=[pe.INPP, pe.OFMP, pe.BATP, pe.OUTP],
                              pdims=[(2, 2), (5, 5), (3, 3), (7, 7)])
-        self.assertTupleEqual(BufShrScheme(ps).dim(de.FIL), (15,) * 2)
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=ps.dim(),
+                        type=NodeRegion.PROC)
+        self.assertTupleEqual(BufShrScheme(nr, ps).dim(de.FIL), (15,) * 2)
 
         # Not adjacent, BATP upon OFMP.
         ps = PartitionScheme(order=[pe.OUTP, pe.BATP, pe.INPP, pe.OFMP],
                              pdims=[(2, 2), (5, 5), (3, 3), (7, 7)])
-        self.assertTupleEqual(BufShrScheme(ps).dim(de.FIL), (5,) * 2)
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=ps.dim(),
+                        type=NodeRegion.PROC)
+        self.assertTupleEqual(BufShrScheme(nr, ps).dim(de.FIL), (5,) * 2)
         # Not adjacent, OFMP upon BATP.
         ps = PartitionScheme(order=[pe.OFMP, pe.INPP, pe.BATP, pe.OUTP],
                              pdims=[(2, 2), (5, 5), (3, 3), (7, 7)])
-        self.assertTupleEqual(BufShrScheme(ps).dim(de.FIL), (3,) * 2)
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=ps.dim(),
+                        type=NodeRegion.PROC)
+        self.assertTupleEqual(BufShrScheme(nr, ps).dim(de.FIL), (3,) * 2)
 
         # Only BATP.
         ps = PartitionScheme(order=[pe.OUTP, pe.BATP, pe.INPP, pe.OFMP],
                              pdims=[(2, 2), (1, 1), (3, 3), (7, 7)])
-        self.assertTupleEqual(BufShrScheme(ps).dim(de.FIL), (3,) * 2)
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=ps.dim(),
+                        type=NodeRegion.PROC)
+        self.assertTupleEqual(BufShrScheme(nr, ps).dim(de.FIL), (3,) * 2)
         # Only OFMP.
         ps = PartitionScheme(order=[pe.OFMP, pe.INPP, pe.BATP, pe.OUTP],
                              pdims=[(2, 2), (5, 5), (1, 1), (7, 7)])
-        self.assertTupleEqual(BufShrScheme(ps).dim(de.FIL), (5,) * 2)
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=ps.dim(),
+                        type=NodeRegion.PROC)
+        self.assertTupleEqual(BufShrScheme(nr, ps).dim(de.FIL), (5,) * 2)
 
     def test_dim_invalid_index(self):
         ''' Accessor dim invalid index. '''
@@ -103,16 +124,18 @@ class TestBufShrScheme(unittest.TestCase):
 
     def test_nbr_dists(self):
         ''' Accessor nbr_dists. '''
-        self.assertTupleEqual(self.bufshr1.nbr_dists[de.FIL], (5, 2))
+        inf = float('inf')
+
+        self.assertTupleEqual(self.bufshr1.nbr_dists[de.FIL], (5, inf))
         self.assertTupleEqual(self.bufshr1.nbr_dists[de.IFM], (15, 2))
         self.assertTupleEqual(self.bufshr1.nbr_dists[de.OFM], (1, 1))
 
         self.assertTupleEqual(self.bufshr2.nbr_dists[de.FIL], (1, 1))
         self.assertTupleEqual(self.bufshr2.nbr_dists[de.IFM], (15, 15))
-        self.assertTupleEqual(self.bufshr2.nbr_dists[de.OFM], (1, 1))
+        self.assertTupleEqual(self.bufshr2.nbr_dists[de.OFM], (inf, inf))
 
         self.assertTupleEqual(self.bufshr3.nbr_dists[de.FIL], (3, 5))
-        self.assertTupleEqual(self.bufshr3.nbr_dists[de.IFM], (12, 10))
+        self.assertTupleEqual(self.bufshr3.nbr_dists[de.IFM], (inf, 10))
         self.assertTupleEqual(self.bufshr3.nbr_dists[de.OFM], (1, 1))
 
     def test_default_data_loops(self):
@@ -122,10 +145,11 @@ class TestBufShrScheme(unittest.TestCase):
         data_loops[de.IFM] = DataDimLoops(le.IFM, le.BAT)
         data_loops[de.OFM] = DataDimLoops(le.OFM, le.BAT)
 
-        for bufshr, ps in zip([self.bufshr1, self.bufshr2, self.bufshr3],
-                              [self.ps1, self.ps2, self.ps3]):
+        for bufshr, nr, ps in zip([self.bufshr1, self.bufshr2, self.bufshr3],
+                                  [self.nr1, self.nr2, self.nr3],
+                                  [self.ps1, self.ps2, self.ps3]):
 
-            bufshr_ = BufShrScheme(ps, data_loops)
+            bufshr_ = BufShrScheme(nr, ps, data_loops)
 
             for dce in range(de.NUM):
                 self.assertTupleEqual(bufshr.dim(dce),
@@ -140,9 +164,10 @@ class TestBufShrScheme(unittest.TestCase):
         data_loops[de.IFM] = DataDimLoops(le.OFM, le.BAT)
         data_loops[de.OFM] = DataDimLoops(le.OFM, le.BAT)
 
-        for ps in [self.ps1, self.ps2, self.ps3]:
+        for nr, ps in zip([self.nr1, self.nr2, self.nr3],
+                          [self.ps1, self.ps2, self.ps3]):
 
-            bufshr = BufShrScheme(ps, data_loops)
+            bufshr = BufShrScheme(nr, ps, data_loops)
 
             self.assertTupleEqual(bufshr.dim(de.IFM), bufshr.dim(de.OFM))
             self.assertTupleEqual(bufshr.nbr_dists[de.IFM],
@@ -155,10 +180,26 @@ class TestBufShrScheme(unittest.TestCase):
         data_loops[de.IFM] = DataDimLoops(le.IFM, le.OFM, le.BAT)
         data_loops[de.OFM] = DataDimLoops(le.OFM, le.BAT)
 
-        bufshr = BufShrScheme(self.ps1, data_loops)
+        bufshr = BufShrScheme(self.nr1, self.ps1, data_loops)
 
         self.assertTupleEqual(bufshr.dim(de.IFM), (1, 1))
-        self.assertTrue(all(math.isnan(d) for d in bufshr.nbr_dists[de.IFM]))
+        self.assertTrue(all(math.isinf(d) for d in bufshr.nbr_dists[de.IFM]))
+
+    def test_mismatch_node_region(self):
+        ''' Mismatched node region and part in constructor. '''
+        # Smaller node region. Invalid.
+        with self.assertRaisesRegexp(ValueError, 'BufShrScheme: .*region.*'):
+            _ = BufShrScheme(NodeRegion(origin=PhyDim2(0, 0),
+                                        dim=PhyDim2(1, 1),
+                                        type=NodeRegion.PROC),
+                             self.ps1)
+
+        # Larger node region. Valid.
+        bufshr = BufShrScheme(NodeRegion(origin=PhyDim2(0, 0),
+                                         dim=PhyDim2(100, 100),
+                                         type=NodeRegion.PROC),
+                              self.ps1)
+        self.assertTupleEqual(bufshr.dim(de.IFM), self.ps1.dim(pe.OUTP))
 
     def test_nhops_rotate_all(self):
         ''' Get nhops_rotate_all. '''

@@ -38,6 +38,11 @@ class TestPartitionScheme(unittest.TestCase):
         self.ps2 = PartitionScheme(order=range(pe.NUM),
                                    pdims=[(2, 2), (5, 5), (3, 3), (1, 1)])
 
+        self.nr1 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps1.dim(),
+                              type=NodeRegion.PROC)
+        self.nr2 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps2.dim(),
+                              type=NodeRegion.PROC)
+
     def test_invalid_order(self):
         ''' Invalid order. '''
         with self.assertRaisesRegexp(ValueError, 'PartitionScheme: .*order.*'):
@@ -128,12 +133,7 @@ class TestPartitionScheme(unittest.TestCase):
 
     def test_coordinate(self):
         ''' Get coordinate. '''
-        nr1 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps1.dim(),
-                         type=NodeRegion.PROC)
-        nr2 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps2.dim(),
-                         type=NodeRegion.PROC)
-
-        for ps, nr in zip([self.ps1, self.ps2], [nr1, nr2]):
+        for ps, nr in zip([self.ps1, self.ps2], [self.nr1, self.nr2]):
 
             coord_list = [ps.coordinate(nr, pidx) for pidx in ps.gen_pidx()]
 
@@ -149,29 +149,37 @@ class TestPartitionScheme(unittest.TestCase):
         pidx = [PhyDim2(0, 0)] * pe.NUM
         pidx[pe.OUTP] = PhyDim2(1, 1)
 
-        self.assertEqual(self.ps1.coordinate(nr1, pidx),
+        self.assertEqual(self.ps1.coordinate(self.nr1, pidx),
                          self.ps1.dim(pe.OFMP, pe.INPP)
                          * PhyDim2(1, 1))
 
-        self.assertEqual(self.ps2.coordinate(nr2, pidx),
+        self.assertEqual(self.ps2.coordinate(self.nr2, pidx),
                          self.ps2.dim(pe.OFMP, pe.BATP, pe.INPP)
                          * PhyDim2(1, 1))
 
     def test_part_neighbor_dist(self):
         ''' Get part_neighbor_dist. '''
-        for ps in [self.ps1, self.ps2]:
-            self.assertTupleEqual(ps.part_neighbor_dist(ps.order[-1]),
-                                  (1, 1))
-            self.assertTupleEqual(ps.part_neighbor_dist(ps.order[-2]),
-                                  ps.dim(ps.order[-1]))
-            self.assertTupleEqual(ps.part_neighbor_dist(ps.order[-3]),
-                                  ps.dim(*ps.order[-2:]))
-            self.assertTupleEqual(ps.part_neighbor_dist(ps.order[-4]),
-                                  ps.dim(*ps.order[-3:]))
+        for ps, nr in zip([self.ps1, self.ps2], [self.nr1, self.nr2]):
+
+            for idx in range(pe.NUM):
+                nbr_dist = ps.part_neighbor_dist(nr, ps.order[idx])
+                dim_below = ps.dim(*ps.order[idx + 1:]) if idx + 1 < pe.NUM \
+                        else PhyDim2(1, 1)
+                dim_cur = ps.dim(ps.order[idx])
+
+                if dim_cur.h == 1:
+                    self.assertTrue(math.isinf(nbr_dist.h))
+                else:
+                    self.assertEqual(nbr_dist.h, dim_below.h)
+
+                if dim_cur.w == 1:
+                    self.assertTrue(math.isinf(nbr_dist.w))
+                else:
+                    self.assertEqual(nbr_dist.w, dim_below.w)
 
     def test_part_neighbor_dist_inv(self):
         ''' Get part_neighbor_dist invalid arg. '''
-        dist = self.ps1.part_neighbor_dist(pe.NUM)
+        dist = self.ps1.part_neighbor_dist(self.nr1, pe.NUM)
         self.assertTrue(all(math.isnan(d) for d in dist))
 
     def test_part_layer(self):

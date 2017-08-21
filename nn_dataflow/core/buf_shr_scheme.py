@@ -32,14 +32,21 @@ class BufShrScheme(object):
     The buffer sharing scheme.
     '''
 
-    def __init__(self, part, data_loops=None):
+    def __init__(self, node_region, part, data_loops=None):
         '''
+        `node_region` is the node region in which the buffer sharing takes
+        place.
+
         `part` is the PartitionScheme instance that determine the buffer
         sharing scheme.
 
         `data_loops` is a DataDimLoops instance that determine the relationship
         between DataCategoryEnum and ParallelEnum. Default is for ConvLayer.
         '''
+
+        if any(pd > nrd for pd, nrd in zip(part.dim(), node_region.dim)):
+            raise ValueError('BufShrScheme: partitioning scheme does not fit '
+                             'in the node region')
 
         if data_loops is None:
             data_loops = [None] * de.NUM
@@ -60,35 +67,43 @@ class BufShrScheme(object):
         # If only one of OFMP and BATP exists, use that one.
         if dim_ofmp.size() == 1:
             lpe_dims[le.BAT] = dim_batp
-            lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(pe.BATP)
+            lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(node_region,
+                                                            pe.BATP)
         elif dim_batp.size() == 1:
             lpe_dims[le.BAT] = dim_ofmp
-            lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(pe.OFMP)
+            lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(node_region,
+                                                            pe.OFMP)
         else:
             # If both exist ...
             if abs(idx_ofmp - idx_batp) == 1:
                 # ... and are adjacent in the partitioning hierarchy, use
                 # both.
                 lpe_dims[le.BAT] = dim_batp * dim_ofmp
-                lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(
-                    pe.OFMP if idx_ofmp > idx_batp else pe.BATP)
+                # Neighbor distance is the smaller one.
+                nbr_dist_ofmp = part.part_neighbor_dist(node_region, pe.OFMP)
+                nbr_dist_batp = part.part_neighbor_dist(node_region, pe.BATP)
+                lpe_nbr_dists[le.BAT] = PhyDim2(*[min(d1, d2) for d1, d2
+                                                  in zip(nbr_dist_ofmp,
+                                                         nbr_dist_batp)])
             else:
                 # ... but are not adjacent, use the bottom one (with
                 # smaller distance).
                 if idx_ofmp > idx_batp:
                     lpe_dims[le.BAT] = dim_ofmp
-                    lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(pe.OFMP)
+                    lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(
+                        node_region, pe.OFMP)
                 else:
                     lpe_dims[le.BAT] = dim_batp
-                    lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(pe.BATP)
+                    lpe_nbr_dists[le.BAT] = part.part_neighbor_dist(
+                        node_region, pe.BATP)
 
         # le.OFM corresponds to pe.OUTP.
         lpe_dims[le.OFM] = part.dim(pe.OUTP)
-        lpe_nbr_dists[le.OFM] = part.part_neighbor_dist(pe.OUTP)
+        lpe_nbr_dists[le.OFM] = part.part_neighbor_dist(node_region, pe.OUTP)
 
         # le.IFM corresponds to pe.INNP.
         lpe_dims[le.IFM] = part.dim(pe.INPP)
-        lpe_nbr_dists[le.IFM] = part.part_neighbor_dist(pe.INPP)
+        lpe_nbr_dists[le.IFM] = part.part_neighbor_dist(node_region, pe.INPP)
 
         # Dimension of the node group.
         self.dims = []
@@ -101,11 +116,17 @@ class BufShrScheme(object):
             lpe = (data_loops[dce].drop(range(le.NUM)) + [None])[0]
             if lpe is None:
                 self.dims.append(PhyDim2(1, 1))
-                self.nbr_dists.append(PhyDim2(float('nan'), float('nan')))
+                self.nbr_dists.append(PhyDim2(float('inf'), float('inf')))
             else:
                 self.dims.append(lpe_dims[lpe])
                 self.nbr_dists.append(lpe_nbr_dists[lpe])
 
+        # Check extraordinary neighbor distance.
+        assert all(all((not math.isnan(nd)) and (not math.isinf(nd) or d == 1)
+                       for d, nd in zip(dim, nbr_dist))
+                   for dim, nbr_dist in zip(self.dims, self.nbr_dists))
+
+        self.node_region = node_region
         self.part = part
         self.data_loops = data_loops
 
@@ -192,16 +213,19 @@ class BufShrScheme(object):
         # turn to W and go one hop to the next H, then turn and go long H, ...
         d_pr = subgrp_dim[idx_pr]
         d_npr = subgrp_dim[1 - idx_pr]
-        dist_pr = self.nbr_dists[dce][idx_pr]
-        dist_npr = self.nbr_dists[dce][1 - idx_pr]
         # Per-step nhops = (H-1) * W * Dh + (W-1) * Dw
-        nhops_nbr = (d_pr - 1) * d_npr * dist_pr + (d_npr - 1) * dist_npr
+        n_pr = (d_pr - 1) * d_npr
+        n_npr = d_npr - 1
+        nhops_nbr = self._nhops_with_neighbor_dist(
+            dce,
+            PhyDim2(*[tpl[1] for tpl
+                      in sorted([(idx_pr, n_pr), (1 - idx_pr, n_npr)])]))
 
         # 2. (M-1)-th node loops back to the 0-th node.
         # Position of the (M-1)-th node.
         coord = self._coordinate(subgrp_size - 1, subgrp_dim, idx_pr)
         # Per-step nhops = distance back to the 0-th node.
-        nhops_lpbk = sum(coord * self.nbr_dists[dce])
+        nhops_lpbk = self._nhops_with_neighbor_dist(dce, coord)
 
         skipped_steps = max(1, 1. * subgrp_size / rotation_unit_cnt)
         assert 1 <= skipped_steps <= subgrp_size
@@ -211,6 +235,7 @@ class BufShrScheme(object):
                 * (subgrp_size - skipped_steps) \
                 * (1. / subgrp_size) \
                 * (self.size(dce) // subgrp_size)
+        assert not math.isinf(nhops) and not math.isnan(nhops)
 
         return nhops
 
@@ -303,7 +328,8 @@ class BufShrScheme(object):
         The coordinate of a node with sequential index `index` in the 2D nodes
         with dimensions `dim`.  The index increases first along the priority
         dimension given by `idx_pr` as the dimension index. Return a PhyDim2
-        coordinate.
+        relative coordinate in the subgroup without scaling by the neighbor
+        distance.
         '''
         dim_pr, dim_npr = dim if idx_pr == 0 else reversed(dim)
         coord_npr, coord_pr = divmod(index, dim_pr)
@@ -314,6 +340,15 @@ class BufShrScheme(object):
         coord = PhyDim2(coord_pr, coord_npr) if idx_pr == 0 \
                 else PhyDim2(coord_npr, coord_pr)
         return coord
+
+    def _nhops_with_neighbor_dist(self, dce, coord):
+        '''
+        Get the number of hops from (0, 0) to `coord` of the subgroup of data
+        category `dce`, by scaling by the neighbor distance.
+        '''
+        dist = [c * d if c else 0 for c, d in zip(coord, self.nbr_dists[dce])]
+        assert not any(math.isinf(d) or math.isnan(d) for d in dist)
+        return PhyDim2(*dist).hop_dist(PhyDim2(0, 0))
 
     def __repr__(self):
         return '{}({})'.format(

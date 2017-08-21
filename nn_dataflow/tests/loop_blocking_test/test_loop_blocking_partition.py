@@ -39,6 +39,8 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
         # LoopBlockingScheme records stats of all nodes.
         self.total_ops = self.layer['PAR'].total_ops(self.batch_size)
 
+        self.par_proc_region = self.resource['PAR'].proc_region
+
     def test_scheme_dict(self):
         ''' get_scheme_dict stats. '''
 
@@ -85,7 +87,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
 
             filter_size, ifmap_size, ofmap_size = self._total_part_size(part)
 
-            bufshr = BufShrScheme(part)
+            bufshr = BufShrScheme(self.par_proc_region, part)
 
             # Filter may still have redundant fetch.
             fil_fetch = part.size(pe.BATP, pe.OFMP) // bufshr.size(de.FIL)
@@ -126,7 +128,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
 
             p_nld, p_occ = self._part_nld(part)
 
-            bufshr = BufShrScheme(part)
+            bufshr = BufShrScheme(self.par_proc_region, part)
 
             # Filter may still have redundant fetch.
             fil_fetch = part.size(pe.BATP, pe.OFMP) // bufshr.size(de.FIL)
@@ -168,7 +170,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
 
             p_nld, p_occ = self._part_nld(part)
 
-            bufshr = BufShrScheme(part)
+            bufshr = BufShrScheme(self.par_proc_region, part)
 
             for lbs in loop_blocking.gen_loopblocking(
                     p_nld, self.resource['PAR'], part, self.cost, p_occ,
@@ -195,7 +197,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
 
             p_nld, p_occ = self._part_nld(part)
 
-            bufshr = BufShrScheme(part)
+            bufshr = BufShrScheme(self.par_proc_region, part)
 
             for lbs in loop_blocking.gen_loopblocking(
                     p_nld, self.resource['PAR'], part, self.cost, p_occ,
@@ -224,7 +226,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
         # Make a PartitionScheme that allows bufshr for all data categories.
         part = PartitionScheme(order=range(pe.NUM),
                                pdims=((2, 1), (1, 2), (1, 1), (2, 1)))
-        bufshr = BufShrScheme(part)
+        bufshr = BufShrScheme(self.par_proc_region, part)
         self.assertTrue(all(bufshr.size(dce) > 1 for dce in range(de.NUM)),
                         'test_bufshr_rotation_example: '
                         'made-up PartitionScheme is not expected: '
@@ -265,7 +267,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
         # Make a PartitionScheme that allows bufshr for IFM.
         part = PartitionScheme(order=range(pe.NUM),
                                pdims=((2, 2), (1, 1), (2, 1), (1, 1)))
-        bufshr = BufShrScheme(part)
+        bufshr = BufShrScheme(self.par_proc_region, part)
         self.assertEqual(bufshr.size(de.IFM), 4,
                          'test_bufshr_skip_rot_example: '
                          'made-up PartitionScheme is not expected: '
@@ -317,7 +319,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
         # Make a PartitionScheme that allows bufshr for IFM.
         part = PartitionScheme(order=range(pe.NUM),
                                pdims=((2, 2), (1, 1), (2, 1), (1, 1)))
-        bufshr = BufShrScheme(part)
+        bufshr = BufShrScheme(self.par_proc_region, part)
         self.assertEqual(bufshr.size(de.IFM), 4,
                          'test_bufshr_wide_fetch_example: '
                          'made-up PartitionScheme is not expected: '
@@ -371,7 +373,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
         # Make a PartitionScheme that allows bufshr for IFM.
         part = PartitionScheme(order=list(reversed(range(pe.NUM))),
                                pdims=((2, 2), (1, 1), (2, 1), (1, 1)))
-        bufshr = BufShrScheme(part)
+        bufshr = BufShrScheme(self.par_proc_region, part)
         self.assertEqual(bufshr.size(de.IFM), 4,
                          'test_bufshr_multisubgrp_example: '
                          'made-up PartitionScheme is not expected: '
