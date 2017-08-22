@@ -18,5 +18,29 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-__version__ = '1.5'
+import unittest
+
+from nn_dataflow.core import Network
+
+import nn_dataflow.nns as nns
+
+class TestNNs(unittest.TestCase):
+    ''' Tests for NN definitions. '''
+
+    def test_all_networks(self):
+        ''' Get all_networks. '''
+        self.assertIn('alex_net', nns.all_networks())
+        self.assertIn('vgg_net', nns.all_networks())
+        self.assertGreater(len(nns.all_networks()), 5)
+
+    def test_import_network(self):
+        ''' Get import_network. '''
+        for name in nns.all_networks():
+            network = nns.import_network(name)
+            self.assertIsInstance(network, Network)
+
+    def test_import_network_invalid(self):
+        ''' Get import_network invalid. '''
+        with self.assertRaisesRegexp(ImportError, 'nns: .*defined.*'):
+            _ = nns.import_network('aaa')
 
