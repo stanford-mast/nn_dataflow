@@ -27,6 +27,8 @@ from .phy_dim2 import PhyDim2
 NODE_REGION_LIST = ['dim',
                     'origin',
                     'type',
+                    'wtot',
+                    'wbeg',
                    ]
 
 class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
@@ -35,6 +37,26 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
 
     The `type` attribute specifies the region type, which could be `PROC` for
     computation processing nodes or 'DATA' for data storage nodes.
+
+    The node region can be optionally folded along the w dimension in a zig-zag
+    manner. The folding scheme is defined by (wtot, wbeg). `wtot` is always
+    positive, representing the number of nodes between two turns (total width).
+    `wbeg` is the number of nodes before reaching the first turning boundary,
+    with its sign representing the direction. E.g.,
+
+    ...
+    ******************
+              ********
+              | wbeg |
+
+    or
+
+    ...
+    ******************
+    *********
+    | -wbeg |
+
+    With folded region, `origin` points to the first node.
 
     NOTE: we cannot overload __contains__ and __iter__ as a node container,
     because the base namedtuple already defines them.
@@ -46,7 +68,17 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
     NUM = 2
 
     def __new__(cls, *args, **kwargs):
-        ntp = super(NodeRegion, cls).__new__(cls, *args, **kwargs)
+
+        # Set default values.
+        kwargs2 = kwargs.copy()
+        if len(args) <= NODE_REGION_LIST.index('wtot'):
+            # Default to dim.w but we haven't checked dim yet. Replace later.
+            kwargs2.setdefault('wtot', None)
+        if len(args) <= NODE_REGION_LIST.index('wbeg'):
+            # Default to wtot. Also replace later.
+            kwargs2.setdefault('wbeg', None)
+
+        ntp = super(NodeRegion, cls).__new__(cls, *args, **kwargs2)
 
         if not isinstance(ntp.dim, PhyDim2):
             raise TypeError('NodeRegion: dim must be a PhyDim2 object.')
@@ -56,36 +88,53 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
         if ntp.type not in range(cls.NUM):
             raise ValueError('NodeRegion: type must be a valid type enum.')
 
+        if ntp.wtot is None:
+            ntp = ntp._replace(wtot=ntp.dim.w)
+        if ntp.wbeg is None:
+            ntp = ntp._replace(wbeg=ntp.wtot)
+
+        if not isinstance(ntp.wtot, int):
+            raise TypeError('NodeRegion: wtot must be an int.')
+        if not isinstance(ntp.wbeg, int):
+            raise TypeError('NodeRegion: wbeg must be an int.')
+
+        if not (0 < abs(ntp.wbeg) <= ntp.wtot) and ntp.dim.size() > 0:
+            raise ValueError('NodeRegion: |wbeg| must be in (0, wtot].')
+
         return ntp
 
     def contains_node(self, coordinate):
-        ''' Whether the region contains the given coordinate. '''
-        min_coord = self.origin
-        max_coord = self.origin + self.dim
-        return all(cmin <= c and c < cmax for c, cmin, cmax
-                   in zip(coordinate, min_coord, max_coord))
+        ''' Whether the region contains the given absolute node coordinate. '''
+        return coordinate in self.node_iter()
 
     def node_iter(self):
-        ''' Iterate through all nodes in the region. '''
-        gens = []
-        for o, d in zip(self.origin, self.dim):
-            gens.append(xrange(o, o + d))
-        cnt = 0
-        for tp in itertools.product(*gens):
-            coord = PhyDim2(*tp)
-            assert self.contains_node(coord)
-            cnt += 1
-            yield coord
+        ''' Iterate through all absolute node coordinates in the region. '''
+        for rel_coord in itertools.product(*[range(d) for d in self.dim]):
+            yield self.rel2abs(PhyDim2(*rel_coord))
 
     def rel2abs(self, rel_coordinate):
         ''' Convert relative node coordinate to absolute node coordinate. '''
+
         if not isinstance(rel_coordinate, PhyDim2):
             raise TypeError('NodeRegion: relative coordinate must be '
                             'a PhyDim2 object.')
-        abs_coordinate = self.origin + rel_coordinate
-        if not self.contains_node(abs_coordinate):
-            raise ValueError('NodeRegion: relative coordinate {} is not '
-                             'in node region {}'.format(rel_coordinate, self))
+        if not all(0 <= c < d for c, d in zip(rel_coordinate, self.dim)):
+            raise ValueError('NodeRegion: relative coordinate {} is not in '
+                             'node region {}.'.format(rel_coordinate, self))
+
+        # Add starting offset to start from the boundary before the first node,
+        # then modulo wtot to get the delta h and w to this boundary point.
+        h, w = divmod(rel_coordinate.w + self.wtot - abs(self.wbeg), self.wtot)
+        # Direction for w, changing every time when h increments.
+        direction = (-1 if self.wbeg < 0 else 1) * (-1 if h % 2 else 1)
+        # Make w relative to the left boundary.
+        w = w if direction > 0 else self.wtot - 1 - w
+
+        abs_coordinate = self.origin \
+                + PhyDim2(h=h * self.dim.h + rel_coordinate.h,
+                          w=w - (self.wtot - self.wbeg if self.wbeg > 0
+                                 else -self.wbeg - 1))
+
         return abs_coordinate
 
     def allocate(self, request_list):

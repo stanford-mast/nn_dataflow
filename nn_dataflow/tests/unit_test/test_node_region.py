@@ -30,10 +30,64 @@ class TestNodeRegion(unittest.TestCase):
         ''' Valid arguments. '''
         nr = NodeRegion(dim=PhyDim2(4, 4),
                         origin=PhyDim2(1, 3),
-                        type=NodeRegion.PROC)
+                        type=NodeRegion.PROC,
+                        wtot=2,
+                        wbeg=-1)
         self.assertTupleEqual(nr.dim, (4, 4), 'dim')
         self.assertTupleEqual(nr.origin, (1, 3), 'origin')
         self.assertEqual(nr.type, NodeRegion.PROC, 'type')
+        self.assertEqual(nr.wtot, 2, 'wtot')
+        self.assertEqual(nr.wbeg, -1, 'wbeg')
+
+    def test_default_wtot_wbeg(self):
+        ''' Default wtot and wbeg. '''
+        nr = NodeRegion(dim=PhyDim2(4, 8),
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC)
+        self.assertEqual(nr.wtot, 8)
+        self.assertEqual(nr.wbeg, 8)
+
+        nr = NodeRegion(dim=PhyDim2(4, 8),
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC,
+                        wtot=6)
+        self.assertEqual(nr.wtot, 6)
+        self.assertEqual(nr.wbeg, 6)
+
+        nr = NodeRegion(dim=PhyDim2(4, 8),
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC,
+                        wbeg=-5)
+        self.assertEqual(nr.wtot, 8)
+        self.assertEqual(nr.wbeg, -5)
+
+    def test_args_kwargs(self):
+        ''' Different ways to give args and kwargs. '''
+        dim = PhyDim2(4, 8)
+        origin = PhyDim2(1, 3)
+        type_ = NodeRegion.PROC
+        wtot = 6
+        wbeg = 5
+
+        nr0 = NodeRegion(dim=dim, origin=origin, type=type_,
+                         wtot=wtot, wbeg=wbeg)
+
+        nr = NodeRegion(dim, origin, type_, wtot, wbeg)
+        self.assertTupleEqual(nr, nr0)
+
+        nr = NodeRegion(dim, origin, wbeg=wbeg, wtot=wtot, type=type_)
+        self.assertTupleEqual(nr, nr0)
+
+        nr = NodeRegion(dim, origin, type=type_, wtot=wtot, wbeg=wbeg)
+        self.assertTupleEqual(nr, nr0)
+
+    def test_larger_wtot(self):
+        ''' wtot > dim.w is valid. '''
+        nr = NodeRegion(dim=PhyDim2(4, 8),
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC,
+                        wtot=20)
+        self.assertEqual(nr.wtot, 20)
 
     def test_invalid_dim(self):
         ''' Invalid dim. '''
@@ -55,6 +109,45 @@ class TestNodeRegion(unittest.TestCase):
             _ = NodeRegion(dim=PhyDim2(4, 4),
                            origin=PhyDim2(1, 3),
                            type=NodeRegion.NUM)
+
+    def test_invalid_wtot_type(self):
+        ''' Invalid wtot type. '''
+        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*wtot.*'):
+            _ = NodeRegion(dim=PhyDim2(4, 4),
+                           origin=PhyDim2(1, 3),
+                           type=NodeRegion.PROC,
+                           wtot=1.3)
+
+    def test_invalid_wbeg_type(self):
+        ''' Invalid wbeg type. '''
+        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*wbeg.*'):
+            _ = NodeRegion(dim=PhyDim2(4, 4),
+                           origin=PhyDim2(1, 3),
+                           type=NodeRegion.PROC,
+                           wbeg=1.3)
+
+    def test_invalid_wbeg(self):
+        ''' Invalid wbeg. '''
+        with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*wbeg.*'):
+            _ = NodeRegion(dim=PhyDim2(4, 4),
+                           origin=PhyDim2(1, 3),
+                           type=NodeRegion.PROC,
+                           wtot=4,
+                           wbeg=5)
+
+        with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*wbeg.*'):
+            _ = NodeRegion(dim=PhyDim2(4, 4),
+                           origin=PhyDim2(1, 3),
+                           type=NodeRegion.PROC,
+                           wtot=4,
+                           wbeg=-5)
+
+        with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*wbeg.*'):
+            _ = NodeRegion(dim=PhyDim2(4, 4),
+                           origin=PhyDim2(1, 3),
+                           type=NodeRegion.PROC,
+                           wtot=4,
+                           wbeg=0)
 
     def test_contains_node(self):
         ''' Whether contains node. '''
@@ -119,4 +212,64 @@ class TestNodeRegion(unittest.TestCase):
 
         with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*not in.*'):
             _ = nr.rel2abs(PhyDim2(0, 4))
+
+    def test_rel2abs_folded(self):
+        ''' Get rel2abs with folded. '''
+        nr = NodeRegion(dim=PhyDim2(4, 8),
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC,
+                        wtot=3)
+        # 67
+        # 543
+        # 012
+
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(1, 2)), (1 + 1, 5))
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(2, 3)), (5 + 2, 5))
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(0, 5)), (5 + 0, 3))
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(3, 7)), (9 + 3, 4))
+
+        self.assertSetEqual(set(nr.rel2abs(PhyDim2(h, w))
+                                for h in range(nr.dim.h)
+                                for w in range(nr.dim.w)),
+                            set(nr.node_iter()))
+
+        nr = NodeRegion(dim=PhyDim2(4, 8),
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC,
+                        wtot=3,
+                        wbeg=1)
+        #   7
+        # 456
+        # 321
+        #   0
+
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(2, 0)), (1 + 2, 3))
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(1, 2)), (5 + 1, 2))
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(2, 3)), (5 + 2, 1))
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(0, 5)), (9 + 0, 2))
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(3, 7)), (13 + 3, 3))
+
+        self.assertSetEqual(set(nr.rel2abs(PhyDim2(h, w))
+                                for h in range(nr.dim.h)
+                                for w in range(nr.dim.w)),
+                            set(nr.node_iter()))
+
+        nr = NodeRegion(dim=PhyDim2(4, 8),
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC,
+                        wtot=4,
+                        wbeg=-2)
+        #   76
+        # 2345
+        # 10
+
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(1, 1)), (1 + 1, 2))
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(2, 3)), (5 + 2, 3))
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(0, 5)), (5 + 0, 5))
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(3, 7)), (9 + 3, 4))
+
+        self.assertSetEqual(set(nr.rel2abs(PhyDim2(h, w))
+                                for h in range(nr.dim.h)
+                                for w in range(nr.dim.w)),
+                            set(nr.node_iter()))
 
