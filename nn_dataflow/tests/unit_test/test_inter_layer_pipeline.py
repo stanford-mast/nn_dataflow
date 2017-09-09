@@ -474,11 +474,10 @@ class TestInterLayerPipeline(unittest.TestCase):
             # Processing region.
 
             for n in rtpl[0].proc_region.node_iter():
-                # FIXME: folded region.
-                # self.assertTrue(self.resource.proc_region.contains_node(n),
-                                # 'test_allocate_segment: node {} outside of '
-                                # 'the processing region {}'
-                                # .format(n, self.resource.proc_region))
+                self.assertTrue(self.resource.proc_region.contains_node(n),
+                                'test_allocate_segment: node {} outside of '
+                                'the processing region {}'
+                                .format(n, self.resource.proc_region))
                 self.assertNotIn(n, used_proc_nodes,
                                  'test_allocate_segment: node {} has been '
                                  'used.'.format(n))

@@ -140,11 +140,12 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
     def allocate(self, request_list):
         '''
         Allocate node subregions spatially within the node region according to
-        the given `request_list`. Return a list of NodeRegion instances, or
-        empty list if failed. The origin offset is absolute, not relative to
-        the origin of self.
+        the given `request_list` which is a list of numbers of nodes requested.
 
-        Requests are given as a list of number of nodes.
+        Return a list of NodeRegion instances, whose origins are absolute
+        offset (not relative to the origin of self). The allocation may fail if
+        and only if the total number of nodes requested is larger than the
+        number of nodes in the region, in which case an empty list is returned.
 
         The strategy is to allocate stripe-wise in a zig-zag order, allowing
         for folding in width. We first determine a stripe height as the
@@ -156,17 +157,13 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
         the request width to the next stripe.
         '''
 
-        # FIXME: currently the subregions occupy the correct folded nodes in
-        # the region, but the returned shapes are the unfolded ones. The
-        # allocation is valid, but the subregion dimensions are not accurate,
-        # so the number of hops are not not accurate.
-
         if sum(request_list) > self.dim.size():
             return []
 
         hstrp = util.gcd(self.dim.h, *request_list)
         subregions = []
 
+        wtot = self.dim.w
         ofs_h, ofs_w = 0, 0
         move_right = True
 
@@ -179,12 +176,18 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
             subdim = PhyDim2(hstrp, width)
             if move_right:
                 origin = PhyDim2(ofs_h, ofs_w)
+                wbeg = min(wtot - ofs_w, width)
+                assert wbeg > 0
             else:
-                origin = PhyDim2(ofs_h, self.dim.w - ofs_w - width)
+                origin = PhyDim2(ofs_h, self.dim.w - ofs_w - 1)
+                wbeg = -min(wtot - ofs_w, width)
+                assert wbeg < 0
 
             subregions.append(NodeRegion(dim=subdim,
                                          origin=self.origin + origin,
-                                         type=self.type))
+                                         type=self.type,
+                                         wtot=wtot,
+                                         wbeg=wbeg))
 
             # Move the offset
             ofs_w += width

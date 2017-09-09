@@ -273,3 +273,88 @@ class TestNodeRegion(unittest.TestCase):
                                 for w in range(nr.dim.w)),
                             set(nr.node_iter()))
 
+    def test_allocate(self):
+        ''' allocate. '''
+
+        nr = NodeRegion(dim=PhyDim2(4, 4),
+                        origin=PhyDim2(1, 3),
+                        type=NodeRegion.PROC)
+
+        def _common_check(length):
+            self.assertEqual(len(subregions), length)
+            aggr_node_set = set()
+            for sr in subregions:
+                self.assertEqual(sr.type, NodeRegion.PROC)
+                self.assertEqual(sr.wtot, 4)
+                for c in sr.node_iter():
+                    self.assertTrue(nr.contains_node(c))
+                self.assertTrue(aggr_node_set.isdisjoint(sr.node_iter()))
+                aggr_node_set.update(sr.node_iter())
+            self.assertSetEqual(set(nr.node_iter()), aggr_node_set)
+
+        request_list = [4, 4, 4, 4, 4]
+        self.assertEqual(len(nr.allocate(request_list)), 0)
+
+        request_list = [2, 3, 3, 2, 4, 2]
+        subregions = nr.allocate(request_list)
+        # 5544
+        # 3344
+        # 2221
+        # 0011
+        _common_check(len(request_list))
+        self.assertTupleEqual(subregions[0].dim, (1, 2))
+        self.assertTupleEqual(subregions[0].origin, (1, 3))
+        self.assertEqual(subregions[0].wbeg, 2)
+        self.assertTupleEqual(subregions[1].dim, (1, 3))
+        self.assertTupleEqual(subregions[1].origin, (1, 5))
+        self.assertEqual(subregions[1].wbeg, 2)
+        self.assertTupleEqual(subregions[2].dim, (1, 3))
+        self.assertTupleEqual(subregions[2].origin, (2, 5))
+        self.assertEqual(subregions[2].wbeg, -3)
+        self.assertTupleEqual(subregions[3].dim, (1, 2))
+        self.assertTupleEqual(subregions[3].origin, (3, 3))
+        self.assertEqual(subregions[3].wbeg, 2)
+        self.assertTupleEqual(subregions[4].dim, (1, 4))
+        self.assertTupleEqual(subregions[4].origin, (3, 5))
+        self.assertEqual(subregions[4].wbeg, 2)
+        self.assertTupleEqual(subregions[5].dim, (1, 2))
+        self.assertTupleEqual(subregions[5].origin, (4, 4))
+        self.assertEqual(subregions[5].wbeg, -2)
+
+        request_list = [5, 11]
+        subregions = nr.allocate(request_list)
+        # 1111
+        # 1111
+        # 1110
+        # 0000
+        _common_check(len(request_list))
+        self.assertTupleEqual(subregions[0].dim, (1, 5))
+        self.assertTupleEqual(subregions[0].origin, (1, 3))
+        self.assertEqual(subregions[0].wbeg, 4)
+        self.assertTupleEqual(subregions[1].dim, (1, 11))
+        self.assertTupleEqual(subregions[1].origin, (2, 5))
+        self.assertEqual(subregions[1].wbeg, -3)
+
+        request_list = [2, 4, 4, 2, 4]
+        subregions = nr.allocate(request_list)
+        # 4432
+        # 4432
+        # 0112
+        # 0112
+        _common_check(len(request_list))
+        self.assertTupleEqual(subregions[0].dim, (2, 1))
+        self.assertTupleEqual(subregions[0].origin, (1, 3))
+        self.assertEqual(subregions[0].wbeg, 1)
+        self.assertTupleEqual(subregions[1].dim, (2, 2))
+        self.assertTupleEqual(subregions[1].origin, (1, 4))
+        self.assertEqual(subregions[1].wbeg, 2)
+        self.assertTupleEqual(subregions[2].dim, (2, 2))
+        self.assertTupleEqual(subregions[2].origin, (1, 6))
+        self.assertEqual(subregions[2].wbeg, 1)
+        self.assertTupleEqual(subregions[3].dim, (2, 1))
+        self.assertTupleEqual(subregions[3].origin, (3, 5))
+        self.assertEqual(subregions[3].wbeg, -1)
+        self.assertTupleEqual(subregions[4].dim, (2, 2))
+        self.assertTupleEqual(subregions[4].origin, (3, 4))
+        self.assertEqual(subregions[4].wbeg, -2)
+
