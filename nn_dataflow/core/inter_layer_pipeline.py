@@ -68,7 +68,9 @@ class InterLayerPipeline(object):
                 yield ((layer,),), ((self.resource,),)
             return
 
-        for segment in self._gen_segment():
+        for vseg in self._gen_vseg():
+
+            segment = vseg
 
             # Skip yield if spatial and temporal allocations are the same.
             segalloc_ret = None
@@ -89,10 +91,10 @@ class InterLayerPipeline(object):
                 if segalloc:
                     yield segalloc
 
-    def _gen_segment(self, vertex_idx=0, done=None):
+    def _gen_vseg(self, vertex_idx=0, done=None):
         '''
-        Generate segments starting from vertex `vertex_idx`. Yield a tuple of
-        the vertices in the segment.
+        Generate vertex segments starting from vertex `vertex_idx`. Yield a
+        tuple of the vertices in the segment.
 
         `done` is a set of vertices which have already been scheduled and the
         output is already in memory.
@@ -113,7 +115,7 @@ class InterLayerPipeline(object):
         the next vertices cannot eliminate the data write-back to memory.
         '''
 
-        segment = tuple()
+        vseg = tuple()
 
         if not done:
             done = set()
@@ -134,52 +136,49 @@ class InterLayerPipeline(object):
 
             # Whether the frontier share dependencies with the current segment,
             # if the segment is not empty.
-            share_deps = not segment \
-                    or not frontier_prevs.isdisjoint(
-                        set.union(set(segment),
-                                  *[self.dag_prev_dict[i] for i in segment]))
+            share_deps = not vseg or not frontier_prevs.isdisjoint(
+                set.union(set(vseg), *[self.dag_prev_dict[i] for i in vseg]))
 
             # Whether some of the multiple previous vertices are in the current
             # segment.
             coupled_prevs = len(frontier_prevs) > 1 \
-                    and not frontier_prevs.isdisjoint(segment)
+                    and not frontier_prevs.isdisjoint(vseg)
 
             if not share_deps or coupled_prevs:
                 # Not sharing any dependencies (rule 1), or previous vertices
                 # overlap with the current segment (rule 2).
 
                 # Make sure the current segment is not empty.
-                assert segment
+                assert vseg
                 # Not extend the segment any more. Note that the current
                 # segment has already been yielded, as well as the recursion,
                 # in the last iteration.
                 break
 
             # Extend the segment.
-            segment += (frontier,)
+            vseg += (frontier,)
 
             # Check whether the segment is valid.
 
-            for idx in segment:
+            for idx in vseg:
                 nexts = self.dag_next_dict[idx]
 
                 # The next vertices should either all or none in the segment
                 # (rule 3).
-                if not (nexts.isdisjoint(segment) or nexts.issubset(segment)):
+                if not (nexts.isdisjoint(vseg) or nexts.issubset(vseg)):
                     # The segment is invalid. Need to add more vertices.
-                    assert min(nexts.difference(segment)) > frontier
+                    assert min(nexts.difference(vseg)) > frontier
                     break
             else:
                 # The segment is valid.
-                yield segment
+                yield vseg
 
                 # Skip if have done.
                 if frontier + 1 in self.seg_vertex_done:
                     continue
 
                 # Recursion.
-                for tpl in self._gen_segment(frontier + 1,
-                                             done.union(segment)):
+                for tpl in self._gen_vseg(frontier + 1, done.union(vseg)):
                     yield tpl
 
         assert vertex_idx not in self.seg_vertex_done
