@@ -21,10 +21,11 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import re
 import unittest
 
-from nn_dataflow.core import InputLayer, FCLayer, PoolingLayer
+from nn_dataflow.core import InputLayer, ConvLayer, FCLayer, PoolingLayer
 from nn_dataflow.core import InterLayerPipeline
 from nn_dataflow.core import Network
 from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import Option
 from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import Resource
 
@@ -183,6 +184,24 @@ class TestInterLayerPipeline(unittest.TestCase):
                     self.assertTrue(vs.isdisjoint(vs2))
             self.assertSetEqual(set.union(*vs_list), set(net))
 
+    def test_vertex_no_merge_lr(self):
+        ''' LocalRegionLayer has no previous layer to merge with. '''
+        net = Network('tmp_net')
+        net.set_input(InputLayer(30, 1))
+        net.add('0', PoolingLayer(30, 1, 1))
+        net.add('1', FCLayer(30, 40))
+        net.add('1p', PoolingLayer(40, 1, 1))
+
+        ilp = InterLayerPipeline(net, self.resource)
+
+        for layer in net:
+            vidx = ilp.dag_vertex_dict[layer]
+
+            self.assertIn(layer, ilp.dag_vertex_list[vidx])
+
+            # Layer is named by topological order.
+            self.assertTrue(layer.startswith(str(vidx)))
+
     def test_prev(self):
         ''' Previous relationship. '''
         for net in self.net.values():
@@ -335,6 +354,21 @@ class TestInterLayerPipeline(unittest.TestCase):
             self.assertGreater(len(seg_list), len(net))
             self.assertLessEqual(len(seg_list), len(net) * 3)
 
+    def test_gen_segment_twice(self):
+        ''' _gen_segment twice. '''
+        # pylint: disable=protected-access
+        for net_name in self.net:
+            if not net_name.startswith('net'):
+                continue
+
+            net = self.net[net_name]
+            ilp = InterLayerPipeline(net, self.resource)
+
+            seg_list_1 = list(ilp._gen_segment())
+            seg_list_2 = list(ilp._gen_segment())
+
+            self.assertListEqual(seg_list_1, seg_list_2)
+
     def test_allocate_segment(self):
         ''' _allocate_segment. '''
         # pylint: disable=protected-access
@@ -426,6 +460,56 @@ class TestInterLayerPipeline(unittest.TestCase):
             # Utilization.
             self.assertGreaterEqual(real_ops / max_ops, 0.9)
 
+    def test_allocate_segment_temporal(self):
+        ''' _allocate_segment temporal. '''
+        # pylint: disable=protected-access
+
+        for net_name in ['net1', 'net2', 'zfnet', 'vgg_net']:
+            net = self.net[net_name]
+            ilp = InterLayerPipeline(net, self.resource)
+
+            segment = tuple(range(len(ilp.dag_vertex_list)))
+            seg, alloc = ilp._allocate_segment(segment, temporal=True)
+
+            self.assertEqual(len(seg), 1)
+            self.assertEqual(len(alloc), 1)
+            ltpl = seg[0]
+            rtpl = alloc[0]
+
+            self.assertEqual(len(ltpl), len(rtpl))
+
+            self.assertSetEqual(set(ltpl), set(net))
+
+            for idx, resource in enumerate(rtpl):
+                self.assertEqual(resource.proc_region,
+                                 self.resource.proc_region)
+
+                if idx == 0:
+                    self.assertEqual(resource.src_data_region(),
+                                     self.resource.src_data_region())
+                else:
+                    self.assertEqual(resource.src_data_region(),
+                                     self.resource.proc_region)
+
+                if idx == len(rtpl) - 1:
+                    self.assertEqual(resource.dst_data_region(),
+                                     self.resource.dst_data_region())
+                else:
+                    self.assertEqual(resource.dst_data_region(),
+                                     self.resource.proc_region)
+
+    def test_allocate_segment_temp_fail(self):
+        ''' _allocate_segment temporal. '''
+        # pylint: disable=protected-access
+
+        net = self.net['net3']
+        ilp = InterLayerPipeline(net, self.resource)
+
+        segment = tuple(range(len(ilp.dag_vertex_list)))
+        segalloc = ilp._allocate_segment(segment, temporal=True)
+
+        self.assertIsNone(segalloc)
+
     def test_ordered_layer_list(self):
         ''' Get ordered_layer_list. '''
 
@@ -441,6 +525,48 @@ class TestInterLayerPipeline(unittest.TestCase):
             # In natural order.
             self.assertTrue(all(nat_key(l1) < nat_key(l2) for l1, l2
                                 in zip(ord_list, ord_list[1:])))
+
+    def test_gen_segment_allocation(self):
+        ''' gen_segment_allocation. '''
+        for net_name in self.net:
+            net = self.net[net_name]
+            ilp = InterLayerPipeline(net, self.resource)
+
+            # No pipelining.
+            options = Option()
+            segalloc_n = set(ilp.gen_segment_allocation(options))
+            for seg, alloc in segalloc_n:
+                self.assertEqual(len(seg), 1)
+                self.assertEqual(len(alloc), 1)
+                ltpl = seg[0]
+                rtpl = alloc[0]
+                self.assertEqual(len(ltpl), 1)
+                self.assertEqual(len(rtpl), 1)
+                self.assertIn(ltpl[0], net)
+                self.assertEqual(rtpl[0], self.resource)
+
+            # Spatial pipelining.
+            options = Option(partition_interlayer=True)
+            segalloc_sp = set(ilp.gen_segment_allocation(options))
+            for seg, alloc in segalloc_sp:
+                self.assertEqual(len(seg), len(alloc))
+                for ltpl in seg:
+                    self.assertLessEqual(sum(1 for l in ltpl
+                                             if isinstance(l, ConvLayer)),
+                                         1)
+
+            # Temporal pipelining.
+            options = Option(hw_gbuf_save_writeback=True)
+            segalloc_tp = set(ilp.gen_segment_allocation(options))
+            for seg, alloc in segalloc_tp:
+                self.assertEqual(len(seg), 1)
+                self.assertEqual(len(alloc), 1)
+
+            # Spatial and temporal pipelining.
+            options = Option(partition_interlayer=True,
+                             hw_gbuf_save_writeback=True)
+            segalloc_stp = set(ilp.gen_segment_allocation(options))
+            self.assertSetEqual(segalloc_stp, segalloc_tp | segalloc_sp)
 
     def _subregion_num_nodes(self, allocation):
         '''

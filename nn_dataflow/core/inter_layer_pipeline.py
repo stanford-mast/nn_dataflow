@@ -70,16 +70,22 @@ class InterLayerPipeline(object):
 
         for segment in self._gen_segment():
 
+            # Skip yield if spatial and temporal allocations are the same.
+            segalloc_ret = None
+
             if options.partition_interlayer:
 
                 segalloc = self._allocate_segment(segment,
                                                   max_util_drop=max_util_drop)
                 if segalloc:
                     yield segalloc
+                    segalloc_ret = segalloc
 
             if options.hw_gbuf_save_writeback:
 
                 segalloc = self._allocate_segment(segment, temporal=True)
+                if segalloc == segalloc_ret:
+                    continue
                 if segalloc:
                     yield segalloc
 
@@ -111,6 +117,8 @@ class InterLayerPipeline(object):
 
         if not done:
             done = set()
+            # Reset.
+            self.seg_vertex_done = set()
 
         if self.dag_input_vertex not in done:
             # Input layer is always in memory.
@@ -478,9 +486,7 @@ class InterLayerPipeline(object):
         seen = set()
 
         def _dfs(vertex):
-            assert vertex not in seen
-            if vertex in visited:
-                return
+            assert vertex not in seen and vertex not in visited
 
             unseen.discard(vertex)
             seen.add(vertex)
