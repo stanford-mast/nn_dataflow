@@ -394,23 +394,26 @@ class InterLayerPipeline(object):
 
             else:
                 prev_layers, _ = self.network.prev_layers(layer_name)
+                prev_layers = set(prev_layers)
                 assert prev_layers
-                last_prev = prev_layers[-1]
 
-                if not last_prev:
-                    # Only has the input layer as the previous layer. Nothing
-                    # to merge.
-                    dag_vertex_set.append((layer_name,))
+                # Find and merge to a vertex if that vertex only contains one
+                # previous layer at the last, because non-last previous layer
+                # will not have its data available to be used for this layer.
+                # Also the previous layer can only have this one next layer,
+                # because its data will be overwritten by this layer locally.
 
+                # Check vertices in the reversed order.
+                for idx in reversed(range(len(dag_vertex_set))):
+                    vhead = dag_vertex_set[idx][:-1]
+                    vtail = dag_vertex_set[idx][-1]
+                    if prev_layers.isdisjoint(vhead) and vtail in prev_layers \
+                            and len(self.network.next_layers(vtail)) == 1:
+                        dag_vertex_set[idx] += (layer_name,)
+                        break
                 else:
-                    # Find and merge to the last previous layer vertex.
-                    found = False
-                    for idx in reversed(range(len(dag_vertex_set))):
-                        if last_prev in dag_vertex_set[idx]:
-                            dag_vertex_set[idx] += (layer_name,)
-                            found = True
-                            break
-                    assert found
+                    # No valid vertex to merge.
+                    dag_vertex_set.append((layer_name,))
 
         assert sum(len(v) for v in dag_vertex_set) == len(self.network)
 

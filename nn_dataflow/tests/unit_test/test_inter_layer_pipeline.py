@@ -98,11 +98,9 @@ class TestInterLayerPipeline(unittest.TestCase):
         net.add('9', FCLayer(1, 1), prevs='7')
         net.add('10', FCLayer(1, 1))
         net.add('10p', PoolingLayer(1, 1, 1), prevs=('8', '10'))
-        net.add('4p1', PoolingLayer(1, 1, 1), prevs='4')
-        net.add('11', FCLayer(1, 1))
+        net.add('11', PoolingLayer(1, 1, 1), prevs='4')
         net.add('12', FCLayer(1, 1))
-        net.add('4p2', PoolingLayer(1, 1, 1), prevs='4')
-        net.add('13', FCLayer(1, 1))
+        net.add('13', PoolingLayer(1, 1, 1), prevs='4')
         net.add('14', FCLayer(1, 1), prevs=('5', '10p', '12', '13'))
         self.net[net.net_name] = net
 
