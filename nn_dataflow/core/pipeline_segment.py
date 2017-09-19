@@ -36,7 +36,7 @@ class PipelineSegment(object):
     # scheduling indices.
     SchedIndex = namedtuple('SchedIndex', ['sp_idx', 'tm_idx'])
 
-    def __init__(self, seg, network, resource, max_util_drop=0.05):
+    def __init__(self, seg, network, batch_size, resource, max_util_drop=0.05):
         if not isinstance(seg, tuple):
             raise TypeError('PipelineSegment: seg must be a tuple.')
         for ltpl in seg:
@@ -53,6 +53,7 @@ class PipelineSegment(object):
 
         self.seg = seg
         self.network = network
+        self.batch_size = batch_size
         self.resource = resource
         self.max_util_drop = max_util_drop
 
@@ -101,12 +102,14 @@ class PipelineSegment(object):
             ', '.join([
                 'seg={}'.format(repr(self.seg)),
                 'network={}'.format(repr(self.network)),
+                'batch_size={}'.format(repr(self.batch_size)),
                 'resource={}'.format(repr(self.resource)),
                 'max_util_drop={}'.format(repr(self.max_util_drop))]))
 
     def _key_attrs(self):
         ''' Used for comparison. '''
-        return (self.seg, self.network, self.resource, self.max_util_drop)
+        return (self.seg, self.network, self.batch_size, self.resource,
+                self.max_util_drop)
 
     def _init_deps(self):
         '''

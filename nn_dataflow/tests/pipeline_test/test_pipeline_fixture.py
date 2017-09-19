@@ -144,7 +144,7 @@ class TestPipelineFixture(unittest.TestCase):
 
     def _make_ilp(self, network):
         ''' Make an InterLayerPipeline instance. '''
-        return InterLayerPipeline(network, self.resource)
+        return InterLayerPipeline(network, self.batch_size, self.resource)
 
     def _make_segment(self, vseg, network, temporal=False, max_util_drop=None):
         ''' Convert vertex segment to (layer) segment. '''
@@ -155,12 +155,18 @@ class TestPipelineFixture(unittest.TestCase):
         seg = tuple(ilp.dag_vertex_list[vidx] for vidx in vseg)
         if temporal:
             seg = (sum(seg, tuple()),)
-        return PipelineSegment(seg, ilp.network, ilp.resource, **kwargs)
+        return PipelineSegment(seg, ilp.network, ilp.batch_size, ilp.resource,
+                               **kwargs)
 
     def _gen_all_segment(self, network, **kwargs):
-        ''' Generate all segments directly from all vertex segments. '''
+        '''
+        Generate all segments directly from all layers and all vertex segments.
+        '''
         # pylint: disable=protected-access
         ilp = self._make_ilp(network)
+        for layer in network:
+            yield PipelineSegment(((layer,),), ilp.network, ilp.batch_size,
+                                  ilp.resource)
         for vseg in ilp._gen_vseg():
             yield self._make_segment(vseg, network, **kwargs)
 

@@ -18,6 +18,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from collections import defaultdict
 import sys
 
 from . import data_category_enum as de
@@ -72,7 +73,8 @@ class NNDataflow(object):
             self.layer_sched_dict[layer_name] = sched
 
         # Inter-layer pipelining.
-        self.ilp = InterLayerPipeline(self.network, self.resource)
+        self.ilp = InterLayerPipeline(self.network, self.batch_size,
+                                      self.resource)
         self.ordered_layer_list = self.ilp.ordered_layer_list()
 
         # The cmp function to sort and pick the top NNDataflowScheme instances.
@@ -88,10 +90,10 @@ class NNDataflow(object):
         Search the optimized dataflows.
         '''
 
-        # Group the segments and allocations by the ending layers.
-        segallocs = {}
-        for seg, alloc in self.ilp.gen_segment_allocation(options):
-            segallocs.setdefault(seg[-1][-1], []).append((seg, alloc))
+        # Group the segments by the ending layers.
+        segments = defaultdict(list)
+        for seg in self.ilp.gen_segment(options):
+            segments[seg[-1][-1]].append(seg)
 
         # Clear and reset.
         self.nndf_tops = {}
@@ -113,11 +115,11 @@ class NNDataflow(object):
 
             # The segments ended with the current layer. Use them to extend the
             # current top schemes.
-            for seg, alloc in segallocs.get(layer_name, []):
+            for seg in segments.get(layer_name, []):
                 if options.verbose:
                     sys.stderr.write('  - {}\n'.format(seg))
                     sys.stderr.flush()
-                tops += self._segment_schedule_search(seg, alloc, options)
+                tops += self._segment_schedule_search(seg, options)
 
             # Always pick and keep top n.
             tops = sorted(tops, cmp=self.cmp_func)[:options.ntops]
@@ -150,15 +152,16 @@ class NNDataflow(object):
 
         return tops, (cache_hits, cache_misses)
 
-    def _segment_schedule_search(self, segment, allocation, options):
+    def _segment_schedule_search(self, segment, options):
         '''
-        Schedule the given `segment` with the `allocation`. Both are given in
-        the form of tuple of sub-tuples, with mixed spatial and temporal
-        scheduling. See `InterLayerPipeline` for details.
+        Schedule the given PipelineSegment `segment`.
 
         Return a list of top NNDataflowScheme instances that include this
         segment. Will NOT update the `nndf_tops` attribute.
         '''
+
+        allocation = segment.allocation()
+        assert allocation
 
         # We take the top schemes that end with the latest previous layer as
         # the initial state.

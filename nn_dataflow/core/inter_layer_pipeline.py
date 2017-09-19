@@ -18,9 +18,11 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from .. import util
+import itertools
+
 from .layer import ConvLayer
 from .network import Network
+from .pipeline_segment import PipelineSegment
 from .resource import Resource
 
 class InterLayerPipeline(object):
@@ -28,16 +30,21 @@ class InterLayerPipeline(object):
     Inter-layer pipeline.
     '''
 
-    def __init__(self, network, resource):
+    def __init__(self, network, batch_size, resource, max_util_drop=0.05):
         if not isinstance(network, Network):
             raise TypeError('InterLayerPipeline: network must be '
                             'a Network instance.')
         if not isinstance(resource, Resource):
             raise TypeError('InterLayerPipeline: resource must be '
                             'a Resource instance.')
+        if not 0 <= max_util_drop <= 1:
+            raise ValueError('InterLayerPipeline: max_util_drop must be '
+                             'between [0, 1].')
 
         self.network = network
+        self.batch_size = batch_size
         self.resource = resource
+        self.max_util_drop = max_util_drop
 
         self._calc_sched_dag()
 
@@ -51,45 +58,47 @@ class InterLayerPipeline(object):
         '''
         return list(sum(self.dag_vertex_list, tuple()))
 
-    def gen_segment_allocation(self, options, max_util_drop=0.05):
+    def gen_segment(self, options):
         '''
-        Generate all inter-layer pipelining segments and their resource
-        allocations.
-
-        Return a segment layer tuple, and a resource allocation tuple. The two
-        tuples contains sub-tuples, where different sub-tuples are spatially
-        scheduled, and different layers in a sub-tuple is temporally scheduled.
+        Generate all valid inter-layer pipelining segments.
         '''
 
-        if not (options.partition_interlayer or options.hw_gbuf_save_writeback):
-            # No inter-layer pipelining, each vertex sequentially occupies the
-            # whole resource.
-            for layer in self.network:
-                yield ((layer,),), ((self.resource,),)
-            return
+        kwargs = {'network': self.network,
+                  'batch_size': self.batch_size,
+                  'resource': self.resource,
+                  'max_util_drop': self.max_util_drop,
+                 }
 
+        # No pipelining, each vertex sequentially occupies the whole resource.
+        for layer in self.network:
+            seg = ((layer,),)
+            segment = PipelineSegment(seg, **kwargs)
+            assert segment.valid
+            yield segment
+
+        # Pipelining.
         for vseg in self._gen_vseg():
 
-            segment = vseg
-
-            # Skip yield if spatial and temporal allocations are the same.
-            segalloc_ret = None
+            # Use set to eliminate duplicates.
+            seg_cands = set()
 
             if options.partition_interlayer:
-
-                segalloc = self._allocate_segment(segment,
-                                                  max_util_drop=max_util_drop)
-                if segalloc:
-                    yield segalloc
-                    segalloc_ret = segalloc
+                # Spatial pipelining.
+                seg = tuple(self.dag_vertex_list[vidx] for vidx in vseg)
+                seg_cands.add(seg)
 
             if options.hw_gbuf_save_writeback:
+                # Temporal pipelining.
+                # Reduce the spatial dimension.
+                seg = (tuple(itertools.chain.from_iterable(
+                    self.dag_vertex_list[vidx] for vidx in vseg)),)
+                seg_cands.add(seg)
 
-                segalloc = self._allocate_segment(segment, temporal=True)
-                if segalloc == segalloc_ret:
-                    continue
-                if segalloc:
-                    yield segalloc
+            # Determine segment allocation.
+            for seg in seg_cands:
+                segment = PipelineSegment(seg, **kwargs)
+                if segment.valid:
+                    yield segment
 
     def _gen_vseg(self, vertex_idx=0, done=None):
         '''
@@ -184,182 +193,6 @@ class InterLayerPipeline(object):
         assert vertex_idx not in self.seg_vertex_done
         self.seg_vertex_done.add(vertex_idx)
 
-    def _allocate_segment(self, segment, temporal=False, max_util_drop=0.05):
-        '''
-        Allocate resource to the vertices in the given `segment`.
-
-        Return a segment layer tuple, and a resource allocation tuple. The two
-        tuples contains sub-tuples, where different sub-tuples are spatially
-        scheduled, and different layers in a sub-tuple is temporally scheduled.
-        Return None if allocation failed.
-
-        If `temporal` is True, the resource is allocated temporally to the
-        vertices in the given `segment`. Each layer in the segment will
-        sequentially use all the resources.
-
-        `max_util_drop` specifies the maximum utilization drop due to mismatch
-        throughput between vertices.
-        '''
-
-        assert segment
-
-        # The segment layers.
-        layer_list = []
-
-        for vidx in segment:
-            layer_list.append(self.dag_vertex_list[vidx])
-
-        if temporal:
-            # Reduce the spatial dimension.
-            layer_list = [sum(layer_list, tuple())]
-
-            # Check. The spatial allocation won't have multiple previous layers
-            # feed a single layer, but could have a single layer feed multiple
-            # next layers. The latter case is not valid for temporal
-            # allocation, as there is nowhere to keep the output.
-            for layer in layer_list[0]:
-                if sum(nl in layer_list[0]
-                       for nl in self.network.next_layers(layer)) > 1:
-                    return None
-
-        # Spatial allocation.
-        proc_region = self.resource.proc_region
-        dim_nodes = proc_region.dim
-        total_nodes = dim_nodes.size()
-
-        ops = [self.dag_vertex_ops[vidx] for vidx in segment]
-        if temporal:
-            ops = [sum(ops)]
-
-        # Enforce a common factor among the numbers of nodes allocated to all
-        # vertices in the segment. Such common factor is likely to be the
-        # common height of the vertex node regions.
-        common_factor_list = [cf for cf, _ in util.factorize(dim_nodes.h, 2)]
-
-        for cf in sorted(common_factor_list, reverse=True):
-            # Pick the largest common factor within the utilization constraint.
-
-            # Number of nodes of each vertex should be approximate to the
-            # number of ops of the vertex.
-            nodes_raw = [o * 1. / sum(ops) * total_nodes for o in ops]
-
-            # Round to the common factor multiples.
-            assert total_nodes % cf == 0
-            nodes = [int(round(nr / cf)) * cf for nr in nodes_raw]
-            # Fix margin.
-            while sum(nodes) != total_nodes:
-                diff = [n - nr for n, nr in zip(nodes, nodes_raw)]
-                if sum(nodes) > total_nodes:
-                    # Decrease the nodes for the vertex with the maximum
-                    # positive difference.
-                    idx, _ = max(enumerate(diff), key=lambda tpl: tpl[1])
-                    nodes[idx] -= cf
-                else:
-                    # Increase the nodes for the vertex with the minimum
-                    # negative difference.
-                    idx, _ = min(enumerate(diff), key=lambda tpl: tpl[1])
-                    nodes[idx] += cf
-
-            if 0 in nodes:
-                continue
-
-            # Utilization.
-            time = max(o * 1. / n for o, n in zip(ops, nodes))
-            utilization = sum(ops) / time / sum(nodes)
-            assert utilization < 1 + 1e-6
-
-            if utilization >= 1 - max_util_drop:
-                # Found
-                break
-
-        else:
-            # Not found.
-            return None
-
-        # Allocate in the processing region according to the number of nodes.
-        subregions = proc_region.allocate(nodes)
-        assert subregions
-
-        if temporal:
-            assert len(subregions) == 1
-            assert subregions[0] == proc_region
-
-        # The resource allocation.
-        resource_list = []
-
-        layer2sp = dict((l, sp_idx)
-                        for sp_idx, ltpl in enumerate(layer_list)
-                        for l in ltpl)
-
-        for ltpl, sr in zip(layer_list, subregions):
-
-            rtpl = tuple()
-
-            for tm_idx, layer in enumerate(ltpl):
-
-                # Data source.
-                prev_layers, _ = self.network.prev_layers(layer)
-
-                local_prev_layers = [pl for pl in prev_layers if pl in ltpl]
-                if local_prev_layers:
-                    assert len(local_prev_layers) == 1
-                    assert local_prev_layers[0] == ltpl[tm_idx - 1]
-
-                # Non-local data source.
-                # We ignore the local data sources.
-                nonlocal_prev_layers = [pl for pl in prev_layers
-                                        if pl not in ltpl]
-
-                if not nonlocal_prev_layers:
-                    # Data source is local.
-                    src_data_region = sr
-                elif any(pl in layer2sp for pl in nonlocal_prev_layers):
-                    # Data source is from the same segment.
-                    assert len(nonlocal_prev_layers) == 1
-                    prev_sp_idx = layer2sp[nonlocal_prev_layers[0]]
-                    src_data_region = subregions[prev_sp_idx]
-                else:
-                    # Data source is from memory.
-                    src_data_region = self.resource.src_data_region()
-
-                # Data destination.
-                next_layers = self.network.next_layers(layer)
-
-                local_next_layers = [nl for nl in next_layers if nl in ltpl]
-                if local_next_layers:
-                    assert len(local_next_layers) == 1
-                    assert local_next_layers[0] == ltpl[tm_idx + 1]
-
-                # Non-local data destination.
-                # We ignore the local data destinations.
-                nonlocal_next_layers = [nl for nl in next_layers
-                                        if nl not in ltpl]
-
-                if not nonlocal_next_layers:
-                    # Data destination is local.
-                    dst_data_region = sr
-                elif any(nl in layer2sp for nl in nonlocal_next_layers):
-                    # Data destination is to the same segment.
-                    assert len(nonlocal_next_layers) == 1
-                    # Put data in local. The next layer will fetch.
-                    dst_data_region = sr
-                else:
-                    # Data destination is to memory.
-                    dst_data_region = self.resource.dst_data_region()
-
-                rtpl += (Resource(proc_region=sr,
-                                  data_regions=(src_data_region,
-                                                dst_data_region),
-                                  dim_array=self.resource.dim_array,
-                                  size_gbuf=self.resource.size_gbuf,
-                                  size_regf=self.resource.size_regf),)
-
-            assert len(ltpl) == len(rtpl)
-            resource_list.append(rtpl)
-
-        assert len(layer_list) == len(resource_list)
-        return tuple(layer_list), tuple(resource_list)
-
     def _calc_sched_dag(self):
         '''
         Build the scheduling DAG of the network. We merge layers with no
@@ -375,8 +208,7 @@ class InterLayerPipeline(object):
         Also record the number of operations of each DAG vertex.
 
         In summary, the attributes initialized include: `dag_input_vertex`,
-        `dag_vertex_list`, `dag_vertex_dict`, `dag_prev_dict`, `dag_next_dict`,
-        `dag_vertex_ops`.
+        `dag_vertex_list`, `dag_vertex_dict`, `dag_prev_dict`, `dag_next_dict`.
         '''
 
         # Vertex of the input layer.
@@ -463,12 +295,6 @@ class InterLayerPipeline(object):
         for vidx in self.dag_prev_dict:
             if self.dag_input_vertex in self.dag_prev_dict[vidx]:
                 self.dag_next_dict[self.dag_input_vertex].add(vidx)
-
-        # Number of ops of each vertex.
-        self.dag_vertex_ops = []
-        for v in self.dag_vertex_list:
-            ops = sum(self.network[l].total_ops() for l in v)
-            self.dag_vertex_ops.append(ops)
 
     def _topological_order(self, dag_vertex_set):
         '''

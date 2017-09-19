@@ -32,10 +32,12 @@ class TestPipelineSegment(TestPipelineFixture):
     def test_valid_args(self):
         ''' Valid arguments. '''
         segment = PipelineSegment((('0',), ('1', '1p')),
-                                  self.net['net1'], self.resource)
+                                  self.net['net1'], self.batch_size,
+                                  self.resource)
         self.assertTrue(segment.valid)
         self.assertTupleEqual(segment.seg, (('0',), ('1', '1p')))
         self.assertIs(segment.network, self.net['net1'])
+        self.assertEqual(segment.batch_size, self.batch_size)
         self.assertIs(segment.resource, self.resource)
 
     def test_invalid_seg(self):
@@ -43,26 +45,30 @@ class TestPipelineSegment(TestPipelineFixture):
         with self.assertRaisesRegexp(TypeError,
                                      'PipelineSegment: .*seg.*tuple.*'):
             _ = PipelineSegment([('0',), ('1', '1p')],
-                                self.net['net1'], self.resource)
+                                self.net['net1'], self.batch_size,
+                                self.resource)
 
         with self.assertRaisesRegexp(TypeError,
                                      'PipelineSegment: .*seg.*sub-tuple.*'):
             _ = PipelineSegment(('0', '1', '1p'),
-                                self.net['net1'], self.resource)
+                                self.net['net1'], self.batch_size,
+                                self.resource)
 
     def test_invalid_network(self):
         ''' Invalid network. '''
         with self.assertRaisesRegexp(TypeError,
                                      'PipelineSegment: .*network.*'):
             _ = PipelineSegment((('0',), ('1', '1p')),
-                                self.net['net1'].input_layer(), self.resource)
+                                self.net['net1'].input_layer(), self.batch_size,
+                                self.resource)
 
     def test_invalid_resource(self):
         ''' Invalid resource. '''
         with self.assertRaisesRegexp(TypeError,
                                      'PipelineSegment: .*resource.*'):
             _ = PipelineSegment((('0',), ('1', '1p')),
-                                self.net['net1'], PhyDim2(1, 1))
+                                self.net['net1'], self.batch_size,
+                                PhyDim2(1, 1))
 
     def test_init_deps_not_valid(self):
         ''' Not valid segment due to init deps. '''
