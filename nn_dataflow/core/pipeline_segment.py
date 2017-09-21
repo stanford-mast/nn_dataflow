@@ -20,9 +20,12 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import namedtuple
 
+from . import loop_enum as le
 from .. import util
+from .layer import ConvLayer
 from .network import Network
 from .resource import Resource
+from .scheduling_constraint import SchedulingConstraint
 
 class PipelineSegment(object):
     '''
@@ -74,6 +77,116 @@ class PipelineSegment(object):
         if not self.valid:
             return None
         return self.alloc
+
+    def gen_constraint(self):
+        '''
+        Generate scheduling constraint for the segment, as a tuple of
+        sub-tuples of SchedulingConstraint instances, corresponding to the
+        layers in the segment.
+
+        Yield the segment constraint tuple, and information for pruning and
+        early termination. The information includes:
+
+        - opt_step: if True, starting from (including) the current constraint,
+          the optimality will guarantee to drop to be lower than the previous
+          ones. Therefore, if we have already found valid schedules at this
+          point, we can skip all the following constraints.
+
+        - strict_step: if True, starting from (including) the current
+          constraint, the constraints will guarantee to be more strict than the
+          previous ones in the same opt step, until the next new opt step.
+          Therefore, if we have not found any valid schedules at this point, we
+          will not, either, for the following constraints in this opt step, and
+          we can fast forward to the next opt step.
+
+        Rules for constraints.
+
+        1. Fmap temporal partitioning factor.
+
+        Apply to all layers in the segment. Should be approximately dividable
+        by hofm of all the layers in the segment.
+
+        2. Top BAT loop factor.
+
+        With a single spatial scheduling, there is no constraint on top BAT
+        loop factor. Otherwise all layers must share the same factor.
+
+        3. Fully buffered data category (ifmaps or ofmaps).
+
+        Only CONV layers require fully buffered data. Local-region layers
+        process data in a streaming manner. We group each CONV layer, and all
+        local-region layers immediately following it within the same spatial
+        scheduling, into a group. The fully buffering requirements only apply
+        to the first layer (ifmaps) or the last layer (ofmaps) in the group.
+        Layers in between do not need to fully buffer.
+
+        For a group G in the segment,
+
+        - (initial) if G is both first spatial and temporal scheduled, it can
+          choose whether to fully buffer ofmaps or not. This is a configuration
+          to explore.
+
+        - (between spatial) if G has a source from G' in another spatial
+          scheduling, the source, as a neighbor source dependency, must be the
+          last temporal scheduled in both G' and that spatial scheduling,
+          - If G' fully buffers only ofmaps, G fully buffers ifmaps.
+          - Otherwise, make G' fully buffer ifmaps, and G fully buffer ofmaps
+            (we bias this case as it can reduce the pipeline filling delay).
+
+        - (between temporal) if G has a source from G' in the same spatial
+          scheduling, the source, as a local source dependency, must be
+          immediately before G. G' must fully buffer ofmaps, and G must fully
+          buffer ifmaps.
+        '''
+
+        # Fmap temporal partitioning factor candidates.
+        fmap_tpart_cands = []
+        hofm_lst = [self.network[l].hofm for ltpl in self.seg for l in ltpl]
+        for f in range(1, min(hofm_lst) + 1):
+            if all(util.approx_dividable(h, f, overhead=.5) for h in hofm_lst):
+                fmap_tpart_cands.append(f)
+        assert fmap_tpart_cands[0] == 1
+
+        # Top BAT factors, sorted from smallest to largest.
+        def _top_tb_cands(fmap_tpart):
+            # Fmap temporal partitioning factor contributes to batch size.
+            cands = [None] if len(self.seg) == 1 else \
+                (t for t, _ in util.factorize(self.batch_size * fmap_tpart, 2))
+            return sorted(cands)
+
+        # Start with fully buffer ofmaps or not.
+        sfbo_cands = [False] if len(self.seg) == 1 else [True, False]
+
+        # Pruning info.
+        opt_step = False
+        strict_step = False
+        constraint_set = set()
+
+        for fmap_tpart in fmap_tpart_cands:
+
+            for top_tb in _top_tb_cands(fmap_tpart):
+
+                for sfbo in sfbo_cands:
+
+                    conditions = (fmap_tpart, top_tb, sfbo)
+
+                    constraint = self._make_constraint(*conditions)
+
+                    if constraint and constraint not in constraint_set:
+
+                        yield constraint, opt_step, strict_step
+
+                        # Reset info until next set.
+                        opt_step = False
+                        strict_step = False
+
+                        constraint_set.add(constraint)
+
+                # Smaller top tb factors are more strict than larger ones.
+                strict_step = True
+
+            # Stop using larger fmap temporal partitioning if small ones work.
+            opt_step = True
 
     def __getitem__(self, index):
         return self.seg[index]
@@ -370,4 +483,96 @@ class PipelineSegment(object):
             assert subregions[0] == proc_region
 
         return subregions
+
+    def _make_constraint(self, *conditions):
+        '''
+        Make scheduling constraint for the segment under the given conditions.
+
+        See gen_constraint() for the rules.
+        '''
+
+        fmap_tpart, top_tb, sfbo = conditions
+
+        # Single spatial scheduling does not have requirements for top tb and
+        # starting fully buffering.
+        assert len(self.seg) > 1 or top_tb is None
+        assert len(self.seg) > 1 or not sfbo
+
+        # Scheduling indices for the last CONV layer.
+        last_idx = PipelineSegment.SchedIndex(-1, 0)
+        # Whether to fully buffer ofmaps for the last group (defer applying to
+        # the last layer of the group).
+        last_fbo = False
+
+        # Top loop factor for each layer.
+        top_bl_t_list = [[[None] * le.NUM for _ in ltpl] for ltpl in self.seg]
+
+        for sp_idx, ltpl in enumerate(self.seg):
+
+            for tm_idx, layer in enumerate(ltpl):
+
+                top_bl_t_list[sp_idx][tm_idx][le.BAT] = top_tb
+
+                if isinstance(self.network[layer], ConvLayer):
+
+                    # Defer applying fully buffer ofmaps to the last group.
+                    if last_fbo:
+                        if last_idx.sp_idx == sp_idx:
+                            # Last group is in the same spatial scheduling.
+                            # Apply to immediate previous layer.
+                            assert tm_idx >= 1
+                            top_bl_t_list[sp_idx][tm_idx - 1][le.OFM] = 1
+                        else:
+                            # Last group is in a previous spatial scheduling.
+                            # Apply to its last temporal scheduled layer.
+                            top_bl_t_list[last_idx.sp_idx][-1][le.OFM] = 1
+                    # Reset
+                    last_fbo = False
+
+                    if last_idx.sp_idx < 0:
+                        # Initial rule.
+                        last_fbo = sfbo
+
+                    src_deps = self.src_dict[sp_idx][tm_idx]
+
+                    if any(s is not None for s in src_deps):
+                        # Between-spatial rule.
+                        assert len(src_deps) == 1
+                        src_sp_idx, src_tm_idx = src_deps[0]
+                        assert src_sp_idx < sp_idx
+                        src_top_bl_t = top_bl_t_list[src_sp_idx][src_tm_idx]
+                        if src_top_bl_t[le.OFM] == 1 \
+                                and src_top_bl_t[le.IFM] != 1:
+                            # When neighbor source only fully buffers ofmaps.
+                            # Make this group fully buffers ifmaps.
+                            top_bl_t_list[sp_idx][tm_idx][le.IFM] = 1
+                        else:
+                            # Make neighbor source fully buffer ifmaps.
+                            src_top_bl_t[le.IFM] = 1
+                            # Make this group fully buffer ofmaps.
+                            last_fbo = True
+
+                    if last_idx.sp_idx == sp_idx:
+                        # Between-temporal rule.
+                        # Make last group fully buffer ofmaps.
+                        assert tm_idx >= 1
+                        top_bl_t_list[sp_idx][tm_idx - 1][le.OFM] = 1
+                        # Make this group fully buffer ifmaps.
+                        top_bl_t_list[sp_idx][tm_idx][le.IFM] = 1
+
+                    last_idx = PipelineSegment.SchedIndex(sp_idx, tm_idx)
+
+        # The last group ofmaps go to memory, do not need to fully buffer.
+        # Ignore final last_fbo value.
+
+        top_bl_lpe = le.BAT if top_tb is not None else None
+
+        # Make SchedulingConstraint instances.
+        constraint = tuple(tuple(SchedulingConstraint(top_bl_t=tuple(top_bl_t),
+                                                      top_bl_lpe=top_bl_lpe,
+                                                      fmap_tpart=fmap_tpart)
+                                 for top_bl_t in tlst)
+                           for tlst in top_bl_t_list)
+
+        return constraint
 

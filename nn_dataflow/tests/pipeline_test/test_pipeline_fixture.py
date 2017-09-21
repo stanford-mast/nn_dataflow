@@ -18,15 +18,18 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from collections import namedtuple
 import unittest
 
-from nn_dataflow.core import InputLayer, FCLayer, PoolingLayer
+from nn_dataflow.core import InputLayer, ConvLayer, FCLayer, PoolingLayer
 from nn_dataflow.core import InterLayerPipeline
+from nn_dataflow.core import LoopEnum as le
 from nn_dataflow.core import Network
 from nn_dataflow.core import NodeRegion
 from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import PipelineSegment
 from nn_dataflow.core import Resource
+from nn_dataflow.core import SchedulingConstraint
 
 from nn_dataflow.nns import import_network, all_networks
 
@@ -244,4 +247,170 @@ class TestPipelineFixture(unittest.TestCase):
                                     if local_node_set.isdisjoint(
                                         data_regions[pl].node_iter())}
                     data_regions[l] = r.dst_data_region()
+
+    def _validate_constraint(self, segment, constraint):
+        ''' Validate segment scheduling constraint. '''
+
+        # Match segment.
+        self.assertEqual(len(constraint), len(segment))
+        for ltpl, ctpl in zip(segment, constraint):
+            self.assertEqual(len(ctpl), len(ltpl))
+            self.assertTrue(all(isinstance(c, SchedulingConstraint)
+                                for c in ctpl))
+
+        # Same fmap tpart and top tb.
+        fmap_tpart = constraint[0][0].fmap_tpart
+        top_tb = constraint[0][0].top_bl_t[le.BAT]
+        self.assertTrue(all(c.fmap_tpart == fmap_tpart
+                            and c.top_bl_t[le.BAT] == top_tb
+                            for ctpl in constraint for c in ctpl))
+
+        # Top tb is a factor of batch size and fmap tpart.
+        if top_tb:
+            self.assertEqual((segment.batch_size * fmap_tpart) % top_tb, 0)
+
+        # Data availability.
+
+        # Mapping of available layer data to its output data access pattern and
+        # the spatial scheduling index.
+        avail_data = {}
+
+        class OutAccPat(object):
+            ''' Output data access pattern types. '''
+            # pylint: disable=too-few-public-methods
+            ANY = 0  # can access in any way
+            DBF = 1  # must double-buffer
+            SEQ = 2  # must consume sequentially
+            RED = 3  # can only be used for reduction in local-region layers
+
+        # pylint: disable=invalid-name
+        AvailDataValType = namedtuple('AvailDataValType', ['oap', 'sp'])
+
+        seg_layers = set(l for ltpl in segment for l in ltpl)
+
+        # Whether to defer fully buffering output.
+        fb_out = False
+        fb_out_conv = None
+
+        for sp_idx, (ltpl, ctpl) in enumerate(zip(segment, constraint)):
+
+            self.assertFalse(fb_out,
+                             '_validate_constraint: deferring fully buffering '
+                             'from {} should not cross spatial scheduling {}.'
+                             .format(fb_out_conv, sp_idx - 1))
+
+            for tm_idx, (layer, cstr) in enumerate(zip(ltpl, ctpl)):
+
+                # Source data and their access patterns.
+                prev_layers, _ = segment.network.prev_layers(layer)
+                prev_oaps = []
+                for pl in prev_layers:
+                    if pl not in seg_layers:
+                        # Off-chip sources.
+                        prev_oaps.append(OutAccPat.ANY)
+                    else:
+                        # On-chip, must be available.
+                        self.assertIn(pl, avail_data,
+                                      '_validate_constraint: layer {} ({}) '
+                                      'source data {} not available on-chip.'
+                                      .format(layer, (sp_idx, tm_idx), pl))
+                        prev_oaps.append(avail_data[pl].oap)
+                # Only buffer input if having source on-chip.
+                has_src = not seg_layers.isdisjoint(prev_layers)
+
+                # Destination data.
+                next_layers = segment.network.next_layers(layer)
+                # Only buffer output if having destination on-chip.
+                has_dst = not seg_layers.isdisjoint(next_layers)
+
+                if isinstance(segment.network[layer], ConvLayer):
+
+                    self.assertFalse(fb_out,
+                                     '_validate_constraint: deferring fully '
+                                     'buffering from {} has not been realized.'
+                                     .format(fb_out_conv))
+
+                    lcl_pl_idx = [idx for idx, pl in enumerate(prev_layers)
+                                  if pl in ltpl]
+                    if lcl_pl_idx:
+                        # Local source must fully buffer its output.
+                        self.assertEqual(len(lcl_pl_idx), 1)
+                        lcl_poap = prev_oaps[lcl_pl_idx[0]]
+                        self.assertTrue(lcl_poap == OutAccPat.DBF
+                                        or lcl_poap == OutAccPat.ANY,
+                                        '_validate_constraint: local source '
+                                        'of layer {} ({}), {}, must fully '
+                                        'buffer output.'
+                                        .format(layer, (sp_idx, tm_idx),
+                                                prev_layers[lcl_pl_idx[0]]))
+
+                    self.assertNotIn(OutAccPat.RED, prev_oaps,
+                                     '_validate_constraint: layer {} ({}) is '
+                                     'CONV type but has RED source.'
+                                     'src: {}, oap: {}'
+                                     .format(layer, (sp_idx, tm_idx),
+                                             prev_layers, prev_oaps))
+
+                    if OutAccPat.SEQ in prev_oaps and has_dst:
+                        # Some source data require sequential access, must
+                        # fully buffer CONV output (deferred).
+                        fb_out = True
+
+                    if OutAccPat.DBF in prev_oaps:
+                        # Some source data require double-buffering, must
+                        # fully buffer CONV input.
+                        self.assertEqual(cstr.top_bl_t[le.IFM], 1,
+                                         '_validate_constraint: input of '
+                                         'layer {} ({}) not fully buffered '
+                                         'but with DBF source.\n'
+                                         'src: {}, oap: {}'
+                                         .format(layer, (sp_idx, tm_idx),
+                                                 prev_layers, prev_oaps))
+
+                    oap = None
+                    if cstr.top_bl_t[le.IFM] == 1:
+                        if cstr.top_bl_t[le.OFM] == 1:
+                            # Fully buffer both, can access output in any way.
+                            # This is fine as we require to buffer either input
+                            # or output for CONV (see below).
+                            oap = OutAccPat.ANY
+                        else:
+                            oap = OutAccPat.SEQ
+                    elif cstr.top_bl_t[le.OFM] == 1:
+                        oap = OutAccPat.DBF
+                    elif fb_out:
+                        # Output is only available to local-region layers.
+                        oap = OutAccPat.RED
+                    elif not has_src:
+                        # Input can be viewed as fully buffered in memory.
+                        oap = OutAccPat.SEQ
+                    else:
+                        # Output can be viewed as fully buffered in memory.
+                        self.assertFalse(has_dst,
+                                         '_validate_constraint: layer {} ({}) '
+                                         'fully buffers neither data.'
+                                         .format(layer, (sp_idx, tm_idx)))
+
+                else:
+
+                    # Stream process, no requirement on source.
+
+                    oap = OutAccPat.ANY
+                    if cstr.top_bl_t[le.OFM] == 1:
+                        # Fully buffer output.
+                        oap = OutAccPat.DBF
+                    elif OutAccPat.SEQ in prev_oaps:
+                        # If there is SEQ input, output must also SEQ.
+                        oap = OutAccPat.SEQ
+
+                # Realize deferred fully buffering output.
+                if cstr.top_bl_t[le.OFM] == 1:
+                    fb_out = False  # reset
+
+                # Overwrite the previous temporal scheduling.
+                avail_data = {l: avail_data[l] for l in avail_data
+                              if avail_data[l].sp != sp_idx}
+                # Add this layer.
+                if oap is not None:
+                    avail_data[layer] = AvailDataValType(oap=oap, sp=sp_idx)
 

@@ -20,6 +20,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import itertools
 
+from nn_dataflow.core import LoopEnum as le
 from nn_dataflow.core import NodeRegion
 from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import PipelineSegment
@@ -284,4 +285,213 @@ class TestPipelineSegment(TestPipelineFixture):
         segment = self._make_segment((0, 1), self.net['net3'], temporal=True)
         self.assertFalse(segment.valid)
         self.assertIsNone(segment.allocation())
+
+    def test_gen_constraint(self):
+        ''' gen_constraint(). '''
+
+        # Single vertex.
+
+        for net_name in self.net:
+
+            net = self.net[net_name]
+            ilp = self._make_ilp(net)
+
+            for idx in range(len(ilp.dag_vertex_list)):
+                segment = self._make_segment((idx,), ilp.network)
+                self.assertTrue(segment.valid)
+
+                for constraint, _, _ in segment.gen_constraint():
+                    self._validate_constraint(segment, constraint)
+
+                    # No top loop constraint for single-vertex segment.
+                    for ctpl in constraint:
+                        for c in ctpl:
+                            self.assertTupleEqual(c.top_bl_t, (None,) * le.NUM)
+                            self.assertEqual(c.top_bl_lpe, None)
+
+        # Spatial pipelining.
+
+        for net_name in self.net:
+
+            net = self.net[net_name]
+
+            for segment in self._gen_all_segment(net):
+                if not segment.valid:
+                    continue
+
+                for constraint, _, _ in segment.gen_constraint():
+                    self._validate_constraint(segment, constraint)
+
+        # Special cases.
+
+        net = self.net['net2']
+
+        segment = PipelineSegment((('0', '1'), ('2', '3')), net,
+                                  self.batch_size, self.resource)
+
+        for constraint, _, _ in segment.gen_constraint():
+            self._validate_constraint(segment, constraint)
+
+    def test_gen_constraint_temporal(self):
+        ''' gen_constraint() temporal. '''
+
+        for net_name in self.net:
+
+            net = self.net[net_name]
+
+            for segment in self._gen_all_segment(net, temporal=True):
+                if not segment.valid:
+                    continue
+
+                for constraint, _, _ in segment.gen_constraint():
+                    self._validate_constraint(segment, constraint)
+
+                    # Single spatial scheduling in temporal pipelining do not
+                    # require top BAT loop.
+                    for ctpl in constraint:
+                        for c in ctpl:
+                            self.assertIsNone(c.top_bl_t[le.BAT])
+                            self.assertIsNone(c.top_bl_lpe)
+
+    def test_gen_constraint_opt_step(self):
+        ''' gen_constraint() pruning info opt_step. '''
+
+        for net_name in self.net:
+
+            if not net_name.startswith('net') and net_name != 'zfnet':
+                # Use ZFNet to give the real fmap dimensions.
+                continue
+            net = self.net[net_name]
+
+            for segment in self._gen_all_segment(net):
+                if not segment.valid:
+                    continue
+
+                ostep_set_ref = None
+                ostep_set = set()
+                last_fmap_tpart = 1
+
+                for constraint, ostep, _ in segment.gen_constraint():
+
+                    fmap_tpart = constraint[0][0].fmap_tpart
+
+                    if ostep:
+                        # Comes a new opt step. Close the current one.
+
+                        # Update fmap tpart.
+                        self.assertGreater(fmap_tpart, last_fmap_tpart,
+                                           'test_gen_constraint_opt_step: '
+                                           'fmap tpart is not monotonically '
+                                           'increasing across opt steps. '
+                                           '{} -> {}.'
+                                           .format(last_fmap_tpart, fmap_tpart))
+                        last_fmap_tpart = fmap_tpart
+
+                        # Compare to ref.
+                        ostep_set_2 = set()
+                        for cstr in ostep_set:
+                            # Replace fmap tpart and top tb.
+                            # Different fmap tpart may lead to different top tb.
+                            cstr_2 = tuple(tuple(c._replace(
+                                fmap_tpart=0,
+                                top_bl_t=(c.top_bl_t[:le.BAT]
+                                          + (0,)
+                                          + c.top_bl_t[le.BAT + 1:]))
+                                                 for c in ctpl)
+                                           for ctpl in cstr)
+                            ostep_set_2.add(cstr_2)
+                        if ostep_set_ref is None:
+                            ostep_set_ref = ostep_set_2
+                        else:
+                            self.assertSetEqual(
+                                ostep_set_2, ostep_set_ref,
+                                'test_gen_constraint_opt_step: constraints '
+                                'differ across opt steps. '
+                                'Network {}, segment {}.'
+                                .format(net_name, segment))
+
+                        ostep_set.clear()
+
+                    ostep_set.add(constraint)
+                    self.assertEqual(fmap_tpart, last_fmap_tpart,
+                                     'test_gen_constraint_opt_step: fmap tpart '
+                                     'is not constant within an opt step. '
+                                     '{} != {}.'
+                                     .format(fmap_tpart, last_fmap_tpart))
+
+    def test_gen_constraint_strict_step(self):
+        ''' gen_constraint() pruning info strict_step. '''
+
+        for net_name in self.net:
+
+            if not net_name.startswith('net') and net_name != 'zfnet':
+                # Use ZFNet to give the real fmap dimensions.
+                continue
+            net = self.net[net_name]
+
+            for segment in self._gen_all_segment(net):
+                if not segment.valid:
+                    continue
+
+                sstep_set_ref = None
+                sstep_set = set()
+                last_top_tb = None if len(segment) == 1 else 1
+
+                for constraint, ostep, sstep in segment.gen_constraint():
+
+                    top_tb = constraint[0][0].top_bl_t[le.BAT]
+
+                    if ostep:
+                        self.assertTrue(sstep,
+                                        'test_gen_constraint_strict_step: '
+                                        'strict step must be True when a new '
+                                        'opt step starts.')
+
+                    if sstep:
+                        # Comes a new strict step. Close the current one.
+
+                        # Update top tb.
+                        if ostep:
+                            # Reset top tb.
+                            last_top_tb = None if len(segment) == 1 else 1
+                        else:
+                            self.assertGreater(
+                                top_tb, last_top_tb,
+                                'test_gen_constraint_strict_step: '
+                                'top tb is not monotonically '
+                                'increasing across strict steps. '
+                                '{} -> {}.'
+                                .format(last_top_tb, top_tb))
+                            last_top_tb = top_tb
+
+                        # Compare to ref.
+                        sstep_set_2 = set()
+                        for cstr in sstep_set:
+                            # Replace fmap tpart and top tb.
+                            cstr_2 = tuple(tuple(c._replace(
+                                fmap_tpart=0,
+                                top_bl_t=(c.top_bl_t[:le.BAT]
+                                          + (0,)
+                                          + c.top_bl_t[le.BAT + 1:]))
+                                                 for c in ctpl)
+                                           for ctpl in cstr)
+                            sstep_set_2.add(cstr_2)
+                        if sstep_set_ref is None:
+                            sstep_set_ref = sstep_set_2
+                        else:
+                            self.assertSetEqual(
+                                sstep_set_2, sstep_set_ref,
+                                'test_gen_constraint_strict_step: constraints '
+                                'differ across strict steps. '
+                                'Network {}, segment {}.'
+                                .format(net_name, segment))
+
+                        sstep_set.clear()
+
+                    sstep_set.add(constraint)
+                    self.assertEqual(top_tb, last_top_tb,
+                                     'test_gen_constraint_strict_step: top tb '
+                                     'is not constant within an strict step. '
+                                     '{} != {}.'
+                                     .format(top_tb, last_top_tb))
 
