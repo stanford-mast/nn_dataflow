@@ -146,6 +146,13 @@ class TestNNDataflow(unittest.TestCase):
 
         self.assertFalse(tops)
 
+        # With inter-layer pipelining.
+        options = Option(hw_gbuf_save_writeback=True,
+                         partition_interlayer=True)
+        tops, _ = nnd.schedule_search(options)
+
+        self.assertFalse(tops)
+
     def test_scheduling_failure(self):
         ''' Layer scheduling failure. '''
         network = self.alex_net

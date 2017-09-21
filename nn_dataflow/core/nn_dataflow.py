@@ -21,19 +21,14 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 from collections import defaultdict
 import sys
 
-from . import data_category_enum as de
-from . import loop_enum as le
 from . import partition
-from .. import util
 from .cost import Cost
 from .inter_layer_pipeline import InterLayerPipeline
-from .layer import ConvLayer
 from .map_strategy import MapStrategy
 from .network import Network
 from .nn_dataflow_scheme import NNDataflowScheme
 from .resource import Resource
 from .scheduling import SchedulingCondition, Scheduling
-from .scheduling_constraint import SchedulingConstraint
 
 class NNDataflow(object):
     '''
@@ -129,12 +124,10 @@ class NNDataflow(object):
             self.nndf_tops[layer_name] = tops
 
         # Final top schemes.
-        try:
-            tops = self.nndf_tops[self.ordered_layer_list[-1]]
-        except KeyError:
+        tops = self.nndf_tops.get(self.ordered_layer_list[-1], [])
+        if not tops:
             sys.stderr.write('No valid schedule found for {}.\n'
                              .format(self.network.net_name))
-            tops = []
         for nndf in tops:
             assert len(nndf) == len(self.network)
 
@@ -160,88 +153,58 @@ class NNDataflow(object):
         segment. Will NOT update the `nndf_tops` attribute.
         '''
 
-        allocation = segment.allocation()
-        assert allocation
-
         # We take the top schemes that end with the latest previous layer as
         # the initial state.
         first_layer_idx = self.ordered_layer_list.index(segment[0][0])
         if first_layer_idx == 0:
             prev_nndf_tops = self.nndf_tops[None]
         else:
-            try:
-                prev_nndf_tops = self.nndf_tops[
-                    self.ordered_layer_list[first_layer_idx - 1]]
-            except KeyError:
-                return []
-
-        def _do_chedule_search(*conditions):
-            ''' Schedule the segment under the given pipelining conditions. '''
-
-            nndf_tops = prev_nndf_tops
-
-            constraint_list = self._gen_segment_scheduling_constraint(
-                segment, *conditions)
-
-            # Spatial scheduling.
-            for sp_idx, (ltpl, rtpl, ctpl) \
-                    in enumerate(zip(segment, allocation, constraint_list)):
-
-                # Temporal scheduling.
-                for tm_idx, (layer, resource, constraint) \
-                        in enumerate(zip(ltpl, rtpl, ctpl)):
-
-                    nndf_tops = self._layer_schedule_search(
-                        layer, resource, constraint, sp_idx, tm_idx,
-                        nndf_tops, options)
-
-            return nndf_tops
-
-        # Decide the fmap temporal partitioning factor candidates, which should
-        # be approximately dividable by hofm of the layers.
-        fmap_tpart_cands = []
-        seg_layer_hofm_list = [self.network[l].hofm
-                               for ltpl in segment for l in ltpl]
-        for f in range(1, min(seg_layer_hofm_list) + 1):
-            if all(util.approx_dividable(hofm, f, overhead=0.5)
-                   for hofm in seg_layer_hofm_list):
-                fmap_tpart_cands.append(f)
-        assert fmap_tpart_cands[0] == 1
-
-        # Decide the top BAT factor, sorted from largest to smallest.
-        def _gen_top_tb_cands(fmap_tpart):
-            if len(segment) == 1:
-                return [None]
-            return sorted((t for t, _ in util.factorize(
-                self.batch_size * fmap_tpart, 2)), reverse=True)
-
-        # Decide the fully buffered starting data category.
-        fb_dce_cands = [de.IFM, de.OFM] if len(segment) > 1 else [None]
+            prev_nndf_tops = self.nndf_tops.get(
+                self.ordered_layer_list[first_layer_idx - 1], [])
+        if not prev_nndf_tops:
+            return []
 
         # New top schemes.
         nndf_tops = []
 
-        # Explore.
-        for fmap_tpart in fmap_tpart_cands:
+        # Allocation.
+        allocation = segment.allocation()
 
-            for fb_dce in fb_dce_cands:
+        fast_forward = False
 
-                tops = []
+        # Explore constraints.
+        for constraint, opt_step, strict_step in segment.gen_constraint():
 
-                for top_tb in _gen_top_tb_cands(fmap_tpart):
+            # Prune.
+            if opt_step:
+                if nndf_tops:
+                    # Already found, skip sub-optimal constraints.
+                    break
+                # Exit fast forwarding, for new optimality step.
+                fast_forward = False
+            if strict_step and not nndf_tops:
+                # Enter fast forwarding, skip more strict constraints.
+                fast_forward = True
 
-                    tops += _do_chedule_search(fmap_tpart, fb_dce, top_tb)
+            if fast_forward:
+                continue
 
-                    if not tops:
-                        # If not found for larger top tb, smaller top tb is
-                        # also invalid.
-                        break
+            # Start from the previous top schemes.
+            curr_nndf_tops = prev_nndf_tops
 
-                    nndf_tops += tops
+            # Spatial scheduling.
+            for sp_idx, (ltpl, rtpl, ctpl) \
+                    in enumerate(zip(segment, allocation, constraint)):
 
-            if nndf_tops:
-                # If found, stop using larger fmap temporal partitioning.
-                break
+                # Temporal scheduling.
+                for tm_idx, (layer, resource, cstr) \
+                        in enumerate(zip(ltpl, rtpl, ctpl)):
+
+                    curr_nndf_tops = self._layer_schedule_search(
+                        layer, resource, cstr, sp_idx, tm_idx,
+                        curr_nndf_tops, options)
+
+            nndf_tops += curr_nndf_tops
 
         # Always pick and keep top n.
         nndf_tops = sorted(nndf_tops, cmp=self.cmp_func)[:options.ntops]
@@ -350,141 +313,4 @@ class NNDataflow(object):
                 input_layer, self.batch_size, part, input_region)
 
             yield input_layout
-
-    def _gen_segment_scheduling_constraint(self, segment, *conditions):
-        '''
-        Generate SchedulingConstraint instances for each layer in the segment
-        with mixed spatial and temporal scheduling, based on the given
-        conditions.
-
-        Return a list (for spatial scheduling) of sub-lists (for temporal
-        scheduling), in the similar format of segment and allocation.
-
-        Conditions include:
-        - fmap temporal partitioning factor, for all layers in the segment.
-        - fully buffered data category (IFM or OFM) of the starting layer.
-          - between spatial scheduling:
-            - if there is single spatial scheduling, it starts with no
-              requirement on fully buffering.
-            - if there is multiple spatial scheduling, the first one can start
-              with either data category (IFM or OFM), and the afterward ones
-              inherit the final requirement of their previous ones.
-          - with all temporal scheduling in the same spatial scheduling:
-            - all local-region layers are merged with their previous CONV
-              layers, composing CONV layer groups.
-            - the fully buffering requirement only applies to the first (IFM)
-              or the last (OFM) layer in the group. Layers in between do not
-              need to fully buffer (can stream instead).
-            - if there are multiple CONV layer groups, the first group inherits
-              the fully buffered data category from the previous spatial
-              scheduling; all the groups need to fully buffer both IFM and OFM,
-              except that the first group does not need to fully buffer IFM
-              (unless inherit), and the last group does not need to fully
-              buffer OFM.
-            - if there is a single CONV layer group, the fully buffered data
-              category alternates.
-            - if there is no CONV layer, no requirement on fully buffering.
-        - top BAT loop factor. With > 1 spatial scheduling, all layers must
-          share the same factor; with single spatial scheduling, each temporal
-          scheduled layers can use different factors.
-        '''
-
-        fmap_tpart, fb_dce, top_tb = conditions
-
-        def _fb_constrained_lpe(dce):
-            '''
-            The constrained LoopEnum for the fully buffered data category.
-            '''
-            return {de.IFM: le.IFM, de.OFM: le.OFM, None: None}[dce]
-
-        def _fb_alter(dce):
-            '''
-            Alternate the fully buffer data category.
-            '''
-            return {de.IFM: de.OFM, de.OFM: de.IFM, None: None}[dce]
-
-        # Spatial scheduling.
-        cnt_spat = len(segment)
-
-        # Single spatial scheduling does not have requirements for top tb and
-        # fully buffering.
-        assert cnt_spat > 1 or top_tb is None
-        assert cnt_spat > 1 or fb_dce is None
-
-        top_bl_lpe = le.BAT if top_tb is not None else None
-
-        top_bl_t_list = []
-
-        for ltpl in segment:
-
-            # Temporal scheduling.
-            cnt_temp = len(ltpl)
-
-            # Find CONV layer groups, representing by the CONV layer index.
-            conv_idx_list = []
-            for tm_idx, layer in enumerate(ltpl):
-                if isinstance(self.network[layer], ConvLayer):
-                    conv_idx_list.append(tm_idx)
-            assert all(p < n for p, n in zip(conv_idx_list, conv_idx_list[1:]))
-
-            # Constraints for top loop factors.
-            ttpl = [[None] * le.NUM for _ in range(cnt_temp)]
-            # Top BAT factor.
-            for top_bl_t in ttpl:
-                top_bl_t[le.BAT] = top_tb
-
-            if not conv_idx_list:
-                # No CONV layers.
-
-                # All layers have no requirements.
-                pass
-
-            else:
-                # Get the begin and end of each group.
-                groups = [(beg, beg2 - 1) for beg, beg2
-                          in zip(conv_idx_list,
-                                 conv_idx_list[1:] + [cnt_temp])]
-                assert len(groups) == len(conv_idx_list)
-
-                # All groups buffers both IFM and OFM.
-                for beg, end in groups:
-                    ttpl[beg][le.IFM] = 1
-                    ttpl[end][le.OFM] = 1
-
-                # Cancel the requirement of the first and last group.
-                ttpl[groups[0][0]][le.IFM] = None
-                ttpl[groups[-1][-1]][le.OFM] = None
-
-                # The first group inherits previous spatial schedule.
-                if fb_dce == de.IFM:
-                    ttpl[groups[0][0]][le.IFM] = 1
-
-                    if groups[0][0] > 0:
-                        # If there are layers before the first group, and the
-                        # first group fully buffers IFM, this semi-group needs
-                        # to fully buffer OFM (in the last layer only).
-                        ttpl[groups[0][0] - 1][le.OFM] = 1
-
-                if len(conv_idx_list) == 1:
-                    # Alternate fully-buffered data category.
-                    fb_dce = _fb_alter(fb_dce)
-                else:
-                    # End with fully buffering OFM for the next spatial
-                    # schedule.
-                    fb_dce = de.OFM
-
-            top_bl_t_list.append(ttpl)
-
-        # IFM of the first layer and OFM of the last layer can go to DRAM.
-        top_bl_t_list[0][0][le.IFM] = None
-        top_bl_t_list[-1][-1][le.OFM] = None
-
-        # Make SchedulingConstraint instances.
-        constraint_list = [[SchedulingConstraint(top_bl_t=tuple(top_bl_t),
-                                                 top_bl_lpe=top_bl_lpe,
-                                                 fmap_tpart=fmap_tpart)
-                            for top_bl_t in ttpl]
-                           for ttpl in top_bl_t_list]
-
-        return constraint_list
 
