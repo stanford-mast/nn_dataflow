@@ -153,34 +153,22 @@ class NNDataflowScheme(MutableMapping):
         return sum(sr.total_time * sr.dict_part['num_nodes']
                    for sr in self.values())
 
-    @classmethod
-    def compare_cost(cls, nndf1, nndf2):
+    def key_cost_with_time_overhead(self, time_overhead=0.1):
         '''
-        Compare function, based on total cost.
+        Key function for comparison, based on total cost within certain time
+        overhead.
         '''
-        return cls.compare_cost_with_time_overhead(nndf1, nndf2,
-                                                   time_overhead=float('inf'))
-
-    @classmethod
-    def compare_cost_with_time_overhead(cls, nndf1, nndf2, time_overhead=0.1):
-        '''
-        Compare function, based on total cost within certain time overhead.
-        '''
-        valid1 = all(t.time() <= t.critical_time() * (1 + time_overhead)
-                     for t in nndf1.seg_tlist)
-        valid2 = all(t.time() <= t.critical_time() * (1 + time_overhead)
-                     for t in nndf2.seg_tlist)
+        valid = all(t.time() <= t.critical_time() * (1 + time_overhead)
+                    for t in self.seg_tlist)
         # Valid is better (smaller) than invalid.
-        return cmp((not valid1, nndf1.total_cost),
-                   (not valid2, nndf2.total_cost))
+        return (not valid, self.total_cost)
 
-    @classmethod
-    def compare_cost_time(cls, nndf1, nndf2):
+    def key_cost_time(self):
         '''
-        Compare function, based on product of total cost and total time.
+        Key function for comparison, based on product of total cost and total
+        time.
         '''
-        return cmp(nndf1.total_cost * nndf1.total_time,
-                   nndf2.total_cost * nndf2.total_time)
+        return self.total_cost * self.total_time
 
     def segment_time_list(self):
         ''' Get the time for each segment. '''
