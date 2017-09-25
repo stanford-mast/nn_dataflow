@@ -233,7 +233,7 @@ class NNDataflow(object):
         for ifmap_layout, prev_nndf in self._gen_layer_ifmap_layout(
                 layer_name, prev_nndf_tops):
 
-            segment_idx = prev_nndf.last_sched_seq[0]
+            segment_idx = prev_nndf.last_seg_idx
             if spatial_idx == 0 and temporal_idx == 0:
                 # New segment.
                 segment_idx += 1

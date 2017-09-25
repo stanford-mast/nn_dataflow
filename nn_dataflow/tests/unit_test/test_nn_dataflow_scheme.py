@@ -52,9 +52,9 @@ class TestNNDataflowScheme(unittest.TestCase):
                        type=NodeRegion.DATA))
 
         self.c1res = SchedulingResult(
-            dict_loop=OrderedDict([('cost', 1.), ('time', 2.), ('ops', 4.),
+            dict_loop=OrderedDict([('cost', 1.), ('time', 200), ('ops', 4.),
                                    ('access', [[7, 8, 9]] * me.NUM),
-                                   ('ti', [1, 2, 3]),
+                                   ('ti', [2, 2, 3]),
                                    ('to', [1, 2, 3]),
                                    ('tb', [1, 2, 3]),
                                    ('orders', [range(3)] * 2),
@@ -70,9 +70,9 @@ class TestNNDataflowScheme(unittest.TestCase):
             sched_seq=(0, 0, 0))
 
         self.p1res = SchedulingResult(
-            dict_loop=OrderedDict([('cost', 0.1), ('time', 0.05), ('ops', 0.1),
+            dict_loop=OrderedDict([('cost', 0.1), ('time', 5), ('ops', 0.1),
                                    ('access', [[.7, .8, .9]] * me.NUM),
-                                   ('ti', [1, 2, 3]),
+                                   ('ti', [2, 2, 3]),
                                    ('to', [1, 2, 3]),
                                    ('tb', [1, 2, 3]),
                                    ('orders', [range(3)] * 2),
@@ -85,11 +85,11 @@ class TestNNDataflowScheme(unittest.TestCase):
                 PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
                 NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
                            type=NodeRegion.DATA)),
-            sched_seq=(0, 0, 1))
+            sched_seq=(0, 1, 0))
 
         self.p2res = SchedulingResult(
             dict_loop=self.p1res.dict_loop, dict_part=self.p1res.dict_part,
-            ofmap_layout=self.p1res.ofmap_layout, sched_seq=(0, 0, 2))
+            ofmap_layout=self.p1res.ofmap_layout, sched_seq=(0, 2, 0))
 
         self.dtfl = NNDataflowScheme(self.network, self.input_layout)
         self.dtfl['c1'] = self.c1res
@@ -170,6 +170,28 @@ class TestNNDataflowScheme(unittest.TestCase):
         with self.assertRaisesRegexp(KeyError, 'NNDataflowScheme: .*p1*'):
             df['p1'] = self.p1res
 
+    def test_setitem_invalid_seg_idx(self):
+        ''' __setitem__ invalid segment index. '''
+        df = NNDataflowScheme(self.network, self.input_layout)
+
+        with self.assertRaisesRegexp(ValueError,
+                                     'NNDataflowScheme: .*segment index*'):
+            df['c1'] = SchedulingResult(
+                dict_loop=self.c1res.dict_loop, dict_part=self.c1res.dict_part,
+                ofmap_layout=self.c1res.ofmap_layout, sched_seq=(1, 0, 0))
+
+        df = NNDataflowScheme(self.network, self.input_layout)
+        df['c1'] = self.c1res
+        df['p1'] = SchedulingResult(
+            dict_loop=self.p1res.dict_loop, dict_part=self.p1res.dict_part,
+            ofmap_layout=self.p1res.ofmap_layout, sched_seq=(1, 0, 0))
+
+        with self.assertRaisesRegexp(ValueError,
+                                     'NNDataflowScheme: .*segment index*'):
+            df['p2'] = SchedulingResult(
+                dict_loop=self.p2res.dict_loop, dict_part=self.p2res.dict_part,
+                ofmap_layout=self.p2res.ofmap_layout, sched_seq=(0, 0, 0))
+
     def test_delitem(self):
         ''' __delitem__. '''
         df = NNDataflowScheme(self.network, self.input_layout)
@@ -204,30 +226,40 @@ class TestNNDataflowScheme(unittest.TestCase):
     def test_properties(self):
         ''' Property accessors. '''
         self.assertAlmostEqual(self.dtfl.total_cost, 1.5 + 0.6 * 2)
-        self.assertAlmostEqual(self.dtfl.total_time, 2 + 0.05 * 2)
+        self.assertAlmostEqual(self.dtfl.total_time, 200 + 5)
 
         self.assertAlmostEqual(self.dtfl.total_ops, 4 + 0.1 * 2)
         for a in self.dtfl.total_accesses:
             self.assertAlmostEqual(a, (7 + 8 + 9) + (.7 + .8 + .9) * 2)
         self.assertAlmostEqual(self.dtfl.total_noc_hops,
                                (4 + 5 + 6) + (.4 + .5 + .6) * 2)
-        self.assertAlmostEqual(self.dtfl.total_node_time, 2 * 4 + 0.05 * 2 * 2)
+        self.assertAlmostEqual(self.dtfl.total_node_time, 200 * 4 + 5 * 2 * 2)
+
+    def test_segment_time_list(self):
+        ''' segment_time_list(). '''
+        dtfl = NNDataflowScheme(self.network, self.input_layout)
+        dtfl['c1'] = self.c1res
+        dtfl['p1'] = self.p1res
+        dtfl['p2'] = SchedulingResult(
+            dict_loop=self.p2res.dict_loop, dict_part=self.p2res.dict_part,
+            ofmap_layout=self.p2res.ofmap_layout, sched_seq=(1, 0, 0))
+        self.assertListEqual(dtfl.segment_time_list(), [205, 5])
 
     def test_stats_active_node_pes(self):
         ''' Per-layer stats: active node PEs. '''
         stats = self.dtfl.perlayer_stats('active_node_pes')
         self.assertEqual(len(stats), len(self.dtfl))
-        self.assertAlmostEqual(stats['c1'], 0.5)
-        self.assertAlmostEqual(stats['p1'], 1)
-        self.assertAlmostEqual(stats['p2'], 1)
+        self.assertAlmostEqual(stats['c1'], 0.005)
+        self.assertAlmostEqual(stats['p1'], 0.01)
+        self.assertAlmostEqual(stats['p2'], 0.01)
 
     def test_stats_total_dram_bw(self):
         ''' Per-layer stats: total DRAM bandwidth. '''
         stats = self.dtfl.perlayer_stats('total_dram_bandwidth')
         self.assertEqual(len(stats), len(self.dtfl))
-        self.assertAlmostEqual(stats['c1'], (7 + 8 + 9) / 2.)
-        self.assertAlmostEqual(stats['p1'], (.7 + .8 + .9) / 0.05)
-        self.assertAlmostEqual(stats['p2'], (.7 + .8 + .9) / 0.05)
+        self.assertAlmostEqual(stats['c1'], (7. + 8. + 9.) / 200)
+        self.assertAlmostEqual(stats['p1'], (.7 + .8 + .9) / 5)
+        self.assertAlmostEqual(stats['p2'], (.7 + .8 + .9) / 5)
 
     def test_stats_not_supported(self):
         ''' Per-layer stats: not supported. '''
