@@ -160,9 +160,7 @@ class TestNNDataflowScheme(unittest.TestCase):
         df['c1'] = self.c1res
 
         with self.assertRaisesRegexp(KeyError, 'NNDataflowScheme: .*c1*'):
-            df['c1'] = SchedulingResult(
-                dict_loop=self.c1res.dict_loop, dict_part=self.c1res.dict_part,
-                ofmap_layout=self.c1res.ofmap_layout, sched_seq=(1, 0, 0))
+            df['c1'] = self.c1res._replace(sched_seq=(1, 0, 0))
 
     def test_setitem_prev_not_in(self):
         ''' __setitem__ already exists. '''
@@ -177,21 +175,15 @@ class TestNNDataflowScheme(unittest.TestCase):
 
         with self.assertRaisesRegexp(ValueError,
                                      'NNDataflowScheme: .*segment index*'):
-            df['c1'] = SchedulingResult(
-                dict_loop=self.c1res.dict_loop, dict_part=self.c1res.dict_part,
-                ofmap_layout=self.c1res.ofmap_layout, sched_seq=(1, 0, 0))
+            df['c1'] = self.c1res._replace(sched_seq=(1, 0, 0))
 
         df = NNDataflowScheme(self.network, self.input_layout)
         df['c1'] = self.c1res
-        df['p1'] = SchedulingResult(
-            dict_loop=self.p1res.dict_loop, dict_part=self.p1res.dict_part,
-            ofmap_layout=self.p1res.ofmap_layout, sched_seq=(1, 0, 0))
+        df['p1'] = self.p1res._replace(sched_seq=(1, 0, 0))
 
         with self.assertRaisesRegexp(ValueError,
                                      'NNDataflowScheme: .*segment index*'):
-            df['p2'] = SchedulingResult(
-                dict_loop=self.p2res.dict_loop, dict_part=self.p2res.dict_part,
-                ofmap_layout=self.p2res.ofmap_layout, sched_seq=(0, 0, 0))
+            df['p2'] = self.p2res._replace(sched_seq=(0, 0, 0))
 
     def test_delitem(self):
         ''' __delitem__. '''
@@ -236,15 +228,23 @@ class TestNNDataflowScheme(unittest.TestCase):
                                (4 + 5 + 6) + (.4 + .5 + .6) * 2)
         self.assertAlmostEqual(self.dtfl.total_node_time, 200 * 4 + 5 * 2 * 2)
 
+    def test_time_full_net_single_seg(self):
+        ''' time() when full network fits in a single segment. '''
+        dtfl = NNDataflowScheme(self.network, self.input_layout)
+        dtfl['c1'] = self.c1res
+        dtfl['p1'] = self.p1res._replace(sched_seq=(0, 1, 0))
+        dtfl['p2'] = self.p2res._replace(sched_seq=(0, 2, 0))
+        dtfl['f1'] = self.c1res._replace(sched_seq=(0, 3, 0))
+        self.assertEqual(dtfl.total_time, 200)
+
     def test_key_cost_time(self):
         ''' key_cost_time. '''
         dtfl = NNDataflowScheme(self.network, self.input_layout)
         dict_loop = self.c1res.dict_loop.copy()
         dict_loop['time'] += 50  # 200 -> 250
         dict_loop['cost'] -= .5  # 1. -> .5
-        dtfl['c1'] = SchedulingResult(
-            dict_loop=dict_loop, dict_part=self.c1res.dict_part,
-            ofmap_layout=self.c1res.ofmap_layout, sched_seq=(0, 0, 0))
+        dtfl['c1'] = self.c1res._replace(dict_loop=dict_loop,
+                                         sched_seq=(0, 0, 0))
         dtfl['p1'] = self.p1res
         dtfl['p2'] = self.p2res
         # Original: 2.7 * 205
@@ -258,9 +258,8 @@ class TestNNDataflowScheme(unittest.TestCase):
         dict_loop = self.c1res.dict_loop.copy()
         dict_loop['time'] -= 180  # 200 -> 20
         dict_loop['cost'] -= .5  # 1. -> .5
-        dtfl['c1'] = SchedulingResult(
-            dict_loop=dict_loop, dict_part=self.c1res.dict_part,
-            ofmap_layout=self.c1res.ofmap_layout, sched_seq=(0, 0, 0))
+        dtfl['c1'] = self.c1res._replace(dict_loop=dict_loop,
+                                         sched_seq=(0, 0, 0))
         dtfl['p1'] = self.p1res
         dtfl['p2'] = self.p2res
         # Original: 2.7, 205, overhead 2.5%
@@ -276,9 +275,7 @@ class TestNNDataflowScheme(unittest.TestCase):
         dtfl = NNDataflowScheme(self.network, self.input_layout)
         dtfl['c1'] = self.c1res
         dtfl['p1'] = self.p1res
-        dtfl['p2'] = SchedulingResult(
-            dict_loop=self.p2res.dict_loop, dict_part=self.p2res.dict_part,
-            ofmap_layout=self.p2res.ofmap_layout, sched_seq=(1, 0, 0))
+        dtfl['p2'] = self.p2res._replace(sched_seq=(1, 0, 0))
         self.assertListEqual(dtfl.segment_time_list(), [205, 5])
 
     def test_stats_active_node_pes(self):

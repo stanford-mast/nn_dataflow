@@ -127,6 +127,10 @@ class NNDataflowScheme(MutableMapping):
     @property
     def total_time(self):
         ''' Get the total time. '''
+        # Special case, when the entire network fits in one segment. No
+        # pipeline filling/draining delay.
+        if len(self.seg_tlist) == 1 and self.__len__() == len(self.network):
+            return self.seg_tlist[0].critical_time()
         return sum(t.time() for t in self.seg_tlist)
 
     @property
