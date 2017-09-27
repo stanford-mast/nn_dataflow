@@ -13,6 +13,16 @@ List of major changes and improvements
     - The batch loop blocking factor is allowed to be inexact but a multiple of
       the constrained factor.
 
+  - Add `InterLayerPipeline`.
+    - Layers are organized into `PipelineSegment`, which are simultaneously
+      mapped on to the resource both spatially and temporally.
+    - Each layer in the segment has a 3-tuple scheduling index including
+      segment index, spatial index, and temporal index.
+    - Each layer in the segment has its resource allocation and scheduling
+      constraint.
+    - Use `PipelineSegmentTiming` to capture the timing relation of layers in
+      the segment.
+
 
 ### Changed
 
@@ -20,10 +30,15 @@ List of major changes and improvements
 
   - Allow data source/destination regions in `Resource` to be non-DATA type.
 
+  - Allow `NodeRegion` to be folded along the w dimension in a zig-zag manner.
+
 - Software models.
 
   - `LoopBlockingScheme` supports remote node buffers as data regions (non-data
     type data regions).
+
+  - Refactor `NNDataflow` and `NNDataflowScheme` to incorporate inter-layer
+    pipelining.
 
 
 ### Fixed
