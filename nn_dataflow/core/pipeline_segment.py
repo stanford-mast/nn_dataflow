@@ -22,7 +22,7 @@ from collections import namedtuple
 
 from . import loop_enum as le
 from .. import util
-from .layer import ConvLayer
+from .layer import ConvLayer, LocalRegionLayer
 from .network import Network
 from .resource import Resource
 from .scheduling_constraint import SchedulingConstraint
@@ -141,9 +141,42 @@ class PipelineSegment(object):
 
         # Fmap temporal partitioning factor candidates.
         fmap_tpart_cands = []
-        hofm_lst = [self.network[l].hofm for ltpl in self.seg for l in ltpl]
+        l_lst = [l for ltpl in self.seg for l in ltpl]
+        hofm_lst = [self.network[l].hofm for l in l_lst]
         for f in range(1, min(hofm_lst) + 1):
-            if all(util.approx_dividable(h, f, overhead=.5) for h in hofm_lst):
+            # Should be dividable.
+            if not all(util.approx_dividable(h, f, overhead=0.5)
+                       for h in hofm_lst):
+                continue
+            # Backtrace layers, find out the pyramid enlargement for hofm.
+            tp_hofm_dict = {}
+            for l in reversed(l_lst):
+                layer = self.network[l]
+                tp_hofm = util.idivc(layer.hofm, f)
+                if l in tp_hofm_dict:
+                    # Already determined by the later layer. Check enlargement.
+                    if tp_hofm_dict[l] > 2 * tp_hofm:
+                        break
+                else:
+                    # No later layer, partition hofm directly.
+                    tp_hofm_dict[l] = tp_hofm
+                # Determine previous layers according to its ifmap size.
+                if isinstance(layer, ConvLayer):
+                    tp_hifm = ConvLayer(
+                        1, 1, (tp_hofm, layer.wofm),
+                        (layer.hfil, layer.wfil),
+                        (layer.htrd, layer.wtrd)).hifm
+                else:
+                    assert isinstance(layer, LocalRegionLayer)
+                    tp_hifm = LocalRegionLayer(
+                        1, (tp_hofm, layer.wofm), layer.nreg,
+                        (layer.hreg, layer.wreg),
+                        (layer.htrd, layer.wtrd)).hifm
+                prev_layers, _ = self.network.prev_layers(l)
+                for pl in prev_layers:
+                    tp_hofm_dict[pl] = tp_hifm
+            else:
+                # No violation.
                 fmap_tpart_cands.append(f)
         assert fmap_tpart_cands[0] == 1
 

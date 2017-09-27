@@ -495,3 +495,20 @@ class TestPipelineSegment(TestPipelineFixture):
                                      '{} != {}.'
                                      .format(top_tb, last_top_tb))
 
+    def test_gen_constraint_fmap_tpart(self):
+        ''' gen_constraint() valid fmap_tpart. '''
+
+        net = self.net['net6']
+
+        segment = self._make_segment((0, 1, 2, 3), net, max_util_drop=1.)
+        self.assertTrue(segment.valid)
+
+        fmap_tpart_set = set()
+        for constraint, _, _ in segment.gen_constraint():
+            fmap_tpart_set.add(constraint[0][0].fmap_tpart)
+
+        # The candidates will be 1 to 6. 5 is not valid due to dividability,
+        # and 6 is not valid due to pyramid enlargement.
+        self.assertNotIn(5, fmap_tpart_set)
+        self.assertNotIn(6, fmap_tpart_set)
+

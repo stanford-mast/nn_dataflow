@@ -129,6 +129,16 @@ class TestPipelineFixture(unittest.TestCase):
         net.add('12', FCLayer(1, 1), prevs=('10', '11'))
         self.net[net.net_name] = net
 
+        net = Network('net6')
+        # Fmap sizes.
+        net.set_input(InputLayer(1, 24))
+        net.add('0', ConvLayer(1, 1, 24, 3))
+        net.add('1', ConvLayer(1, 1, 12, 3, strd=2))
+        net.add('1p', PoolingLayer(1, 6, 2))
+        net.add('2', ConvLayer(1, 1, 6, 3))
+        net.add('3', ConvLayer(1, 1, 6, 3, strd=4), prevs=('0'))
+        self.net[net.net_name] = net
+
         # Real networks.
         for net_name in all_networks():
             self.net[net_name] = import_network(net_name)
