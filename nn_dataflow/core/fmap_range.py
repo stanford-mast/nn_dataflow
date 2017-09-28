@@ -85,9 +85,10 @@ class FmapRange(util.ContentHashClass):
         '''
         begs, ends = self._extract_attrs(*attrs)
 
-        lens = [e - b for b, e in zip(begs, ends)]
-
-        return util.prod(lens)
+        sz = 1
+        for b, e in zip(begs, ends):
+            sz *= e - b
+        return sz
 
     def overlap(self, other):
         '''
@@ -98,10 +99,10 @@ class FmapRange(util.ContentHashClass):
 
         begs = []
         ends = []
-        for srng, orng in zip(zip(self.fp_beg, self.fp_end),
-                              zip(other.fp_beg, other.fp_end)):
-            b = max(srng[0], orng[0])
-            e = min(srng[1], orng[1])
+        for sb, se, ob, oe in zip(self.fp_beg, self.fp_end,
+                                  other.fp_beg, other.fp_end):
+            b = max(sb, ob)
+            e = min(se, oe)
             if b >= e:
                 # No overlap, return 0 FmapRange.
                 return FmapRange([0]*len(_FMAP_POSITION_ATTRS),
@@ -109,6 +110,21 @@ class FmapRange(util.ContentHashClass):
             begs.append(b)
             ends.append(e)
         return FmapRange(begs, ends)
+
+    def overlap_size(self, other):
+        ''' Optimized routine for self.overlap(other).size(). '''
+        if not isinstance(other, FmapRange):
+            raise TypeError('FmapRange: an FmapRange object is required.')
+
+        sz = 1
+        for sb, se, ob, oe in zip(self.fp_beg, self.fp_end,
+                                  other.fp_beg, other.fp_end):
+            b = max(sb, ob)
+            e = min(se, oe)
+            if b >= e:
+                return 0
+            sz *= (e - b)
+        return sz
 
     def __contains__(self, fpos):
         '''
@@ -140,7 +156,7 @@ class FmapRange(util.ContentHashClass):
             return 0
 
         # Overlap check.
-        if self.overlap(other).size() > 0:
+        if self.overlap_size(other) > 0:
             raise ValueError('FmapRange: comparing two overlap ranges. '
                              '{} vs. {}'.format(self, other))
 
@@ -253,7 +269,7 @@ class FmapRangeMap(object):
         counts = Counter()
         for kv in self.keyvals:
             counts[kv[1]] = counts.setdefault(kv[1], 0) \
-                    + frng.overlap(kv[0]).size()
+                    + frng.overlap_size(kv[0])
         return counts
 
     def rget_single(self, frng):

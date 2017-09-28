@@ -116,6 +116,25 @@ class TestFmapRange(unittest.TestCase):
         with self.assertRaisesRegexp(TypeError, 'FmapRange: .*'):
             fr1.overlap(((0,) * 4, (2,) * 4))
 
+    def test_overlap_size(self):
+        ''' Get overlap_size. '''
+        fr1 = FmapRange((-11, -4, 3, 0), (3, 5, 7, 11))
+        fr2 = FmapRange((0, 3, 3, -5), (3, 10, 4, 3))
+        self.assertEqual(fr1.overlap_size(fr2), 3 * 2 * 1 * 3)
+        self.assertEqual(fr2.overlap_size(fr1), 3 * 2 * 1 * 3)
+
+        fr3 = FmapRange((0, 7, 3, -5), (3, 10, 4, 3))
+        self.assertEqual(fr1.overlap_size(fr3), 0)
+
+        fr4 = FmapRange((-12, -12, -12, -12), (12, 12, 12, 12))
+        self.assertEqual(fr1.overlap_size(fr4), fr1.size())
+
+    def test_overlap_size_error(self):
+        ''' Get overlap_size error. '''
+        fr1 = FmapRange((-11, -4, 3, 0), (3, 5, 7, 11))
+        with self.assertRaisesRegexp(TypeError, 'FmapRange: .*'):
+            fr1.overlap_size(((0,) * 4, (2,) * 4))
+
     def test_contains(self):
         ''' Whether contains fmap point. '''
         fr = FmapRange((-11, -4, 3, 0), (3, 5, 7, 11))
