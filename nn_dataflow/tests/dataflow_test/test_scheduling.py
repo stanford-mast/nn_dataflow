@@ -165,16 +165,6 @@ class TestScheduling(unittest.TestCase):
         schd = Scheduling(layer, self.batch_size, self.cost,
                           MapStrategyEyeriss)
 
-        # Shift ifmap out of memory region.
-        condition = SchedulingCondition(
-            resource=self.resource,
-            constraint=self.none_cstr,
-            ifmap_layout=ifmap_layout.view(PhyDim2(1, 1)),
-            sched_seq=self.sched_seq)
-
-        with self.assertRaisesRegexp(ValueError, 'Scheduling: .*ifmap.*'):
-            _ = schd.schedule_search(condition, self.options)
-
         # Not match layer.
         condition = SchedulingCondition(
             resource=self.resource,

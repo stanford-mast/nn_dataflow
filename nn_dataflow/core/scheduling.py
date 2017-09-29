@@ -157,9 +157,12 @@ class Scheduling(object):
 
         # Ifmap layout.
         ifmap_layout = condition.ifmap_layout
-        if not ifmap_layout.is_in_region(src_data_region):
-            raise ValueError('Scheduling: ifmap layout contains invalid '
-                             'source memory nodes.')
+        # This assertion is invalid now, as we allow layouts with different
+        # types to merge, and thus the layout may contains both DATA region
+        # nodes and PROC region nodes.
+        # if not ifmap_layout.is_in_region(src_data_region):
+            # raise ValueError('Scheduling: ifmap layout contains invalid '
+                             # 'source memory nodes.')
         cifrng = ifmap_layout.frmap.complete_fmap_range()
         if cifrng.size('b') != self.batch_size \
                 or cifrng.size('n') != self.layer.nifm \

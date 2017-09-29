@@ -240,14 +240,12 @@ class TestDataLayout(unittest.TestCase):
         with self.assertRaisesRegexp(TypeError, 'DataLayout: .*other.*'):
             _ = self.dly.merge('+', PhyDim2(1, 3))
 
-    def test_merge_invalid_region_type(self):
-        ''' Merge invalid region type. '''
+    def test_merge_region_type_diff(self):
+        ''' Merge different region types. '''
         dly = DataLayout(origin=self.dly.origin, frmap=self.dly.frmap,
                          type=NodeRegion.PROC)
-        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*type.*'):
-            _ = self.dly.merge('|', dly)
-        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*type.*'):
-            _ = self.dly.merge('+', dly)
+        self.assertEqual(self.dly.merge('|', dly).type, NodeRegion.DATA)
+        self.assertEqual(self.dly.merge('+', dly).type, NodeRegion.DATA)
 
     def test_merge_invalid_merge_symbol(self):
         ''' Merge invalid merge symbol. '''

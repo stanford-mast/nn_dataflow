@@ -46,6 +46,9 @@ List of major changes and improvements
 - Remove assertion to allow lower array utilization which could occur during
   mapping small layers, e.g., with fmap temporal partitioning.
 
+- Allow `DataLayout` with different types to merge, which results in the more
+  conservative type.
+
 
 ## [v1.4 -- v1.5] -- 2017-08-18
 

@@ -107,9 +107,10 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
         if not isinstance(other, DataLayout):
             raise TypeError('DataLayout: other must be a DataLayout object.')
 
-        if self.type != other.type:
-            raise ValueError('DataLayout: layouts to be merged must have '
-                             'the same type.')
+        if self.type == NodeRegion.DATA or other.type == NodeRegion.DATA:
+            new_type = NodeRegion.DATA
+        else:
+            new_type = NodeRegion.PROC
 
         scfrng = self.frmap.complete_fmap_range()
         ocfrng = other.frmap.complete_fmap_range()
@@ -165,5 +166,5 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
 
         assert frmap.is_complete()
 
-        return DataLayout(frmap=frmap, origin=self.origin, type=self.type)
+        return DataLayout(frmap=frmap, origin=self.origin, type=new_type)
 
