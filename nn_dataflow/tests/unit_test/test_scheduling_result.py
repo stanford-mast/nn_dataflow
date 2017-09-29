@@ -39,6 +39,7 @@ class TestSchedulingResult(unittest.TestCase):
                                                   [30, 40, 50],
                                                   [400, 500, 600],
                                                   [5000, 6000, 7000]]),
+                                      ('remote_gbuf_access', [0, 0, 0]),
                                      ])
         self.dict_part = OrderedDict([('cost', 9.876),
                                       ('total_nhops', [123, 456, 789]),
@@ -130,13 +131,24 @@ class TestSchedulingResult(unittest.TestCase):
         self.assertEqual(result.total_ops, 1234)
 
     def test_total_accesses(self):
-        ''' Accessor total_cost. '''
+        ''' Accessor total_accesses. '''
         result = SchedulingResult(dict_loop=self.dict_loop,
                                   dict_part=self.dict_part,
                                   ofmap_layout=self.ofmap_layout,
                                   sched_seq=self.sched_seq)
         self.assertSequenceEqual(result.total_accesses,
                                  [9, 120, 1500, 18000])
+
+    def test_total_accesses_rgbuf(self):
+        ''' Accessor total_accesses remote gbuf. '''
+        dict_loop = self.dict_loop.copy()
+        dict_loop['remote_gbuf_access'] = [10, 20, 30]
+        result = SchedulingResult(dict_loop=dict_loop,
+                                  dict_part=self.dict_part,
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
+        self.assertSequenceEqual(result.total_accesses,
+                                 [9, 120 + 60, 1500, 18000])
 
     def test_total_noc_hops(self):
         ''' Accessor total_noc_hops. '''

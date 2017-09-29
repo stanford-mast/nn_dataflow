@@ -22,6 +22,7 @@ import itertools
 from collections import OrderedDict, namedtuple
 
 from . import loop_blocking
+from . import mem_hier_enum as me
 from . import partition
 from .. import util
 from .cost import Cost
@@ -110,7 +111,9 @@ class SchedulingResult(namedtuple('SchedulingResult',
     def total_accesses(self):
         ''' Get the total accesses at all memory hierarchies as a list. '''
         # dict_loop stats are over all nodes.
-        return [sum(acc) for acc in self.dict_loop['access']]
+        accesses = [sum(acc) for acc in self.dict_loop['access']]
+        accesses[me.GBUF] += sum(self.dict_loop['remote_gbuf_access'])
+        return accesses
 
     @property
     def total_noc_hops(self):
