@@ -30,7 +30,7 @@ from .data_dim_loops import DataDimLoops
 from .data_layout import DataLayout
 from .fmap_range import FmapPosition, FmapRange, FmapRangeMap
 from .layer import Layer, InputLayer, ConvLayer, FCLayer, \
-        LocalRegionLayer, PoolingLayer
+        LocalRegionLayer, PoolingLayer, EltwiseLayer
 from .loop_blocking_scheme import LoopBlockingScheme
 from .map_strategy import MapStrategy, MapStrategyEyeriss
 from .nested_loop_desc import NestedLoopDesc

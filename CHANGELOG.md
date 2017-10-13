@@ -3,6 +3,12 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+### Added
+
+- Workload models.
+
+  - Add `EltwiseLayer`.
+
 
 ## [v1.4 -- v1.5] -- 2017-08-18
 
