@@ -9,6 +9,8 @@ List of major changes and improvements
 
   - Add `EltwiseLayer`.
 
+  - Add various LSTMs.
+
 
 ## [v1.4 -- v1.5] -- 2017-08-18
 
