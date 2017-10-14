@@ -314,7 +314,9 @@ class InterLayerPipeline(object):
         seen = set()
 
         def _dfs(vertex):
-            assert vertex not in seen and vertex not in visited
+            assert vertex not in seen
+            if vertex in visited:
+                return
 
             unseen.discard(vertex)
             seen.add(vertex)

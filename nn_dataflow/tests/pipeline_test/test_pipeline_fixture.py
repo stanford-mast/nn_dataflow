@@ -139,6 +139,18 @@ class TestPipelineFixture(unittest.TestCase):
         net.add('3', ConvLayer(1, 1, 6, 3, strd=4), prevs=('0'))
         self.net[net.net_name] = net
 
+        net = Network('net7')
+        # Topological order: see a visited vertex again.
+        #  /---
+        # 0-1-\\
+        #  \2--2p
+        net.set_input(InputLayer(1, 1))
+        net.add('0', FCLayer(1, 1))
+        net.add('1', FCLayer(1, 1), prevs='0')
+        net.add('2', FCLayer(1, 1), prevs='0')
+        net.add('2p', PoolingLayer(1, 1, 1), prevs=('0', '1', '2'))
+        self.net[net.net_name] = net
+
         # Real networks.
         for net_name in all_networks():
             self.net[net_name] = import_network(net_name)
