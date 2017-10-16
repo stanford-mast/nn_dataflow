@@ -106,6 +106,8 @@ class LoopBlockingScheme(object):
 
         self.lcnt = util.prod(bl_tp)
 
+        self.time = float('inf')
+
         # Buffer data size for one unit.
         self.unit_size = [tuple() for _ in range(BL.NUM)]
         self.unit_size[BL.GBUF] = self.nld.usize_gbuf
