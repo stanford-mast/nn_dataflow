@@ -144,15 +144,13 @@ class LoopBlockingScheme(object):
                 self.valid = False
                 return
             if resource.src_data_region() == resource.proc_region:
-                self.fetch[BL.GBUF][de.IFM] = 0
                 # Force to store in gbuf.
                 self.stored_in_gbuf[de.IFM] = True
         if not self.dst_is_dram:
             if self.fetch[BL.GBUF][de.OFM] > 1:
                 self.valid = False
                 return
-            if resource.src_data_region() == resource.proc_region:
-                self.fetch[BL.GBUF][de.OFM] = 0
+            if resource.dst_data_region() == resource.proc_region:
                 # Force to store in gbuf.
                 self.stored_in_gbuf[de.OFM] = True
 

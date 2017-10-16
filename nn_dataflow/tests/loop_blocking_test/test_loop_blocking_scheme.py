@@ -479,6 +479,8 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
                                lbs_norm.access[me.GBUF][de.IFM])
         self.assertAlmostEqual(lbs.access[me.GBUF][de.OFM],
                                lbs_norm.access[me.GBUF][de.OFM])
-        self.assertAlmostEqual(lbs.remote_gbuf_access[de.IFM], 0)
-        self.assertAlmostEqual(lbs.remote_gbuf_access[de.OFM], 0)
+        self.assertAlmostEqual(lbs.remote_gbuf_access[de.IFM],
+                               lbs_norm.access[me.DRAM][de.IFM])
+        self.assertAlmostEqual(lbs.remote_gbuf_access[de.OFM],
+                               lbs_norm.access[me.DRAM][de.OFM])
 
