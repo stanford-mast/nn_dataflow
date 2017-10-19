@@ -129,10 +129,10 @@ class TestNNDataflow(unittest.TestCase):
 
         # Very small REGF.
         self.resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
-                                                        dim=PhyDim2(1, 1),
+                                                        dim=PhyDim2(4, 4),
                                                         type=NodeRegion.PROC),
                                  data_regions=(NodeRegion(origin=PhyDim2(0, 0),
-                                                          dim=PhyDim2(1, 1),
+                                                          dim=PhyDim2(4, 4),
                                                           type=NodeRegion.DATA),
                                               ),
                                  dim_array=PhyDim2(16, 16),

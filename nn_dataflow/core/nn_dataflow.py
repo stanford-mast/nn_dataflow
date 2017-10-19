@@ -182,7 +182,7 @@ class NNDataflow(object):
                     break
                 # Exit fast forwarding, for new optimality step.
                 fast_forward = False
-            if strict_step and not nndf_tops:
+            elif strict_step and not nndf_tops:
                 # Enter fast forwarding, skip more strict constraints.
                 fast_forward = True
 
