@@ -25,8 +25,8 @@ import subprocess
 
 from . import __version__
 
-def _command_output(args):
-    with subprocess.Popen(args, stdout=subprocess.PIPE).stdout as fh:
+def _command_output(args, cwd):
+    with subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE).stdout as fh:
         return fh.read().strip()
 
 def get_version(with_local=False):
@@ -35,25 +35,29 @@ def get_version(with_local=False):
     version = __version__
 
     if with_local:
-        if subprocess.call(['git', 'rev-parse'],
+        cwd = os.path.dirname(os.path.abspath(__file__))
+
+        if subprocess.call(['git', 'rev-parse'], cwd=cwd,
                            stderr=subprocess.STDOUT,
                            stdout=open(os.devnull, 'w')) != 0:
             # Not in git repo.
             return version
 
         # Dirty summary.
-        short_stat = _command_output(['git', 'diff', 'HEAD', '--shortstat']) \
+        short_stat = _command_output(['git', 'diff', 'HEAD', '--shortstat'],
+                                     cwd) \
                 .replace('files changed', 'fc').replace('file changed', 'fc') \
                 .replace('insertions(+)', 'a').replace(' insertion(+)', 'a') \
                 .replace('deletions(-)', 'd').replace(' deletion(-)', 'd') \
                 .replace(',', '').replace(' ', '')
-        diff_hash = hashlib.md5(_command_output(['git', 'diff', 'HEAD'])) \
+        diff_hash = hashlib.md5(_command_output(['git', 'diff', 'HEAD'], cwd)) \
                 .hexdigest()[:8]
         dirty = '' if not short_stat else '-' + short_stat + '-' + diff_hash
 
         # Git describe.
-        desc = _command_output(['git', 'describe', '--tags',
-                                '--dirty={}'.format(dirty)])
+        desc = _command_output(['git', 'describe', '--tags', '--always',
+                                '--dirty={}'.format(dirty)],
+                               cwd)
 
         version += '+' + desc
 
