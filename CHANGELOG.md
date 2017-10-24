@@ -11,11 +11,17 @@ List of major changes and improvements
 
   - Add various LSTMs.
 
+
 ### Changed
 
 - Software models.
 
   - `Scheduling` breaks cost tie using time.
+
+
+### Fixed
+
+- Output dict `PartitionScheme` format fix.
 
 
 ## [v1.4 -- v1.5] -- 2017-08-18

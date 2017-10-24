@@ -265,7 +265,7 @@ class Scheduling(object):
         dict_part = OrderedDict([('cost', cost_part),
                                  ('num_nodes', part.size()),
                                  ('total_nhops', total_nhops),
-                                 ('part', part.__dict__),
+                                 ('part', part),
                                  ('unit_nhops', unit_nhops)])
 
         return SchedulingResult(dict_loop=dict_loop,
