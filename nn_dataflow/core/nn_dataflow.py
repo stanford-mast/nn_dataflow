@@ -36,7 +36,8 @@ class NNDataflow(object):
     '''
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, network, batch_size, resource, cost, map_strategy):
+    def __init__(self, network, batch_size, resource, cost, map_strategy,
+                 time_overhead=0.1):
         if not isinstance(network, Network):
             raise TypeError('NNDataflow: network must be a Network instance.')
         if not isinstance(resource, Resource):
@@ -73,7 +74,11 @@ class NNDataflow(object):
         self.ordered_layer_list = self.ilp.ordered_layer_list()
 
         # The key function to sort and pick the top NNDataflowScheme instances.
-        self.key_func = lambda nndf: nndf.key_cost_with_time_overhead()
+        self.key_func = lambda nndf: (nndf.total_cost, nndf.total_time)
+
+        # Allowed time overhead due to layer pipelining.
+        self.time_overhead = time_overhead
+        self.layer_base_time = {}
 
         # NNDataflowScheme tops.
         # The top schemes are organized by the ending layers, and keeping
@@ -88,10 +93,12 @@ class NNDataflow(object):
         # Group the segments by the ending layers.
         segments = defaultdict(list)
         for seg in self.ilp.gen_segment(options):
-            segments[seg[-1][-1]].append(seg)
+            if seg not in segments[seg[-1][-1]]:
+                segments[seg[-1][-1]].append(seg)
 
         # Clear and reset.
         self.nndf_tops = {}
+        self.layer_base_time = {}
 
         # Initial input layout.
         self.nndf_tops[None] = []
@@ -153,6 +160,25 @@ class NNDataflow(object):
         segment. Will NOT update the `nndf_tops` attribute.
         '''
 
+        # Single-layer or multi-layer segment.
+        single_layer = len(segment) == 1 and len(segment[0]) == 1
+        if single_layer:
+            layer = segment[0][0]
+            assert layer not in self.layer_base_time
+            self.layer_base_time[layer] = float('inf')
+            time_limit = float('inf')
+        else:
+            # Get time limit.
+            time_limit = 0
+            for ltpl in segment:
+                for layer in ltpl:
+                    assert layer in self.layer_base_time, \
+                            'NNDataflow: single-layer segment must be ' \
+                            'yielded before multi-layer segments. ' \
+                            'Got {} before {}.'.format(segment, layer)
+                    time_limit += self.layer_base_time[layer]
+            time_limit *= (1 + self.time_overhead)
+
         # We take the top schemes that end with the latest previous layer as
         # the initial state.
         first_layer_idx = self.ordered_layer_list.index(segment[0][0])
@@ -204,10 +230,17 @@ class NNDataflow(object):
                         layer, resource, cstr, sp_idx, tm_idx,
                         curr_nndf_tops, options)
 
-            nndf_tops += curr_nndf_tops
+            # Filter by time limit.
+            nndf_tops += [nndf for nndf in curr_nndf_tops
+                          if nndf.segment_time_list()[-1] <= time_limit]
 
         # Always pick and keep top n.
         nndf_tops = sorted(nndf_tops, key=self.key_func)[:options.ntops]
+
+        # Set base time for scheduling layer individually.
+        if single_layer and nndf_tops:
+            layer = segment[0][0]
+            self.layer_base_time[layer] = nndf_tops[0][layer].total_time
 
         return nndf_tops
 

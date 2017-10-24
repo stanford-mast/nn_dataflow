@@ -34,7 +34,6 @@ from nn_dataflow.core import SchedulingResult
 
 class TestNNDataflowScheme(unittest.TestCase):
     ''' Tests for NNDataflowScheme. '''
-    # pylint: disable=too-many-public-methods
 
     def setUp(self):
         self.network = Network('test_net')
@@ -238,39 +237,6 @@ class TestNNDataflowScheme(unittest.TestCase):
         dtfl['p2'] = self.p2res._replace(sched_seq=(0, 2, 0))
         dtfl['f1'] = self.c1res._replace(sched_seq=(0, 3, 0))
         self.assertEqual(dtfl.total_time, 200)
-
-    def test_key_cost_time(self):
-        ''' key_cost_time. '''
-        dtfl = NNDataflowScheme(self.network, self.input_layout)
-        dict_loop = self.c1res.dict_loop.copy()
-        dict_loop['time'] += 50  # 200 -> 250
-        dict_loop['cost'] -= .5  # 1. -> .5
-        dtfl['c1'] = self.c1res._replace(dict_loop=dict_loop,
-                                         sched_seq=(0, 0, 0))
-        dtfl['p1'] = self.p1res
-        dtfl['p2'] = self.p2res
-        # Original: 2.7 * 205
-        # Now: 2.2 * 255
-        self.assertLess(dtfl.total_cost, self.dtfl.total_cost)
-        self.assertGreater(dtfl.key_cost_time(), self.dtfl.key_cost_time())
-
-    def test_key_cost_with_time_orhd(self):
-        ''' key_cost_with_time_overhead. '''
-        dtfl = NNDataflowScheme(self.network, self.input_layout)
-        dict_loop = self.c1res.dict_loop.copy()
-        dict_loop['time'] -= 180  # 200 -> 20
-        dict_loop['cost'] -= .5  # 1. -> .5
-        dtfl['c1'] = self.c1res._replace(dict_loop=dict_loop,
-                                         sched_seq=(0, 0, 0))
-        dtfl['p1'] = self.p1res
-        dtfl['p2'] = self.p2res
-        # Original: 2.7, 205, overhead 2.5%
-        # Now: 2.2, 25, overhead 25%
-        self.assertLess(dtfl.total_cost, self.dtfl.total_cost)
-        self.assertGreater(dtfl.key_cost_with_time_overhead(),
-                           self.dtfl.key_cost_with_time_overhead())
-        self.assertLess(dtfl.key_cost_with_time_overhead(time_overhead=.3),
-                        self.dtfl.key_cost_with_time_overhead(time_overhead=.3))
 
     def test_segment_time_list(self):
         ''' segment_time_list(). '''

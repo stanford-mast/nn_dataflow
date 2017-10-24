@@ -157,23 +157,6 @@ class NNDataflowScheme(MutableMapping):
         return sum(sr.total_time * sr.dict_part['num_nodes']
                    for sr in self.values())
 
-    def key_cost_with_time_overhead(self, time_overhead=0.1):
-        '''
-        Key function for comparison, based on total cost within certain time
-        overhead.
-        '''
-        valid = all(t.time() <= t.critical_time() * (1 + time_overhead)
-                    for t in self.seg_tlist)
-        # Valid is better (smaller) than invalid.
-        return (not valid, self.total_cost)
-
-    def key_cost_time(self):
-        '''
-        Key function for comparison, based on product of total cost and total
-        time.
-        '''
-        return self.total_cost * self.total_time
-
     def segment_time_list(self):
         ''' Get the time for each segment. '''
         return [t.time() for t in self.seg_tlist]

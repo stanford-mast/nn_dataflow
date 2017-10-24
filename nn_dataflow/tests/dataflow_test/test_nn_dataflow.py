@@ -124,6 +124,19 @@ class TestNNDataflow(unittest.TestCase):
         for layer in network:
             self.assertIn(layer, stderr_value)
 
+    def test_pipelining(self):
+        ''' Pipelining. '''
+        network = self.alex_net
+        batch_size = 1
+
+        options = Option(hw_gbuf_save_writeback=True,
+                         partition_interlayer=True)
+        nnd = NNDataflow(network, batch_size, self.resource, self.cost,
+                         self.map_strategy)
+
+        tops, _ = nnd.schedule_search(options)
+        self.assertTrue(tops)
+
     def test_no_valid_dataflow(self):
         ''' No valid dataflow is found. '''
 
