@@ -137,6 +137,21 @@ class TestNNDataflow(unittest.TestCase):
         tops, _ = nnd.schedule_search(options)
         self.assertTrue(tops)
 
+    def test_sched_instance_sharing(self):
+        ''' Scheduling instance sharing between layers. '''
+        network = self.alex_net
+        batch_size = 1
+
+        nnd = NNDataflow(network, batch_size, self.resource, self.cost,
+                         self.map_strategy)
+
+        self.assertIs(nnd.layer_sched_dict['conv1_a'],
+                      nnd.layer_sched_dict['conv1_b'])
+        self.assertIs(nnd.layer_sched_dict['conv2_a'],
+                      nnd.layer_sched_dict['conv2_b'])
+        self.assertIs(nnd.layer_sched_dict['pool1_a'],
+                      nnd.layer_sched_dict['pool1_b'])
+
     def test_no_valid_dataflow(self):
         ''' No valid dataflow is found. '''
 

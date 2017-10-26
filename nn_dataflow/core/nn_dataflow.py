@@ -117,7 +117,7 @@ class NNDataflow(object):
             # current top schemes.
             for seg in segments.get(layer_name, []):
                 if options.verbose:
-                    sys.stderr.write('  - {}\n'.format(seg))
+                    sys.stderr.write('  - {}\n'.format(seg.seg))
                     sys.stderr.flush()
                 tops += self._segment_schedule_search(seg, options)
 
