@@ -22,6 +22,8 @@ List of major changes and improvements
       constraint.
     - Use `PipelineSegmentTiming` to capture the timing relation of layers in
       the segment.
+    - Specify maximum allowed execution time overhead due to layer pipelining
+      in `Option`.
 
 
 ### Changed

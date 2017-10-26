@@ -112,6 +112,16 @@ class TestOption(unittest.TestCase):
                                      'partition_hybrid.*'):
             _ = Option(partition_hybrid=False, partition_ifmaps=True)
 
+    def test_invalid_time_ovhd(self):
+        ''' Invalid layer_pipeline_time_ovhd. '''
+        with self.assertRaisesRegexp(KeyError,
+                                     'Option: .*layer_pipeline_time_ovhd.*'):
+            _ = Option(layer_pipeline_time_ovhd=None)
+
+        with self.assertRaisesRegexp(ValueError,
+                                     'Option: .*layer_pipeline_time_ovhd.*'):
+            _ = Option(layer_pipeline_time_ovhd=-1)
+
     def test_option_list(self):
         ''' Accessor option_list. '''
         options = Option()

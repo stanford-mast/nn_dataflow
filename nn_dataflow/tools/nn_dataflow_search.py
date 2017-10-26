@@ -150,6 +150,7 @@ def do_scheduling(args):
                      partition_batch=args.batch_partition,
                      partition_ifmaps=args.ifmaps_partition,
                      partition_interlayer=args.interlayer_partition,
+                     layer_pipeline_time_ovhd=args.layer_pipeline_time_overhead,
                      ntops=args.top,
                      nprocesses=args.processes,
                      verbose=args.verbose)
@@ -257,6 +258,11 @@ def argparser():
                     help='Allow partitioning resources across multiple layers '
                          'and process them simultaneously as an inter-layer '
                          'pipeline.')
+
+    ap.add_argument('--layer-pipeline-time-overhead',
+                    type=float, default=float('inf'),
+                    help='maximum allowed execution time overhead due to '
+                         'layer pipelining.')
 
     ap.add_argument('-t', '--top', type=int, default=1,
                     help='Number of top schedules to keep during search.')

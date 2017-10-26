@@ -36,8 +36,7 @@ class NNDataflow(object):
     '''
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, network, batch_size, resource, cost, map_strategy,
-                 time_overhead=0.1):
+    def __init__(self, network, batch_size, resource, cost, map_strategy):
         if not isinstance(network, Network):
             raise TypeError('NNDataflow: network must be a Network instance.')
         if not isinstance(resource, Resource):
@@ -77,7 +76,6 @@ class NNDataflow(object):
         self.key_func = lambda nndf: (nndf.total_cost, nndf.total_time)
 
         # Allowed time overhead due to layer pipelining.
-        self.time_overhead = time_overhead
         self.layer_base_time = {}
 
         # NNDataflowScheme tops.
@@ -177,7 +175,7 @@ class NNDataflow(object):
                             'yielded before multi-layer segments. ' \
                             'Got {} before {}.'.format(segment, layer)
                     time_limit += self.layer_base_time[layer]
-            time_limit *= (1 + self.time_overhead)
+            time_limit *= (1 + options.layer_pipeline_time_ovhd)
 
         # We take the top schemes that end with the latest previous layer as
         # the initial state.

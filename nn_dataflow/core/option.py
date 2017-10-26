@@ -29,6 +29,7 @@ OPTION_LIST = ['sw_gbuf_bypass',
                'partition_batch',
                'partition_ifmaps',
                'partition_interlayer',
+               'layer_pipeline_time_ovhd',
                'ntops',
                'nprocesses',
                'verbose',
@@ -66,6 +67,7 @@ class Option(namedtuple('Option', OPTION_LIST)):
         kwdict.setdefault('partition_batch', False)
         kwdict.setdefault('partition_ifmaps', False)
         kwdict.setdefault('partition_interlayer', False)
+        kwdict.setdefault('layer_pipeline_time_ovhd', float('inf'))
         kwdict.setdefault('ntops', 1)
         kwdict.setdefault('nprocesses', 1)
         kwdict.setdefault('verbose', False)
@@ -88,6 +90,13 @@ class Option(namedtuple('Option', OPTION_LIST)):
         if ntp.partition_ifmaps and not ntp.partition_hybrid:
             raise ValueError('Option: partition_ifmaps requires '
                              'partition_hybrid to be set.')
+
+        if not isinstance(ntp.layer_pipeline_time_ovhd, (int, float)):
+            raise KeyError('Option: layer_pipeline_time_ovhd must be a '
+                           'number.')
+        if ntp.layer_pipeline_time_ovhd < 0:
+            raise ValueError('Option: layer_pipeline_time_ovhd must be '
+                             'positive.')
 
         return ntp
 
