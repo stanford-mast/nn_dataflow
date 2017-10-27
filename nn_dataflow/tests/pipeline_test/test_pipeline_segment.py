@@ -400,15 +400,16 @@ class TestPipelineSegment(TestPipelineFixture):
                                                  for c in ctpl)
                                            for ctpl in cstr)
                             ostep_set_2.add(cstr_2)
-                        if ostep_set_ref is None:
-                            ostep_set_ref = ostep_set_2
-                        else:
-                            self.assertSetEqual(
-                                ostep_set_2, ostep_set_ref,
-                                'test_gen_constraint_opt_step: constraints '
-                                'differ across opt steps. '
-                                'Network {}, segment {}.'
-                                .format(net_name, segment))
+                        # Larger fmap tpart value may introduce more valid
+                        # constraints.
+                        self.assertTrue(
+                            ostep_set_ref is None
+                            or ostep_set_ref.issubset(ostep_set_2),
+                            'test_gen_constraint_opt_step: constraints '
+                            'differ across opt steps. '
+                            'Network {}, segment {}.'
+                            .format(net_name, segment))
+                        ostep_set_ref = ostep_set_2
 
                         ostep_set.clear()
 
@@ -476,15 +477,16 @@ class TestPipelineSegment(TestPipelineFixture):
                                                  for c in ctpl)
                                            for ctpl in cstr)
                             sstep_set_2.add(cstr_2)
-                        if sstep_set_ref is None:
-                            sstep_set_ref = sstep_set_2
-                        else:
-                            self.assertSetEqual(
-                                sstep_set_2, sstep_set_ref,
-                                'test_gen_constraint_strict_step: constraints '
-                                'differ across strict steps. '
-                                'Network {}, segment {}.'
-                                .format(net_name, segment))
+                        # Larger fmap tpart value may introduce more valid
+                        # constraints.
+                        self.assertTrue(
+                            sstep_set_ref is None
+                            or sstep_set_ref.issubset(sstep_set_2),
+                            'test_gen_constraint_strict_step: constraints '
+                            'differ across strict steps. '
+                            'Network {}, segment {}.'
+                            .format(net_name, segment))
+                        sstep_set_ref = sstep_set_2
 
                         sstep_set.clear()
 

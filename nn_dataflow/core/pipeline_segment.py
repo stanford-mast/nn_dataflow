@@ -607,5 +607,23 @@ class PipelineSegment(object):
                                  for top_bl_t in tlst)
                            for tlst in top_bl_t_list)
 
+        # Check whether the constraint is possible to realize.
+        for ltpl, rtpl, ctpl in zip(self.seg, self.alloc, constraint):
+            for layer, resource, cstr in zip(ltpl, rtpl, ctpl):
+
+                # Required GBUF size.
+                req_size_gbuf = 0
+                if cstr.top_bl_t[le.IFM] == 1:
+                    # Fully buffer ifmaps.
+                    req_size_gbuf += self.network[layer].total_ifmap_size()
+                if cstr.top_bl_t[le.OFM] == 1:
+                    # Fully buffer ofmaps.
+                    req_size_gbuf += self.network[layer].total_ofmap_size()
+                req_size_gbuf //= cstr.fmap_tpart
+
+                if req_size_gbuf > \
+                        resource.size_gbuf * resource.proc_region.dim.size():
+                    return None
+
         return constraint
 
