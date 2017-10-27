@@ -20,7 +20,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from nn_dataflow.core import DataDimLoops
 from nn_dataflow.core import DataCategoryEnum as de
-from nn_dataflow.core import Layer, ConvLayer
+from nn_dataflow.core import Layer, ConvLayer, LocalRegionLayer
 from nn_dataflow.core import LoopEnum as le
 from nn_dataflow.core import MapStrategyEyeriss
 from nn_dataflow.core import MemHierEnum as me
@@ -116,7 +116,7 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
                                      DataDimLoops(le.IFM, le.BAT))
                     self.assertEqual(nld.data_loops[de.OFM],
                                      DataDimLoops(le.OFM, le.BAT))
-                elif isinstance(layer, ConvLayer):
+                elif isinstance(layer, LocalRegionLayer):
                     self.assertEqual(nld.data_loops[de.FIL],
                                      DataDimLoops())
                     self.assertEqual(nld.data_loops[de.IFM],

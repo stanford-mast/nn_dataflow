@@ -332,3 +332,24 @@ class PoolingLayer(LocalRegionLayer):
                 'sreg={}'.format(repr((self.hreg, self.wreg))),
                 'strd={}'.format(repr((self.htrd, self.wtrd)))]))
 
+
+class EltwiseLayer(LocalRegionLayer):
+    '''
+    NN element-wise layer parameters.
+
+    As a special case of LocalRegionLayer.
+
+    sreg = nreg = 1
+    '''
+
+    def __init__(self, nofm, sofm):
+        super(EltwiseLayer, self).__init__(nofm, sofm, 1, 1)
+        assert self.hreg == self.wreg == self.nreg == 1
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'nofm={}'.format(repr(self.nofm)),
+                'sofm={}'.format(repr((self.hofm, self.wofm)))]))
+

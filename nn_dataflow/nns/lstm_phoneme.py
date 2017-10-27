@@ -18,5 +18,31 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-__version__ = '1.6-rc.1'
+from nn_dataflow.core import Network
+from nn_dataflow.core import InputLayer, FCLayer
+
+from nn_dataflow.nns import add_lstm_cell
+
+'''
+LSTM for phoneme classification.
+
+Graves and Schmidhuber, 2005
+'''
+
+NN = Network('PHONEME')
+
+NN.set_input(InputLayer(26, 1))
+
+NN.add('init', FCLayer(26, 140))
+C = H = 'init'
+
+# Unroll by the sequence length, assuming 10.
+for idx in range(10):
+    we = 'We_{}'.format(idx)
+    cell = 'cell_{}'.format(idx)
+    wd = 'Wd_{}'.format(idx)
+
+    NN.add(we, FCLayer(26, 140), prevs=(NN.INPUT_LAYER_KEY,))
+    C, H = add_lstm_cell(NN, cell, 140, we, C, H)
+    NN.add(wd, FCLayer(140, 61), prevs=(H,))
 

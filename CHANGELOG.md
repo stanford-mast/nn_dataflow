@@ -52,6 +52,29 @@ List of major changes and improvements
   conservative type.
 
 
+## [v1.5 -- v1.6] -- 2017-10-26
+
+### Added
+
+- Workload models.
+
+  - Add `EltwiseLayer`.
+
+  - Add various LSTMs.
+
+
+### Changed
+
+- Software models.
+
+  - `Scheduling` breaks cost tie using time.
+
+
+### Fixed
+
+- Output dict `PartitionScheme` format fix.
+
+
 ## [v1.4 -- v1.5] -- 2017-08-18
 
 ### Added

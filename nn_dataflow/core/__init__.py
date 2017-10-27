@@ -31,7 +31,7 @@ from .data_layout import DataLayout
 from .fmap_range import FmapPosition, FmapRange, FmapRangeMap
 from .inter_layer_pipeline import InterLayerPipeline
 from .layer import Layer, InputLayer, ConvLayer, FCLayer, \
-        LocalRegionLayer, PoolingLayer
+        LocalRegionLayer, PoolingLayer, EltwiseLayer
 from .loop_blocking_scheme import LoopBlockingScheme
 from .map_strategy import MapStrategy, MapStrategyEyeriss
 from .nested_loop_desc import NestedLoopDesc

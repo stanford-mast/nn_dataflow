@@ -21,6 +21,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import unittest
 
 from nn_dataflow.core import Network
+from nn_dataflow.core import InputLayer
 
 import nn_dataflow.nns as nns
 
@@ -43,4 +44,52 @@ class TestNNs(unittest.TestCase):
         ''' Get import_network invalid. '''
         with self.assertRaisesRegexp(ImportError, 'nns: .*defined.*'):
             _ = nns.import_network('aaa')
+
+    def test_add_lstm_cell(self):
+        ''' Add LSTM cell. '''
+        net = Network('LSTM')
+        net.set_input(InputLayer(512, 1))
+        c, h = nns.add_lstm_cell(net, 'cell0', 512,
+                                 net.INPUT_LAYER_KEY, net.INPUT_LAYER_KEY,
+                                 net.INPUT_LAYER_KEY)
+        c, h = nns.add_lstm_cell(net, 'cell1', 512,
+                                 net.INPUT_LAYER_KEY, c, h)
+        c, h = nns.add_lstm_cell(net, 'cell2', 512,
+                                 net.INPUT_LAYER_KEY, c, h)
+        num_weights = 0
+        for layer in net:
+            try:
+                num_weights += net[layer].total_filter_size()
+            except AttributeError:
+                pass
+        self.assertEqual(num_weights, 512 * 512 * 2 * 4 * 3)
+
+    def test_add_lstm_cell_invalid_type(self):
+        ''' Add LSTM cell with invalid type. '''
+        with self.assertRaisesRegexp(TypeError, 'add_lstm_cell: .*network.*'):
+            _ = nns.add_lstm_cell(InputLayer(512, 1), 'cell0', 512,
+                                  None, None, None)
+
+    def test_add_lstm_cell_not_in(self):
+        ''' Add LSTM cell input not in. '''
+        net = Network('LSTM')
+        net.set_input(InputLayer(512, 1))
+        with self.assertRaisesRegexp(ValueError, 'add_lstm_cell: .*in.*'):
+            _ = nns.add_lstm_cell(net, 'cell0', 512,
+                                  'a', net.INPUT_LAYER_KEY,
+                                  net.INPUT_LAYER_KEY)
+
+        net = Network('LSTM')
+        net.set_input(InputLayer(512, 1))
+        with self.assertRaisesRegexp(ValueError, 'add_lstm_cell: .*in.*'):
+            _ = nns.add_lstm_cell(net, 'cell0', 512,
+                                  net.INPUT_LAYER_KEY, 'a',
+                                  net.INPUT_LAYER_KEY)
+
+        net = Network('LSTM')
+        net.set_input(InputLayer(512, 1))
+        with self.assertRaisesRegexp(ValueError, 'add_lstm_cell: .*in.*'):
+            _ = nns.add_lstm_cell(net, 'cell0', 512,
+                                  net.INPUT_LAYER_KEY, net.INPUT_LAYER_KEY,
+                                  'a')
 
