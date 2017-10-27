@@ -1,3 +1,9 @@
+.. image:: https://travis-ci.org/stanford-mast/nn_dataflow.svg?branch=master
+    :target: https://travis-ci.org/stanford-mast/nn_dataflow
+.. image:: https://coveralls.io/repos/github/stanford-mast/nn_dataflow/badge.svg?branch=master
+    :target: https://coveralls.io/github/stanford-mast/nn_dataflow?branch=master
+
+
 Neural Network Dataflow Scheduling
 ==================================
 

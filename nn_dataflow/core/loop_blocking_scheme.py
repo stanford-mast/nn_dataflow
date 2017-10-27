@@ -112,6 +112,8 @@ class LoopBlockingScheme(object):
 
         self.lcnt = util.prod(bl_tp)
 
+        self.time = float('inf')
+
         # Buffer sharing initialization.
         self._init_bufshr(bufshr, options)
 

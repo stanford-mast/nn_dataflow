@@ -177,7 +177,8 @@ class Scheduling(object):
                 tops.append(r)
 
         # Pick the top n.
-        tops = sorted(tops, key=lambda r: r.total_cost)[:options.ntops]
+        tops = sorted(tops, key=lambda r: (r.total_cost, r.total_time)) \
+                [:options.ntops]
 
         # Check total op count.
         # Initial occupation also applies to layer.
@@ -273,7 +274,7 @@ class Scheduling(object):
                                  ('total_nhops', total_nhops),
                                  ('mem_nhops', mem_nhops),
                                  ('node_nhops', node_nhops),
-                                 ('part', part.__dict__),
+                                 ('part', part),
                                  ('unit_nhops', unit_nhops)])
 
         return SchedulingResult(dict_loop=dict_loop,

@@ -23,7 +23,7 @@ import unittest
 from nn_dataflow.core import Layer
 from nn_dataflow.core import InputLayer
 from nn_dataflow.core import ConvLayer, FCLayer
-from nn_dataflow.core import LocalRegionLayer, PoolingLayer
+from nn_dataflow.core import LocalRegionLayer, PoolingLayer, EltwiseLayer
 
 class TestLayer(unittest.TestCase):
     ''' Tests for Layer. '''
@@ -325,6 +325,12 @@ class TestLocalRegionLayer(unittest.TestCase):
         player = PoolingLayer(64, 28, 3, strd=2)
         self.assertEqual(player.ops_per_neuron(), 9)
 
+    def test_eltwiselayer(self):
+        ''' EltwiseLayer init. '''
+        elayer = EltwiseLayer(64, 28)
+        self.assertEqual(elayer.ops_per_neuron(), 1)
+        self.assertEqual(elayer.total_ifmap_size(), elayer.total_ofmap_size())
+
     def test_repr(self):
         ''' __repr__. '''
         # pylint: disable=eval-used
@@ -339,5 +345,10 @@ class TestLocalRegionLayer(unittest.TestCase):
                   PoolingLayer(64, 28, 3, strd=2),
                   PoolingLayer(64, [28, 14], [3, 4], strd=[2, 3])]:
             self.assertIn('PoolingLayer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
+
+        for l in [EltwiseLayer(64, 32),
+                  EltwiseLayer(64, 28)]:
+            self.assertIn('EltwiseLayer', repr(l))
             self.assertEqual(eval(repr(l)), l)
 

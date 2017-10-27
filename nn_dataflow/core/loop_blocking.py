@@ -145,7 +145,7 @@ def _gen_loopblocking_perprocess(
             yield lbs
 
     return heapq.nsmallest(options.ntops, _sweep(),
-                           key=lambda lbs: lbs.get_cost(cost))
+                           key=lambda lbs: (lbs.get_cost(cost), lbs.time))
 
 
 def gen_loopblocking(nested_loop_desc, resource, part, cost, part_occ, options):
@@ -214,7 +214,7 @@ def gen_loopblocking(nested_loop_desc, resource, part, cost, part_occ, options):
         results.append(r)
 
     for lbs in heapq.nsmallest(options.ntops, retrieve_func,
-                               key=lambda lbs: lbs.get_cost(cost)):
+                               key=lambda lbs: (lbs.get_cost(cost), lbs.time)):
         yield lbs
 
     if pool is not None:
