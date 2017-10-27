@@ -182,6 +182,12 @@ class Scheduling(object):
         for part in partition.gen_partition(self.layer, self.batch_size,
                                             proc_region.dim, options,
                                             guaranteed=True):
+            # Explore single-node schedules.
+            top_lbs_list = list(self.schedule_search_per_node(
+                part, condition.resource, condition.constraint, options))
+            if not top_lbs_list:
+                continue
+
             # Ofmap layout.
             ofmap_layout = partition.get_ofmap_layout(
                 self.layer, self.batch_size, part, dst_data_region)
@@ -191,15 +197,11 @@ class Scheduling(object):
                 self.layer, self.batch_size, part, proc_region,
                 filter_nodes, ifmap_layout, ofmap_layout, options)
 
-            # Explore single-node schedules.
-            for lbs in self.schedule_search_per_node(
-                    part, condition.resource, condition.constraint, options):
-
-                # Make scheduling result.
-                r = self._get_result(lbs, part, condition.constraint,
-                                     condition.sched_seq, unit_nhops,
-                                     ofmap_layout)
-                tops.append(r)
+            # Make scheduling result.
+            tops += [self._get_result(lbs, part, condition.constraint,
+                                      condition.sched_seq, unit_nhops,
+                                      ofmap_layout)
+                     for lbs in top_lbs_list]
 
         # Pick the top n.
         tops = sorted(tops, key=lambda r: (r.total_cost, r.total_time)) \
