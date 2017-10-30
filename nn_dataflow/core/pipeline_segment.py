@@ -144,9 +144,8 @@ class PipelineSegment(object):
         l_lst = [l for ltpl in self.seg for l in ltpl]
         hofm_lst = [self.network[l].hofm for l in l_lst]
         for f in range(1, min(hofm_lst) + 1):
-            # Should be dividable.
-            if not all(util.approx_dividable(h, f, overhead=0.5)
-                       for h in hofm_lst):
+            # Large factor should divide the fmap height.
+            if f > 4 and not all(h % f == 0 for h in hofm_lst):
                 continue
             # Backtrace layers, find out the pyramid enlargement for hofm.
             tp_hofm_dict = {}
@@ -155,7 +154,7 @@ class PipelineSegment(object):
                 tp_hofm = util.idivc(layer.hofm, f)
                 if l in tp_hofm_dict:
                     # Already determined by the later layer. Check enlargement.
-                    if tp_hofm_dict[l] > 2 * tp_hofm:
+                    if tp_hofm_dict[l] > 1.5 * tp_hofm:
                         break
                 else:
                     # No later layer, partition hofm directly.
@@ -178,6 +177,8 @@ class PipelineSegment(object):
             else:
                 # No violation.
                 fmap_tpart_cands.append(f)
+        if not fmap_tpart_cands:
+            return
         assert fmap_tpart_cands[0] == 1
 
         # Top BAT factors, sorted from smallest to largest.
