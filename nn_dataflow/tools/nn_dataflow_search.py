@@ -22,6 +22,7 @@ import argparse
 import json
 import multiprocessing
 import sys
+import time
 from collections import OrderedDict
 
 from nn_dataflow.core import NNDataflow
@@ -154,7 +155,10 @@ def do_scheduling(args):
     ## Search schedules.
 
     nnd = NNDataflow(network, batch_size, resource, cost, MapStrategyEyeriss)
+    tbeg = time.time()
     tops, cache_stats = nnd.schedule_search(options)
+    tend = time.time()
+    telapsed = tend - tbeg
 
     if not tops:
         sys.stderr.write('No valid dataflow found.\n')
@@ -176,6 +180,7 @@ def do_scheduling(args):
     res_map['options'] = options._asdict()
 
     res_map['cache_stats'] = cache_stats
+    res_map['elapsed'] = telapsed
 
     stats = stats_dict(top, cost)
     for key, val in stats.items():
