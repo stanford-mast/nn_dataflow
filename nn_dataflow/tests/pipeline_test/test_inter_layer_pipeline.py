@@ -329,6 +329,19 @@ class TestInterLayerPipeline(TestPipelineFixture):
                                for v in ilp.dag_vertex_list)
             self.assertTrue(segs_intersect.issubset(segs_single))
 
+    def test_gen_segment_max_degree(self):
+        ''' gen_segment() maximum degree. '''
+        net = self.net['vgg_net']
+        ilp = self._make_ilp(net)
+
+        options = Option(partition_interlayer=True,
+                         hw_gbuf_save_writeback=True,
+                         layer_pipeline_max_degree=4)
+        for segment in ilp.gen_segment(options):
+            self.assertLessEqual(sum(1 if isinstance(net[l], ConvLayer) else 0
+                                     for ltpl in segment for l in ltpl),
+                                 4)
+
     def test_gen_segment_vseg(self):
         ''' gen_segment() vertex segment. '''
 

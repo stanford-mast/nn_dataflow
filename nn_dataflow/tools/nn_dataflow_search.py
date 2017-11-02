@@ -151,6 +151,7 @@ def do_scheduling(args):
                      partition_ifmaps=args.ifmaps_partition,
                      partition_interlayer=args.interlayer_partition,
                      layer_pipeline_time_ovhd=args.layer_pipeline_time_overhead,
+                     layer_pipeline_max_degree=args.layer_pipeline_max_degree,
                      ntops=args.top,
                      nprocesses=args.processes,
                      verbose=args.verbose)
@@ -263,6 +264,10 @@ def argparser():
                     type=float, default=float('inf'),
                     help='maximum allowed execution time overhead due to '
                          'layer pipelining.')
+    ap.add_argument('--layer-pipeline-max-degree',
+                    type=float, default=float('inf'),
+                    help='maximum allowed layer pipelining degree, i.e., '
+                         'number of vertices in a pipeline segment.')
 
     ap.add_argument('-t', '--top', type=int, default=1,
                     help='Number of top schedules to keep during search.')

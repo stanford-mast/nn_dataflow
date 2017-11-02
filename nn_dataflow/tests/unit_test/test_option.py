@@ -122,6 +122,16 @@ class TestOption(unittest.TestCase):
                                      'Option: .*layer_pipeline_time_ovhd.*'):
             _ = Option(layer_pipeline_time_ovhd=-1)
 
+    def test_invalid_max_degree(self):
+        ''' Invalid layer_pipeline_max_degree. '''
+        with self.assertRaisesRegexp(KeyError,
+                                     'Option: .*layer_pipeline_max_degree.*'):
+            _ = Option(layer_pipeline_max_degree=None)
+
+        with self.assertRaisesRegexp(ValueError,
+                                     'Option: .*layer_pipeline_max_degree.*'):
+            _ = Option(layer_pipeline_max_degree=-1)
+
     def test_option_list(self):
         ''' Accessor option_list. '''
         options = Option()

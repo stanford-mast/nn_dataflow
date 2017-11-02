@@ -30,6 +30,7 @@ OPTION_LIST = ['sw_gbuf_bypass',
                'partition_ifmaps',
                'partition_interlayer',
                'layer_pipeline_time_ovhd',
+               'layer_pipeline_max_degree',
                'ntops',
                'nprocesses',
                'verbose',
@@ -68,6 +69,7 @@ class Option(namedtuple('Option', OPTION_LIST)):
         kwdict.setdefault('partition_ifmaps', False)
         kwdict.setdefault('partition_interlayer', False)
         kwdict.setdefault('layer_pipeline_time_ovhd', float('inf'))
+        kwdict.setdefault('layer_pipeline_max_degree', float('inf'))
         kwdict.setdefault('ntops', 1)
         kwdict.setdefault('nprocesses', 1)
         kwdict.setdefault('verbose', False)
@@ -96,6 +98,13 @@ class Option(namedtuple('Option', OPTION_LIST)):
                            'number.')
         if ntp.layer_pipeline_time_ovhd < 0:
             raise ValueError('Option: layer_pipeline_time_ovhd must be '
+                             'positive.')
+
+        if not isinstance(ntp.layer_pipeline_max_degree, (int, float)):
+            raise KeyError('Option: layer_pipeline_max_degree must be a '
+                           'number.')
+        if ntp.layer_pipeline_max_degree < 0:
+            raise ValueError('Option: layer_pipeline_max_degree must be '
                              'positive.')
 
         return ntp

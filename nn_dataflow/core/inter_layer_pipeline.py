@@ -79,6 +79,9 @@ class InterLayerPipeline(object):
         # Pipelining.
         for vseg in self._gen_vseg():
 
+            if len(vseg) > options.layer_pipeline_max_degree:
+                continue
+
             # Use set to eliminate duplicates.
             seg_cands = set()
 
