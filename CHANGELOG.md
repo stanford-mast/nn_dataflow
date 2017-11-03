@@ -21,6 +21,9 @@ List of major changes and improvements
 
   - `Scheduling` breaks cost tie using time.
 
+  - Add dimensional partitioning option, i.e., each partitioning can only be
+    along one dimension unless it is the only partitioning.
+
 
 ### Fixed
 

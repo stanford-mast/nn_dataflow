@@ -68,6 +68,13 @@ def gen_partition(layer, batch_size, dim_nodes, options, guaranteed=False):
                     or not util.approx_dividable(layer.wofm, pdims[pe.OFMP].w):
                 continue
 
+            if options.partition_dimensional:
+                # Force each partitioning to be only along one dimension,
+                # except if there is only one partitioning.
+                if any(pd.h != 1 and pd.w != 1 for pd in pdims) \
+                        and sum(pd.size() > 1 for pd in pdims) > 1:
+                    continue
+
             if (not options.partition_ifmaps) and pdims[pe.INPP].size() > 1:
                 continue
             else:

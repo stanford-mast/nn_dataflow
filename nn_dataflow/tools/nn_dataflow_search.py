@@ -146,6 +146,7 @@ def do_scheduling(args):
     options = Option(sw_gbuf_bypass=tuple(bypass),
                      sw_solve_loopblocking=args.solve_loopblocking,
                      partition_hybrid=args.hybrid_partition,
+                     partition_dimensional=args.dimensional_partition,
                      partition_batch=args.batch_partition,
                      partition_ifmaps=args.ifmaps_partition,
                      ntops=args.top,
@@ -243,6 +244,10 @@ def argparser():
                     action='store_true',
                     help='Use hybrid partition for layer for node mapping. '
                          'Otherwise use naive method based on layer type.')
+    ap.add_argument('--dimensional-partition', action='store_true',
+                    help='Restrict dimensional partitioning, i.e., each '
+                         'partitioning can only be along one dimension '
+                         'unless it is the only partitioning.')
     ap.add_argument('--batch-partition', action='store_true',
                     help='Allow partitioning batch, i.e., consider data '
                          'parallelism.')
