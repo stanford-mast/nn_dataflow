@@ -197,18 +197,16 @@ class NNDataflow(object):
         fast_forward = False
 
         # Explore constraints.
-        for constraint, opt_step, strict_step in segment.gen_constraint():
+        for constraint, opt_step, ff_end in segment.gen_constraint():
 
             # Prune.
             if opt_step:
                 if nndf_tops:
                     # Already found, skip sub-optimal constraints.
                     break
-                # Exit fast forwarding, for new optimality step.
+            if ff_end:
+                # Exit fast forwarding.
                 fast_forward = False
-            elif strict_step and not nndf_tops:
-                # Enter fast forwarding, skip more strict constraints.
-                fast_forward = True
 
             if fast_forward:
                 continue
@@ -231,6 +229,11 @@ class NNDataflow(object):
             # Filter by time limit.
             nndf_tops += [nndf for nndf in curr_nndf_tops
                           if nndf.segment_time_list()[-1] <= time_limit]
+
+            if not curr_nndf_tops or nndf_tops:
+                # Enter fast forwarding if 1) constraint is infeasible; or 2)
+                # already found with less strict constraint.
+                fast_forward = True
 
         # Always pick and keep top n.
         nndf_tops = sorted(nndf_tops, key=self.key_func)[:options.ntops]

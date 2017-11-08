@@ -420,8 +420,8 @@ class TestPipelineSegment(TestPipelineFixture):
                                      '{} != {}.'
                                      .format(fmap_tpart, last_fmap_tpart))
 
-    def test_gen_constraint_strict_step(self):
-        ''' gen_constraint() pruning info strict_step. '''
+    def test_gen_constraint_ff_end(self):
+        ''' gen_constraint() pruning info ff_end. '''
 
         for net_name in self.net:
 
@@ -434,68 +434,47 @@ class TestPipelineSegment(TestPipelineFixture):
                 if not segment.valid:
                     continue
 
-                sstep_set_ref = None
-                sstep_set = set()
-                last_top_tb = None if len(segment) == 1 else 1
+                last_top_tb = 0
+                last_cstr = None
 
-                for constraint, ostep, sstep in segment.gen_constraint():
+                for constraint, ostep, ff_end in segment.gen_constraint():
 
                     top_tb = constraint[0][0].top_bl_t[le.BAT]
 
                     if ostep:
-                        self.assertTrue(sstep,
-                                        'test_gen_constraint_strict_step: '
-                                        'strict step must be True when a new '
+                        self.assertTrue(ff_end,
+                                        'test_gen_constraint_ff_end: '
+                                        'ff_end must be True when a new '
                                         'opt step starts.')
 
-                    if sstep:
-                        # Comes a new strict step. Close the current one.
+                    if last_top_tb is None:
+                        self.assertTrue(ff_end,
+                                        'test_gen_constraint_ff_end: '
+                                        'ff_end must be True when previous '
+                                        'top tb is None.')
 
-                        # Update top tb.
-                        if ostep:
-                            # Reset top tb.
-                            last_top_tb = None if len(segment) == 1 else 1
-                        else:
-                            self.assertGreater(
-                                top_tb, last_top_tb,
-                                'test_gen_constraint_strict_step: '
-                                'top tb is not monotonically '
-                                'increasing across strict steps. '
-                                '{} -> {}.'
-                                .format(last_top_tb, top_tb))
-                            last_top_tb = top_tb
+                    # Replace top tb.
+                    cstr = tuple(tuple(c._replace(
+                        top_bl_t=(c.top_bl_t[:le.BAT]
+                                  + (0,)
+                                  + c.top_bl_t[le.BAT + 1:]))
+                                       for c in ctpl) for ctpl in constraint)
 
-                        # Compare to ref.
-                        sstep_set_2 = set()
-                        for cstr in sstep_set:
-                            # Replace fmap tpart and top tb.
-                            cstr_2 = tuple(tuple(c._replace(
-                                fmap_tpart=0,
-                                top_bl_t=(c.top_bl_t[:le.BAT]
-                                          + (0,)
-                                          + c.top_bl_t[le.BAT + 1:]))
-                                                 for c in ctpl)
-                                           for ctpl in cstr)
-                            sstep_set_2.add(cstr_2)
-                        # Larger fmap tpart value may introduce more valid
-                        # constraints.
-                        self.assertTrue(
-                            sstep_set_ref is None
-                            or sstep_set_ref.issubset(sstep_set_2),
-                            'test_gen_constraint_strict_step: constraints '
-                            'differ across strict steps. '
-                            'Network {}, segment {}.'
-                            .format(net_name, segment))
-                        sstep_set_ref = sstep_set_2
+                    if last_cstr and not ff_end:
+                        self.assertEqual(cstr, last_cstr,
+                                         'test_gen_constraint_ff_end: '
+                                         'with False ff_end, constraints must '
+                                         'be the same except for top tb. '
+                                         'current {}; last {}.'
+                                         .format(cstr, last_cstr))
+                        self.assertGreater(top_tb, last_top_tb,
+                                           'test_gen_constraint_ff_end: '
+                                           'with False ff_end, top tb must '
+                                           'increase. current {}; last {}.'
+                                           .format(top_tb, last_top_tb))
 
-                        sstep_set.clear()
-
-                    sstep_set.add(constraint)
-                    self.assertEqual(top_tb, last_top_tb,
-                                     'test_gen_constraint_strict_step: top tb '
-                                     'is not constant within an strict step. '
-                                     '{} != {}.'
-                                     .format(top_tb, last_top_tb))
+                    last_cstr = cstr
+                    last_top_tb = top_tb
 
     def test_gen_constraint_fmap_tpart(self):
         ''' gen_constraint() valid fmap_tpart. '''

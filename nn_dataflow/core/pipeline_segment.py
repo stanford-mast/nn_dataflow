@@ -92,12 +92,11 @@ class PipelineSegment(object):
           ones. Therefore, if we have already found valid schedules at this
           point, we can skip all the following constraints.
 
-        - strict_step: if True, starting from (including) the current
-          constraint, the constraints will guarantee to be more strict than the
-          previous ones in the same opt step, until the next new opt step.
-          Therefore, if we have not found any valid schedules at this point, we
-          will not, either, for the following constraints in this opt step, and
-          we can fast forward to the next opt step.
+        - ff_end: if True, starting from (including) the current constraint,
+          the constraints will have NO strictness relation with the previous
+          ones. Between two ff_end points, the constraints are guaranteed to be
+          increasingly strict. If previously we have encountered an infeasible
+          constraint, we can fast forward until a ff_end point.
 
         Rules for constraints.
 
@@ -193,14 +192,14 @@ class PipelineSegment(object):
 
         # Pruning info.
         opt_step = False
-        strict_step = False
+        ff_end = False
         constraint_set = set()
 
         for fmap_tpart in fmap_tpart_cands:
 
-            for top_tb in _top_tb_cands(fmap_tpart):
+            for sfbo in sfbo_cands:
 
-                for sfbo in sfbo_cands:
+                for top_tb in _top_tb_cands(fmap_tpart):
 
                     conditions = (fmap_tpart, top_tb, sfbo)
 
@@ -208,16 +207,16 @@ class PipelineSegment(object):
 
                     if constraint and constraint not in constraint_set:
 
-                        yield constraint, opt_step, strict_step
+                        yield constraint, opt_step, ff_end
 
                         # Reset info until next set.
                         opt_step = False
-                        strict_step = False
+                        ff_end = False
 
                         constraint_set.add(constraint)
 
                 # Smaller top tb factors are more strict than larger ones.
-                strict_step = True
+                ff_end = True
 
             # Stop using larger fmap temporal partitioning if small ones work.
             opt_step = True
