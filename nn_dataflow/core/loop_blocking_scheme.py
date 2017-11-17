@@ -107,6 +107,7 @@ class LoopBlockingScheme(object):
         self.lcnt = util.prod(bl_tp)
 
         self.time = float('inf')
+        self.proc_time = float('inf')
 
         # Buffer data size for one unit.
         self.unit_size = [tuple() for _ in range(BL.NUM)]
@@ -153,6 +154,8 @@ class LoopBlockingScheme(object):
             self.valid = False
             return
 
+        # Array bus.
+        self.array_bus_width = resource.array_bus_width
         # Parallel partitioning.
         self.num_nodes = resource.proc_region.dim.size()
         # Occupation.
@@ -163,6 +166,7 @@ class LoopBlockingScheme(object):
         self.finalized_stats = False
         self.ops = float('nan')
         self.time = float('nan')
+        self.proc_time = float('nan')
         self.access = [[float('nan')] * de.NUM for _ in range(me.NUM)]
 
     def is_valid(self):
@@ -250,6 +254,7 @@ class LoopBlockingScheme(object):
         return OrderedDict([('cost', self.get_cost(cost)),
                             ('ops', self.ops),
                             ('time', self.time),
+                            ('proc_time', self.proc_time),
                             ('access', self.access),
                             ('fetch', self.fetch),
                             ('size', size),
@@ -411,7 +416,7 @@ class LoopBlockingScheme(object):
 
         self.ops = self.nld.unit_ops * self.lcnt * self.num_nodes \
                 * self.part_occ
-        self.time = self.nld.unit_time * self.lcnt
+        self.proc_time = self.nld.unit_time * self.lcnt
 
         self.access[me.REGF] = [v * self.lcnt * t
                                 * self.num_nodes * self.part_occ for v, t
@@ -435,6 +440,13 @@ class LoopBlockingScheme(object):
                                 * self.fetch[self.BL.GBUF][dce]
                                 * self.num_nodes
                                 for dce in range(de.NUM)]
+
+        # Total time = proc time + array multicast time.
+        # Array multicast uses separate bus for each data category.
+        # Each data from GBUF takes one cycle to multicast to PEs.
+        multicast_time = util.idivc(max(self.access[me.GBUF]) // self.num_nodes,
+                                    self.array_bus_width)
+        self.time = self.proc_time + multicast_time
 
         self.finalized_stats = True
 

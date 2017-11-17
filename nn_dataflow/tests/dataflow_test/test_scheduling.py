@@ -53,7 +53,8 @@ class TestScheduling(unittest.TestCase):
                                    type=NodeRegion.PROC),
             data_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 1),
                                      type=NodeRegion.DATA),),
-            dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64)
+            dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64,
+            array_bus_width=float('inf'))
 
         self.options = Option(partition_hybrid=True, partition_batch=True,
                               partition_ifmaps=True, ntops=10)

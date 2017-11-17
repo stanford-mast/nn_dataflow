@@ -14,6 +14,10 @@ List of major changes and improvements
 
   - Add various LSTMs.
 
+- Hardware models:
+
+  - Consider array bus width and its impact on data multicast latency.
+
 
 ### Changed
 
