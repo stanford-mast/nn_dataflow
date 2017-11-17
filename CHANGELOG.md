@@ -29,6 +29,8 @@ List of major changes and improvements
 
 - Output dict `PartitionScheme` format fix.
 
+- `idivc` with inf arguments.
+
 
 ## [v1.4 -- v1.5] -- 2017-08-18
 
