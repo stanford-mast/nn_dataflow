@@ -18,6 +18,8 @@ List of major changes and improvements
 
   - Consider array bus width and its impact on data multicast latency.
 
+  - Consider DRAM access time due to bandwidth limit.
+
 
 ### Changed
 

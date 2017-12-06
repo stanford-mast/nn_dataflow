@@ -104,6 +104,7 @@ def do_scheduling(args):
     array_bus_width = args.bus_width // args.word
     if not array_bus_width:
         array_bus_width = float('inf')
+    dram_bandwidth = args.dram_bw / word
 
     proc_region = NodeRegion(dim=dim_nodes,
                              origin=PhyDim2(0, 0),
@@ -128,7 +129,8 @@ def do_scheduling(args):
                         dim_array=dim_array,
                         size_gbuf=size_gbuf,
                         size_regf=size_regf,
-                        array_bus_width=array_bus_width)
+                        array_bus_width=array_bus_width,
+                        dram_bandwidth=dram_bandwidth)
 
     ## Cost.
 
@@ -223,6 +225,8 @@ def argparser():
 
     ap.add_argument('--bus-width', type=int, default=0,
                     help='array bus width in bits. set 0 to ignore')
+    ap.add_argument('--dram-bw', type=float, default='inf',
+                    help='total DRAM bandwidth in bytes per cycle.')
 
     ap.add_argument('--op-cost', type=float, default=1,
                     help='cost of arithmetic operation')

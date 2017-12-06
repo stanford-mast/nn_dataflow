@@ -106,8 +106,8 @@ class LoopBlockingScheme(object):
 
         self.lcnt = util.prod(bl_tp)
 
+        # Need to define time for invalid scheme.
         self.time = float('inf')
-        self.proc_time = float('inf')
 
         # Buffer data size for one unit.
         self.unit_size = [tuple() for _ in range(BL.NUM)]
@@ -156,6 +156,8 @@ class LoopBlockingScheme(object):
 
         # Array bus.
         self.array_bus_width = resource.array_bus_width
+        # DRAM bandwidth.
+        self.dram_bandwidth = resource.dram_bandwidth
         # Parallel partitioning.
         self.num_nodes = resource.proc_region.dim.size()
         # Occupation.
@@ -167,6 +169,8 @@ class LoopBlockingScheme(object):
         self.ops = float('nan')
         self.time = float('nan')
         self.proc_time = float('nan')
+        self.bus_time = float('nan')
+        self.dram_time = float('nan')
         self.access = [[float('nan')] * de.NUM for _ in range(me.NUM)]
 
     def is_valid(self):
@@ -255,6 +259,8 @@ class LoopBlockingScheme(object):
                             ('ops', self.ops),
                             ('time', self.time),
                             ('proc_time', self.proc_time),
+                            ('bus_time', self.bus_time),
+                            ('dram_time', self.dram_time),
                             ('access', self.access),
                             ('fetch', self.fetch),
                             ('size', size),
@@ -441,12 +447,15 @@ class LoopBlockingScheme(object):
                                 * self.num_nodes
                                 for dce in range(de.NUM)]
 
-        # Total time = proc time + array multicast time.
+        # DRAM access time.
+        self.dram_time = sum(self.access[me.DRAM]) / self.dram_bandwidth
+
         # Array multicast uses separate bus for each data category.
         # Each data from GBUF takes one cycle to multicast to PEs.
-        multicast_time = util.idivc(max(self.access[me.GBUF]) // self.num_nodes,
-                                    self.array_bus_width)
-        self.time = self.proc_time + multicast_time
+        self.bus_time = util.idivc(max(self.access[me.GBUF]) // self.num_nodes,
+                                   self.array_bus_width)
+
+        self.time = max(self.proc_time + self.bus_time, self.dram_time)
 
         self.finalized_stats = True
 

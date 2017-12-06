@@ -38,7 +38,7 @@ class TestSchedulingCondition(unittest.TestCase):
             data_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                      type=NodeRegion.DATA),),
             dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64,
-            array_bus_width=float('inf'))
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'))
 
         frmap = FmapRangeMap()
         frmap.add(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)), (PhyDim2(0, 0),))

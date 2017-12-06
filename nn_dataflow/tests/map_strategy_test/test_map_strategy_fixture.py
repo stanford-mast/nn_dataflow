@@ -70,5 +70,5 @@ class TestMapStrategyFixture(unittest.TestCase):
         self.resource['BASE'] = Resource(
             proc_region=proc_region, data_regions=data_regions,
             dim_array=PhyDim2(12, 14), size_gbuf=108*1024, size_regf=520,
-            array_bus_width=float('inf'))
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'))
 

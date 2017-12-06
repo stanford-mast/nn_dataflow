@@ -30,6 +30,7 @@ RESOURCE_LIST = ['proc_region',
                  'size_gbuf',
                  'size_regf',
                  'array_bus_width',
+                 'dram_bandwidth',
                 ]
 
 class Resource(namedtuple('Resource', RESOURCE_LIST)):
@@ -78,6 +79,11 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
                             'or infinity.')
         if ntp.array_bus_width <= 0:
             raise ValueError('Resource: array_bus_width must be positive.')
+
+        if not isinstance(ntp.dram_bandwidth, (float, int)):
+            raise TypeError('Resource: dram_bandwidth must be a number')
+        if ntp.dram_bandwidth <= 0:
+            raise ValueError('Resource: dram_bandwidth must be positive.')
 
         return ntp
 
