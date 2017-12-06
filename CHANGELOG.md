@@ -20,6 +20,10 @@ List of major changes and improvements
 
   - Consider DRAM access time due to bandwidth limit.
 
+- Software engineering.
+
+  - Record search time.
+
 
 ### Changed
 
@@ -29,6 +33,11 @@ List of major changes and improvements
 
   - Add dimensional partitioning option, i.e., each partitioning can only be
     along one dimension unless it is the only partitioning.
+
+- Software engineering.
+
+  - Change `NNDataflowScheme` node-time product interface to explicitly be
+    static cost.
 
 
 ### Fixed
