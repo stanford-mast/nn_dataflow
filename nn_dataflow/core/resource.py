@@ -19,6 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from collections import namedtuple
+import math
 
 from .node_region import NodeRegion
 from .phy_dim2 import PhyDim2
@@ -28,6 +29,8 @@ RESOURCE_LIST = ['proc_region',
                  'dim_array',
                  'size_gbuf',
                  'size_regf',
+                 'array_bus_width',
+                 'dram_bandwidth',
                 ]
 
 class Resource(namedtuple('Resource', RESOURCE_LIST)):
@@ -66,6 +69,18 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
             raise TypeError('Resource: size_gbuf must be a scalar')
         if hasattr(ntp.size_regf, '__len__'):
             raise TypeError('Resource: size_regf must be a scalar')
+
+        if not isinstance(ntp.array_bus_width, int) \
+                and not math.isinf(ntp.array_bus_width):
+            raise TypeError('Resource: array_bus_width must be an integer '
+                            'or infinity.')
+        if ntp.array_bus_width <= 0:
+            raise ValueError('Resource: array_bus_width must be positive.')
+
+        if not isinstance(ntp.dram_bandwidth, (float, int)):
+            raise TypeError('Resource: dram_bandwidth must be a number')
+        if ntp.dram_bandwidth <= 0:
+            raise ValueError('Resource: dram_bandwidth must be positive.')
 
         return ntp
 

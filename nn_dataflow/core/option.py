@@ -26,6 +26,7 @@ OPTION_LIST = ['sw_gbuf_bypass',
                'sw_solve_loopblocking',
                'hw_gbuf_save_writeback',
                'partition_hybrid',
+               'partition_dimensional',
                'partition_batch',
                'partition_ifmaps',
                'partition_interlayer',
@@ -65,6 +66,7 @@ class Option(namedtuple('Option', OPTION_LIST)):
         kwdict.setdefault('sw_solve_loopblocking', False)
         kwdict.setdefault('hw_gbuf_save_writeback', False)
         kwdict.setdefault('partition_hybrid', False)
+        kwdict.setdefault('partition_dimensional', False)
         kwdict.setdefault('partition_batch', False)
         kwdict.setdefault('partition_ifmaps', False)
         kwdict.setdefault('partition_interlayer', False)

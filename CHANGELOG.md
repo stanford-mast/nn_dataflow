@@ -52,7 +52,7 @@ List of major changes and improvements
   conservative type.
 
 
-## [v1.5 -- v1.6] -- 2017-10-26
+## [v1.5 -- v1.6] -- 2017-12-05
 
 ### Added
 
@@ -62,6 +62,16 @@ List of major changes and improvements
 
   - Add various LSTMs.
 
+- Hardware models:
+
+  - Consider array bus width and its impact on data multicast latency.
+
+  - Consider DRAM access time due to bandwidth limit.
+
+- Software engineering.
+
+  - Record search time.
+
 
 ### Changed
 
@@ -69,10 +79,20 @@ List of major changes and improvements
 
   - `Scheduling` breaks cost tie using time.
 
+  - Add dimensional partitioning option, i.e., each partitioning can only be
+    along one dimension unless it is the only partitioning.
+
+- Software engineering.
+
+  - Change `NNDataflowScheme` node-time product interface to explicitly be
+    static cost.
+
 
 ### Fixed
 
 - Output dict `PartitionScheme` format fix.
+
+- `idivc` with inf arguments.
 
 
 ## [v1.4 -- v1.5] -- 2017-08-18

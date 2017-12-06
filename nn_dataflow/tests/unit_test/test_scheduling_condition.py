@@ -38,7 +38,8 @@ class TestSchedulingCondition(unittest.TestCase):
                                    type=NodeRegion.PROC),
             data_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                      type=NodeRegion.DATA),),
-            dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64)
+            dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64,
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'))
 
         self.none_cstr = SchedulingConstraint()
 

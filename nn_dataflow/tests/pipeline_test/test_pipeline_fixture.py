@@ -164,7 +164,8 @@ class TestPipelineFixture(unittest.TestCase):
                                      type=NodeRegion.DATA),
                           NodeRegion(origin=PhyDim2(0, 4), dim=PhyDim2(8, 4),
                                      type=NodeRegion.DATA)),
-            dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64)
+            dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64,
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'))
 
 
     def _make_ilp(self, network):

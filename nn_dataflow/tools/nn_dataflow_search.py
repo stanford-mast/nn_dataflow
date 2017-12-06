@@ -22,6 +22,7 @@ import argparse
 import json
 import multiprocessing
 import sys
+import time
 from collections import OrderedDict
 
 from nn_dataflow.core import NNDataflow
@@ -60,7 +61,7 @@ def stats_dict(dfsch, cost):
     total_access_cost = sum(a * c for a, c
                             in zip(dfsch.total_accesses, cost.mem_hier))
     total_noc_cost = dfsch.total_noc_hops * cost.noc_hop
-    total_static_cost = dfsch.total_node_time * cost.unit_static
+    total_static_cost = dfsch.total_static_cost(cost.unit_static)
 
     sum_cost = total_op_cost + total_access_cost + total_noc_cost \
             + total_static_cost
@@ -101,6 +102,11 @@ def do_scheduling(args):
     size_gbuf = args.gbuf / word
     size_regf = args.regf / word
 
+    array_bus_width = args.bus_width // args.word
+    if not array_bus_width:
+        array_bus_width = float('inf')
+    dram_bandwidth = args.dram_bw / word
+
     proc_region = NodeRegion(dim=dim_nodes,
                              origin=PhyDim2(0, 0),
                              type=NodeRegion.PROC)
@@ -123,7 +129,9 @@ def do_scheduling(args):
                         data_regions=data_regions,
                         dim_array=dim_array,
                         size_gbuf=size_gbuf,
-                        size_regf=size_regf)
+                        size_regf=size_regf,
+                        array_bus_width=array_bus_width,
+                        dram_bandwidth=dram_bandwidth)
 
     ## Cost.
 
@@ -147,6 +155,7 @@ def do_scheduling(args):
                      sw_solve_loopblocking=args.solve_loopblocking,
                      hw_gbuf_save_writeback=args.enable_save_writeback,
                      partition_hybrid=args.hybrid_partition,
+                     partition_dimensional=args.dimensional_partition,
                      partition_batch=args.batch_partition,
                      partition_ifmaps=args.ifmaps_partition,
                      partition_interlayer=args.interlayer_partition,
@@ -159,7 +168,10 @@ def do_scheduling(args):
     ## Search schedules.
 
     nnd = NNDataflow(network, batch_size, resource, cost, MapStrategyEyeriss)
+    tbeg = time.time()
     tops, cache_stats = nnd.schedule_search(options)
+    tend = time.time()
+    telapsed = tend - tbeg
 
     if not tops:
         sys.stderr.write('No valid dataflow found.\n')
@@ -181,6 +193,7 @@ def do_scheduling(args):
     res_map['options'] = options._asdict()
 
     res_map['cache_stats'] = cache_stats
+    res_map['elapsed'] = telapsed
 
     stats = stats_dict(top, cost)
     for key, val in stats.items():
@@ -215,6 +228,11 @@ def argparser():
     ap.add_argument('--gbuf', type=int, required=True,
                     help='global buffer size in bytes')
 
+    ap.add_argument('--bus-width', type=int, default=0,
+                    help='array bus width in bits. set 0 to ignore')
+    ap.add_argument('--dram-bw', type=float, default='inf',
+                    help='total DRAM bandwidth in bytes per cycle.')
+
     ap.add_argument('--op-cost', type=float, default=1,
                     help='cost of arithmetic operation')
     ap.add_argument('--hier-cost', type=float, nargs=4, default=[200, 6, 2, 1],
@@ -247,6 +265,10 @@ def argparser():
                     action='store_true',
                     help='Use hybrid partition for layer for node mapping. '
                          'Otherwise use naive method based on layer type.')
+    ap.add_argument('--dimensional-partition', action='store_true',
+                    help='Restrict dimensional partitioning, i.e., each '
+                         'partitioning can only be along one dimension '
+                         'unless it is the only partitioning.')
     ap.add_argument('--batch-partition', action='store_true',
                     help='Allow partitioning batch, i.e., consider data '
                          'parallelism.')

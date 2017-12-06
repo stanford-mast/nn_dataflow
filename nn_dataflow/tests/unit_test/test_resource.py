@@ -41,11 +41,15 @@ class TestResource(unittest.TestCase):
                             dim_array=PhyDim2(16, 16),
                             size_gbuf=131072,
                             size_regf=512,
+                            array_bus_width=8,
+                            dram_bandwidth=128,
                            )
         self.assertTupleEqual(resource.proc_region.dim, (2, 2), 'proc_region')
         self.assertTupleEqual(resource.dim_array, (16, 16), 'dim_array')
         self.assertEqual(resource.size_gbuf, 131072, 'size_gbuf')
         self.assertEqual(resource.size_regf, 512, 'size_regf')
+        self.assertEqual(resource.array_bus_width, 8, 'array_bus_width')
+        self.assertEqual(resource.dram_bandwidth, 128, 'dram_bandwidth')
 
     def test_invalid_proc_region(self):
         ''' Invalid proc_region. '''
@@ -60,6 +64,8 @@ class TestResource(unittest.TestCase):
                          dim_array=PhyDim2(16, 16),
                          size_gbuf=131072,
                          size_regf=512,
+                         array_bus_width=8,
+                         dram_bandwidth=128,
                         )
 
     def test_invalid_proc_region_data(self):
@@ -77,6 +83,8 @@ class TestResource(unittest.TestCase):
                          dim_array=PhyDim2(16, 16),
                          size_gbuf=131072,
                          size_regf=512,
+                         array_bus_width=8,
+                         dram_bandwidth=128,
                         )
 
     def test_invalid_dim_array(self):
@@ -94,6 +102,8 @@ class TestResource(unittest.TestCase):
                          dim_array=(16, 16),
                          size_gbuf=131072,
                          size_regf=512,
+                         array_bus_width=8,
+                         dram_bandwidth=128,
                         )
 
     def test_invalid_size_gbuf(self):
@@ -111,6 +121,8 @@ class TestResource(unittest.TestCase):
                          dim_array=PhyDim2(16, 16),
                          size_gbuf=(131072,),
                          size_regf=512,
+                         array_bus_width=8,
+                         dram_bandwidth=128,
                         )
 
     def test_invalid_size_regf(self):
@@ -128,6 +140,116 @@ class TestResource(unittest.TestCase):
                          dim_array=PhyDim2(16, 16),
                          size_gbuf=131072,
                          size_regf=(512,),
+                         array_bus_width=8,
+                         dram_bandwidth=128,
+                        )
+
+    def test_invalid_array_bus_width(self):
+        ''' Invalid array_bus_width. '''
+        with self.assertRaisesRegexp(TypeError,
+                                     'Resource: .*array_bus_width.*'):
+            _ = Resource(proc_region=NodeRegion(dim=PhyDim2(2, 2),
+                                                origin=PhyDim2(0, 0),
+                                                type=NodeRegion.PROC),
+                         data_regions=(NodeRegion(dim=PhyDim2(2, 1),
+                                                  origin=PhyDim2(0, 0),
+                                                  type=NodeRegion.DATA),
+                                       NodeRegion(dim=PhyDim2(2, 1),
+                                                  origin=PhyDim2(0, 1),
+                                                  type=NodeRegion.DATA)),
+                         dim_array=PhyDim2(16, 16),
+                         size_gbuf=131072,
+                         size_regf=512,
+                         array_bus_width=1.2,
+                         dram_bandwidth=128,
+                        )
+        with self.assertRaisesRegexp(ValueError,
+                                     'Resource: .*array_bus_width.*'):
+            _ = Resource(proc_region=NodeRegion(dim=PhyDim2(2, 2),
+                                                origin=PhyDim2(0, 0),
+                                                type=NodeRegion.PROC),
+                         data_regions=(NodeRegion(dim=PhyDim2(2, 1),
+                                                  origin=PhyDim2(0, 0),
+                                                  type=NodeRegion.DATA),
+                                       NodeRegion(dim=PhyDim2(2, 1),
+                                                  origin=PhyDim2(0, 1),
+                                                  type=NodeRegion.DATA)),
+                         dim_array=PhyDim2(16, 16),
+                         size_gbuf=131072,
+                         size_regf=512,
+                         array_bus_width=-2,
+                         dram_bandwidth=128,
+                        )
+        with self.assertRaisesRegexp(ValueError,
+                                     'Resource: .*array_bus_width.*'):
+            _ = Resource(proc_region=NodeRegion(dim=PhyDim2(2, 2),
+                                                origin=PhyDim2(0, 0),
+                                                type=NodeRegion.PROC),
+                         data_regions=(NodeRegion(dim=PhyDim2(2, 1),
+                                                  origin=PhyDim2(0, 0),
+                                                  type=NodeRegion.DATA),
+                                       NodeRegion(dim=PhyDim2(2, 1),
+                                                  origin=PhyDim2(0, 1),
+                                                  type=NodeRegion.DATA)),
+                         dim_array=PhyDim2(16, 16),
+                         size_gbuf=131072,
+                         size_regf=512,
+                         array_bus_width=0,
+                         dram_bandwidth=128,
+                        )
+
+    def test_invalid_dram_bandwidth(self):
+        ''' Invalid dram_bandwidth. '''
+        with self.assertRaisesRegexp(TypeError,
+                                     'Resource: .*dram_bandwidth.*'):
+            _ = Resource(proc_region=NodeRegion(dim=PhyDim2(2, 2),
+                                                origin=PhyDim2(0, 0),
+                                                type=NodeRegion.PROC),
+                         data_regions=(NodeRegion(dim=PhyDim2(2, 1),
+                                                  origin=PhyDim2(0, 0),
+                                                  type=NodeRegion.DATA),
+                                       NodeRegion(dim=PhyDim2(2, 1),
+                                                  origin=PhyDim2(0, 1),
+                                                  type=NodeRegion.DATA)),
+                         dim_array=PhyDim2(16, 16),
+                         size_gbuf=131072,
+                         size_regf=512,
+                         array_bus_width=8,
+                         dram_bandwidth=None,
+                        )
+        with self.assertRaisesRegexp(ValueError,
+                                     'Resource: .*dram_bandwidth.*'):
+            _ = Resource(proc_region=NodeRegion(dim=PhyDim2(2, 2),
+                                                origin=PhyDim2(0, 0),
+                                                type=NodeRegion.PROC),
+                         data_regions=(NodeRegion(dim=PhyDim2(2, 1),
+                                                  origin=PhyDim2(0, 0),
+                                                  type=NodeRegion.DATA),
+                                       NodeRegion(dim=PhyDim2(2, 1),
+                                                  origin=PhyDim2(0, 1),
+                                                  type=NodeRegion.DATA)),
+                         dim_array=PhyDim2(16, 16),
+                         size_gbuf=131072,
+                         size_regf=512,
+                         array_bus_width=8,
+                         dram_bandwidth=-3,
+                        )
+        with self.assertRaisesRegexp(ValueError,
+                                     'Resource: .*dram_bandwidth.*'):
+            _ = Resource(proc_region=NodeRegion(dim=PhyDim2(2, 2),
+                                                origin=PhyDim2(0, 0),
+                                                type=NodeRegion.PROC),
+                         data_regions=(NodeRegion(dim=PhyDim2(2, 1),
+                                                  origin=PhyDim2(0, 0),
+                                                  type=NodeRegion.DATA),
+                                       NodeRegion(dim=PhyDim2(2, 1),
+                                                  origin=PhyDim2(0, 1),
+                                                  type=NodeRegion.DATA)),
+                         dim_array=PhyDim2(16, 16),
+                         size_gbuf=131072,
+                         size_regf=512,
+                         array_bus_width=8,
+                         dram_bandwidth=0,
                         )
 
     def test_invalid_data_regions_type(self):
@@ -142,6 +264,8 @@ class TestResource(unittest.TestCase):
                          dim_array=PhyDim2(16, 16),
                          size_gbuf=131072,
                          size_regf=(512,),
+                         array_bus_width=8,
+                         dram_bandwidth=128,
                         )
         with self.assertRaisesRegexp(TypeError, 'Resource: .*data_regions.*'):
             _ = Resource(proc_region=NodeRegion(dim=PhyDim2(2, 2),
@@ -153,6 +277,8 @@ class TestResource(unittest.TestCase):
                          dim_array=PhyDim2(16, 16),
                          size_gbuf=131072,
                          size_regf=(512,),
+                         array_bus_width=8,
+                         dram_bandwidth=128,
                         )
         with self.assertRaisesRegexp(TypeError, 'Resource: .*data_regions.*'):
             _ = Resource(proc_region=NodeRegion(dim=PhyDim2(2, 2),
@@ -165,6 +291,8 @@ class TestResource(unittest.TestCase):
                          dim_array=PhyDim2(16, 16),
                          size_gbuf=131072,
                          size_regf=(512,),
+                         array_bus_width=8,
+                         dram_bandwidth=128,
                         )
 
     def test_invalid_data_regions_len(self):
@@ -179,6 +307,8 @@ class TestResource(unittest.TestCase):
                          dim_array=PhyDim2(16, 16),
                          size_gbuf=131072,
                          size_regf=(512,),
+                         array_bus_width=8,
+                         dram_bandwidth=128,
                         )
 
     def test_src_data_region(self):
@@ -193,6 +323,8 @@ class TestResource(unittest.TestCase):
                             dim_array=PhyDim2(16, 16),
                             size_gbuf=131072,
                             size_regf=512,
+                            array_bus_width=8,
+                            dram_bandwidth=128,
                             data_regions=(nr1, nr2))
         self.assertEqual(resource.src_data_region(), nr1, 'src_data_region')
         resource = Resource(proc_region=NodeRegion(dim=PhyDim2(4, 4),
@@ -201,6 +333,8 @@ class TestResource(unittest.TestCase):
                             dim_array=PhyDim2(16, 16),
                             size_gbuf=131072,
                             size_regf=512,
+                            array_bus_width=8,
+                            dram_bandwidth=128,
                             data_regions=(nr1,))
         self.assertEqual(resource.src_data_region(), nr1, 'src_data_region')
 
@@ -216,6 +350,8 @@ class TestResource(unittest.TestCase):
                             dim_array=PhyDim2(16, 16),
                             size_gbuf=131072,
                             size_regf=512,
+                            array_bus_width=8,
+                            dram_bandwidth=128,
                             data_regions=(nr1, nr2))
         self.assertEqual(resource.dst_data_region(), nr2, 'dst_data_region')
         resource = Resource(proc_region=NodeRegion(dim=PhyDim2(4, 4),
@@ -224,6 +360,8 @@ class TestResource(unittest.TestCase):
                             dim_array=PhyDim2(16, 16),
                             size_gbuf=131072,
                             size_regf=512,
+                            array_bus_width=8,
+                            dram_bandwidth=128,
                             data_regions=(nr1,))
         self.assertEqual(resource.dst_data_region(), nr1, 'dst_data_region')
 

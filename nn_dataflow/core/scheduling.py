@@ -102,6 +102,16 @@ class SchedulingResult(namedtuple('SchedulingResult',
         return self.dict_loop['time']
 
     @property
+    def total_node_time(self):
+        ''' Get the total time on processing nodes. '''
+        return self.dict_loop['proc_time'] + self.dict_loop['bus_time']
+
+    @property
+    def total_dram_time(self):
+        ''' Get the total time on DRAM access. '''
+        return self.dict_loop['dram_time']
+
+    @property
     def total_ops(self):
         ''' Get the total ops. '''
         # dict_loop stats are over all nodes.
