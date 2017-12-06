@@ -61,7 +61,7 @@ def stats_dict(dfsch, cost):
     total_access_cost = sum(a * c for a, c
                             in zip(dfsch.total_accesses, cost.mem_hier))
     total_noc_cost = dfsch.total_noc_hops * cost.noc_hop
-    total_static_cost = dfsch.total_node_time * cost.unit_static
+    total_static_cost = dfsch.total_static_cost(cost.unit_static)
 
     sum_cost = total_op_cost + total_access_cost + total_noc_cost \
             + total_static_cost
