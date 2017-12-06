@@ -147,7 +147,8 @@ class NNDataflowScheme(MutableMapping):
     @staticmethod
     def active_node_pes(sched_result):
         ''' Layer active node PE counts. '''
-        return 1. * sched_result.total_ops / sched_result.total_time \
+        return 1. * sched_result.total_ops \
+                / sched_result.dict_loop['proc_time'] \
                 / sched_result.dict_part['num_nodes']
 
     @staticmethod

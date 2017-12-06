@@ -53,6 +53,8 @@ class TestNNDataflowScheme(unittest.TestCase):
 
         self.c1res = SchedulingResult(
             dict_loop=OrderedDict([('cost', 1.), ('time', 2.), ('ops', 4.),
+                                   ('proc_time', 2), ('bus_time', 0),
+                                   ('dram_time', 0),
                                    ('access', [[7, 8, 9]] * me.NUM),
                                   ]),
             dict_part=OrderedDict([('cost', 0.5), ('total_nhops', [4, 5, 6]),
@@ -66,6 +68,8 @@ class TestNNDataflowScheme(unittest.TestCase):
 
         self.pres = SchedulingResult(
             dict_loop=OrderedDict([('cost', 0.1), ('time', 0.05), ('ops', 0.1),
+                                   ('proc_time', 0.05), ('bus_time', 0),
+                                   ('dram_time', 0),
                                    ('access', [[.7, .8, .9]] * me.NUM),
                                   ]),
             dict_part=OrderedDict([('cost', 0.5), ('total_nhops', [.4, .5, .6]),

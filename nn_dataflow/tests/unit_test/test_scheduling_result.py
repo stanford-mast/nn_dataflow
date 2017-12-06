@@ -34,6 +34,9 @@ class TestSchedulingResult(unittest.TestCase):
 
         self.dict_loop = OrderedDict([('cost', 1.234),
                                       ('time', 123.4),
+                                      ('proc_time', 59),
+                                      ('bus_time', 40),
+                                      ('dram_time', 120),
                                       ('ops', 1234),
                                       ('access', [[2, 3, 4],
                                                   [30, 40, 50],
@@ -95,6 +98,23 @@ class TestSchedulingResult(unittest.TestCase):
                                   dict_part=self.dict_part,
                                   ofmap_layout=self.ofmap_layout)
         self.assertAlmostEqual(result.total_time, 123.4)
+
+        self.assertGreaterEqual(result.total_time, result.total_node_time)
+        self.assertGreaterEqual(result.total_time, result.total_dram_time)
+
+    def test_total_node_time(self):
+        ''' Accessor total_node_time. '''
+        result = SchedulingResult(dict_loop=self.dict_loop,
+                                  dict_part=self.dict_part,
+                                  ofmap_layout=self.ofmap_layout)
+        self.assertAlmostEqual(result.total_node_time, 59 + 40)
+
+    def test_total_dram_time(self):
+        ''' Accessor total_dram_time. '''
+        result = SchedulingResult(dict_loop=self.dict_loop,
+                                  dict_part=self.dict_part,
+                                  ofmap_layout=self.ofmap_layout)
+        self.assertAlmostEqual(result.total_dram_time, 120)
 
     def test_total_ops(self):
         ''' Accessor total_ops. '''
