@@ -27,6 +27,7 @@ OPTION_LIST = ['sw_gbuf_bypass',
                'hw_access_forwarding',
                'hw_gbuf_sharing',
                'partition_hybrid',
+               'partition_dimensional',
                'partition_batch',
                'partition_ifmaps',
                'ntops',
@@ -64,6 +65,7 @@ class Option(namedtuple('Option', OPTION_LIST)):
         kwdict.setdefault('hw_access_forwarding', False)
         kwdict.setdefault('hw_gbuf_sharing', False)
         kwdict.setdefault('partition_hybrid', False)
+        kwdict.setdefault('partition_dimensional', False)
         kwdict.setdefault('partition_batch', False)
         kwdict.setdefault('partition_ifmaps', False)
         kwdict.setdefault('ntops', 1)

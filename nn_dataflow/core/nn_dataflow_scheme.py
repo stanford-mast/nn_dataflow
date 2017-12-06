@@ -123,11 +123,10 @@ class NNDataflowScheme(MutableMapping):
         ''' Get the total NoC hops. '''
         return sum(sr.total_noc_hops for sr in self.values())
 
-    @property
-    def total_node_time(self):
-        ''' Get the total node-time products. '''
-        return sum(sr.total_time * sr.dict_part['num_nodes']
-                   for sr in self.values())
+    def total_static_cost(self, unit_static):
+        ''' Get the total static cost. '''
+        return unit_static * sum(sr.total_time * sr.dict_part['num_nodes']
+                                 for sr in self.values())
 
     def perlayer_stats(self, stats_name):
         '''
@@ -148,7 +147,8 @@ class NNDataflowScheme(MutableMapping):
     @staticmethod
     def active_node_pes(sched_result):
         ''' Layer active node PE counts. '''
-        return 1. * sched_result.total_ops / sched_result.total_time \
+        return 1. * sched_result.total_ops \
+                / sched_result.dict_loop['proc_time'] \
                 / sched_result.dict_part['num_nodes']
 
     @staticmethod

@@ -74,6 +74,11 @@ class TestPartitionFixture(unittest.TestCase):
                                        partition_batch=True,
                                        partition_ifmaps=False,
                                        **optdict)
+        self.options['DIMPART'] = Option(partition_hybrid=True,
+                                         partition_batch=True,
+                                         partition_ifmaps=True,
+                                         partition_dimensional=True,
+                                         **optdict)
         self.options['ACCFWD'] = Option(partition_hybrid=True,
                                         partition_batch=True,
                                         partition_ifmaps=True,

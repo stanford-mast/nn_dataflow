@@ -51,6 +51,12 @@ class TestUtilIdivc(unittest.TestCase):
         self.assertAlmostEqual(util.idivc(34.3, 3), 12)
         self.assertAlmostEqual(util.idivc(34, 3.), 12)
 
+    def test_inf(self):
+        ''' Inf. '''
+        self.assertEqual(util.idivc(3, float('inf')), 0, 'idivc: inf')
+        self.assertTrue(math.isnan(util.idivc(float('inf'), float('inf'))),
+                        'idivc: inf')
+
 
 class TestUtilProd(unittest.TestCase):
     ''' Tests for util.prod. '''

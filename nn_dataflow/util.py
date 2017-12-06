@@ -18,6 +18,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+import math
 from operator import mul
 
 '''
@@ -50,6 +51,10 @@ def idivc(valx, valy):
 
     Return the min integer that is no less than `valx / valy`.
     '''
+    if math.isinf(valy):
+        if math.isinf(valx):
+            return float('nan')
+        return 0
     return (valx + valy - 1) // valy
 
 

@@ -53,6 +53,8 @@ class TestNNDataflow(unittest.TestCase):
                                  dim_array=PhyDim2(16, 16),
                                  size_gbuf=128 * 1024 // 2,  # 128 kB
                                  size_regf=512 // 2,  # 512 B
+                                 array_bus_width=float('inf'),
+                                 dram_bandwidth=float('inf'),
                                 )
 
         self.cost = Cost(mac_op=1,
@@ -138,6 +140,8 @@ class TestNNDataflow(unittest.TestCase):
                                  dim_array=PhyDim2(16, 16),
                                  size_gbuf=128 * 1024 // 2,  # 128 kB
                                  size_regf=2,
+                                 array_bus_width=float('inf'),
+                                 dram_bandwidth=float('inf'),
                                 )
 
         nnd = NNDataflow(self.alex_net, 4, self.resource, self.cost,
@@ -254,6 +258,8 @@ class TestNNDataflow(unittest.TestCase):
                             dim_array=PhyDim2(12, 14),
                             size_gbuf=108 * 1024 // 2,  # 108 kB
                             size_regf=261,  # 225 + 12 + 24
+                            array_bus_width=float('inf'),
+                            dram_bandwidth=float('inf'),
                            )
 
         cost = Cost(mac_op=2e-12,
@@ -342,6 +348,8 @@ class TestNNDataflow(unittest.TestCase):
                             dim_array=PhyDim2(16, 16),
                             size_gbuf=576056 // 2,  # 576 kB
                             size_regf=1024 // 2,  # 1 kB
+                            array_bus_width=float('inf'),
+                            dram_bandwidth=float('inf'),
                            )
 
         cost = Cost(mac_op=2e-12,
@@ -366,6 +374,8 @@ class TestNNDataflow(unittest.TestCase):
                             dim_array=PhyDim2(14, 14),
                             size_gbuf=133032 // 2,  # 133 kB
                             size_regf=512 // 2,  # 512 B
+                            array_bus_width=float('inf'),
+                            dram_bandwidth=float('inf'),
                            )
 
         cost = Cost(mac_op=2e-12,
