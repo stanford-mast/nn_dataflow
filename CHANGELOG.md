@@ -24,6 +24,7 @@ List of major changes and improvements
       the segment.
     - Specify maximum allowed execution time overhead due to layer pipelining
       in `Option`.
+    - Specify maximum pipelining degree for layer pipelining in `Option`.
 
 
 ### Changed
