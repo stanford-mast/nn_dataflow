@@ -176,9 +176,7 @@ class PipelineSegmentTiming(object):
             return
 
         # Start time of each layer in the segment. Only for added layers.
-        start_list = []
-        for layer_name in self.layer2idx:
-            self._calc_start_time(layer_name, start_list)
+        start_list = self._calc_start_time()
 
         # Critical stage time, as the max of all spatial scheduling.
         self.cached_crit_time = max(sum(timing.time for timing in tlist)
@@ -196,65 +194,69 @@ class PipelineSegmentTiming(object):
 
         assert self.cached_time >= self.cached_crit_time
 
-    def _calc_start_time(self, layer_name, start_list):
+    def _calc_start_time(self):
         '''
-        Calculate the start time of a layer, with the start time of previous
-        layers given as a nested list indexed by spatial and temporal indices.
-        Append the start time to the nested list.
+        Calculate the start time of each layer as a nested list indexed by
+        spatial and temporal indices.
+
+        For temporal scheduling, each fused group will execute each batch group
+        to completion, and then switch to the next batch group. So the start
+        time only waits for one batch group.
         '''
 
-        layer_idx = self.layer2idx[layer_name]
-        assert layer_idx is not None
-        sp_idx, tm_idx = layer_idx
+        start_list = []
 
-        # Allocate.
-        if tm_idx == 0:
-            start_list.append([])
-        start_list[-1].append(0)
-        assert sp_idx == len(start_list) - 1
-        assert tm_idx == len(start_list[sp_idx]) - 1
+        for layer_name, layer_idx in self.layer2idx.items():
+            sp_idx, tm_idx = layer_idx
 
-        # Start time depends on the ready time of the previous on-chip layers.
-        prev_layers, _ = self.network.prev_layers(layer_name)
-        prev_indices = [self.layer2idx[pl] for pl in prev_layers
-                        if pl in self.layer2idx]
+            # Append.
+            if tm_idx == 0:
+                start_list.append([])
+            start_list[-1].append(0)
+            assert sp_idx == len(start_list) - 1
+            assert tm_idx == len(start_list[sp_idx]) - 1
 
-        start = 0
+            # Start time depends on the ready time of the previous on-chip
+            # layers.
+            prev_layers, _ = self.network.prev_layers(layer_name)
+            prev_indices = [self.layer2idx[pl] for pl in prev_layers
+                            if pl in self.layer2idx]
 
-        for prev_sp_idx, prev_tm_idx in prev_indices:
-            if prev_sp_idx == sp_idx:
-                # Same spatial scheduling, wait for full time.
-                assert prev_tm_idx == tm_idx - 1, \
-                        ('PipelineSegmentTiming: same-spatial dependency '
-                         '{} of {} must be immediate previous.'
-                         .format((prev_sp_idx, prev_tm_idx), layer_idx))
-                prev_timing = self.timing_list[prev_sp_idx][prev_tm_idx]
-                ready = start_list[prev_sp_idx][prev_tm_idx] \
-                        + prev_timing.time // self.bat_ngrp
-            else:
-                assert prev_sp_idx < sp_idx
-                # Previous spatial scheduling, wait for one group.
-                assert prev_tm_idx == len(self.timing_list[prev_sp_idx]) - 1, \
-                        ('PipelineSegmentTiming: previous-spatial dependency '
-                         '{} must be the last temporal scheduling out of {}.'
-                         .format((prev_sp_idx, prev_tm_idx),
-                                 len(self.timing_list[prev_sp_idx])))
-                # Number of groups should be min of input and previous output.
-                ngrp = self.timing_list[sp_idx][tm_idx].ifm_ngrp
-                tgrp = 0
-                # Backtrace all fused layers.
-                while True:
+            for prev_sp_idx, prev_tm_idx in prev_indices:
+                if prev_sp_idx == sp_idx:
+                    # Same spatial scheduling, wait for full time.
+                    assert prev_tm_idx == tm_idx - 1, \
+                            ('PipelineSegmentTiming: same-spatial dependency '
+                             '{} of {} must be immediate previous.'
+                             .format((prev_sp_idx, prev_tm_idx), layer_idx))
                     prev_timing = self.timing_list[prev_sp_idx][prev_tm_idx]
-                    ngrp = min(ngrp, prev_timing.ofm_ngrp)
-                    tgrp += prev_timing.time // self.bat_ngrp
-                    if not prev_timing.fused or prev_tm_idx == 0:
-                        ready = start_list[prev_sp_idx][prev_tm_idx] \
-                                + tgrp // ngrp
-                        break
-                    prev_tm_idx -= 1
+                    ready = start_list[prev_sp_idx][prev_tm_idx] \
+                            + prev_timing.time // self.bat_ngrp
+                else:
+                    assert prev_sp_idx < sp_idx
+                    # Previous spatial scheduling, wait for one group.
+                    prev_sp_timing_list = self.timing_list[prev_sp_idx]
+                    assert prev_tm_idx == len(prev_sp_timing_list) - 1, \
+                            ('PipelineSegmentTiming: prev-spatial dependency '
+                             '{} must be the last temporal scheduling in {}.'
+                             .format((prev_sp_idx, prev_tm_idx),
+                                     len(prev_sp_timing_list)))
+                    # Backtrace all fused layers.
+                    unfused_tm_idx = max(i for i, t
+                                         in enumerate(prev_sp_timing_list)
+                                         if not t.fused)
+                    fused_timing_list = prev_sp_timing_list[unfused_tm_idx:]
+                    tgrp = sum(t.time for t in fused_timing_list)
+                    # The number of groups should be min of input and previous
+                    # outputs.
+                    ngrp = min(self.timing_list[sp_idx][tm_idx].ifm_ngrp,
+                               min(t.ofm_ngrp for t in fused_timing_list))
+                    ready = start_list[prev_sp_idx][unfused_tm_idx] \
+                            + tgrp // self.bat_ngrp // ngrp
 
-            # Max of dependency ready time.
-            start = max(start, ready)
+                # Max of dependency ready time.
+                start_list[sp_idx][tm_idx] = max(start_list[sp_idx][tm_idx],
+                                                 ready)
 
-        start_list[sp_idx][tm_idx] = start
+        return start_list
 
