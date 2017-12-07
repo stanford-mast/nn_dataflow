@@ -160,6 +160,12 @@ class NNDataflowScheme(MutableMapping):
         ''' Get the time for each segment. '''
         return [t.time() for t in self.seg_tlist]
 
+    def segment_dram_time_list(self):
+        '''
+        Get the time for each segment on DRAM access.
+        '''
+        return [t.dram_time() for t in self.seg_tlist]
+
     def perlayer_stats(self, stats_name):
         '''
         Get a dict of per-layer stats. Valid stats must be a static method.

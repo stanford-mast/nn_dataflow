@@ -31,11 +31,13 @@ class PipelineSegmentTiming(object):
 
     # Timing info of a layer in the segment, including
     # - the total time of the layer.
+    # - the total node time of the layer.
+    # - the total DRAM time of the layer.
     # - whether the layer is fused with its previous layer.
     # - the number of groups of which IFM are sequentially processed.
     # - the number of groups of which OFM are sequentially processed.
-    LayerTiming = namedtuple('LayerTiming', ['time', 'fused',
-                                             'ifm_ngrp', 'ofm_ngrp'])
+    LayerTiming = namedtuple('LayerTiming', ['time', 'node_time', 'dram_time',
+                                             'fused', 'ifm_ngrp', 'ofm_ngrp'])
 
     def __init__(self, network, seg_idx):
 
@@ -64,6 +66,8 @@ class PipelineSegmentTiming(object):
         # BAT group may change.
         self.cached_time = None
         self.cached_crit_time = None
+        self.cached_node_time = None
+        self.cached_dram_time = None
 
     def time(self):
         ''' The total time of the end-to-end segment schedule. '''
@@ -76,6 +80,18 @@ class PipelineSegmentTiming(object):
         self._calc_time()
         assert self.cached_crit_time is not None
         return self.cached_crit_time
+
+    def node_time(self):
+        ''' The total time on processing nodes of the segment. '''
+        self._calc_time()
+        assert self.cached_node_time is not None
+        return self.cached_node_time
+
+    def dram_time(self):
+        ''' The total time on DRAM access of the segment. '''
+        self._calc_time()
+        assert self.cached_dram_time is not None
+        return self.cached_dram_time
 
     def add(self, layer_name, sched_result):
         ''' Add the SchedulingResult of a new layer. '''
@@ -149,8 +165,10 @@ class PipelineSegmentTiming(object):
 
         # Construct layer timing info.
         timing = PipelineSegmentTiming.LayerTiming(
-            time=sched_result.total_time, fused=fused,
-            ifm_ngrp=ifm_ngrp, ofm_ngrp=ofm_ngrp)
+            time=sched_result.total_time,
+            node_time=sched_result.total_node_time,
+            dram_time=sched_result.total_dram_time,
+            fused=fused, ifm_ngrp=ifm_ngrp, ofm_ngrp=ofm_ngrp)
 
         # Append.
         self.timing_list[-1].append(timing)
@@ -160,6 +178,8 @@ class PipelineSegmentTiming(object):
         # Invalidate cached results.
         self.cached_time = None
         self.cached_crit_time = None
+        self.cached_node_time = None
+        self.cached_dram_time = None
 
     def _sched_seq_incr(self, pos):
         ''' Get the next sched seq incremented at the given position. '''
@@ -172,7 +192,9 @@ class PipelineSegmentTiming(object):
     def _calc_time(self):
         ''' Calculate the time and critical time. '''
 
-        if self.cached_time is not None and self.cached_crit_time is not None:
+        if self.cached_time is not None and self.cached_crit_time is not None \
+                and self.cached_node_time is not None \
+                and self.cached_dram_time is not None:
             return
 
         # Start time of each layer in the segment. Only for added layers.
@@ -182,17 +204,26 @@ class PipelineSegmentTiming(object):
         self.cached_crit_time = max(sum(timing.time for timing in tlist)
                                     for tlist in self.timing_list)
 
-        # Total time, as the max of end time of the last BAT group.
+        # Total node time, as the max of end time of the last BAT group.
         # The interval between BAT groups is determined by the critical stage
         # time of one BAT group.
-        self.cached_time = max(start + timing.time // self.bat_ngrp
-                               + self.cached_crit_time // self.bat_ngrp
-                               * (self.bat_ngrp - 1)
-                               for slist, tlist
-                               in zip(start_list, self.timing_list)
-                               for start, timing in zip(slist, tlist))
+        self.cached_node_time = max(start + timing.time // self.bat_ngrp
+                                    + self.cached_crit_time // self.bat_ngrp
+                                    * (self.bat_ngrp - 1)
+                                    for slist, tlist
+                                    in zip(start_list, self.timing_list)
+                                    for start, timing in zip(slist, tlist))
+        assert self.cached_node_time >= self.cached_crit_time
 
-        assert self.cached_time >= self.cached_crit_time
+        # Time limit of the DRAM bandwidth.
+        # Each layer DRAM time is calculated using the layer accesses and the
+        # maximum bandwidth. Accumulating the accesses is accumulating the
+        # time.
+        self.cached_dram_time = sum(timing.dram_time for timing
+                                    in itertools.chain.from_iterable(
+                                        self.timing_list))
+
+        self.cached_time = max(self.cached_node_time, self.cached_dram_time)
 
     def _calc_start_time(self):
         '''

@@ -250,6 +250,22 @@ class TestNNDataflowScheme(unittest.TestCase):
         dtfl['p2'] = self.p2res._replace(sched_seq=(1, 0, 0))
         self.assertListEqual(dtfl.segment_time_list(), [205, 5])
 
+    def test_segment_dram_time_list(self):
+        ''' segment_dram_time_list(). '''
+        c1_dict_loop = self.c1res.dict_loop.copy()
+        c1_dict_loop['dram_time'] = 180
+        p1_dict_loop = self.p1res.dict_loop.copy()
+        p1_dict_loop['dram_time'] = 5
+        p2_dict_loop = self.p2res.dict_loop.copy()
+        p2_dict_loop['dram_time'] = 10
+        dtfl = NNDataflowScheme(self.network, self.input_layout)
+        dtfl['c1'] = self.c1res._replace(dict_loop=c1_dict_loop)
+        dtfl['p1'] = self.p1res._replace(dict_loop=p1_dict_loop)
+        dtfl['p2'] = self.p2res._replace(sched_seq=(1, 0, 0),
+                                         dict_loop=p2_dict_loop)
+        self.assertListEqual(dtfl.segment_dram_time_list(), [185, 10])
+        self.assertListEqual(dtfl.segment_time_list(), [205, 10])
+
     def test_total_static_cost(self):
         ''' Static cost. '''
         self.assertAlmostEqual(self.dtfl.total_static_cost(1),

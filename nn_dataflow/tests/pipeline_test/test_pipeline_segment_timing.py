@@ -276,11 +276,30 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
 
                 self.assertEqual(timing.critical_time(), timing.time())
 
+    def test_time_dram_time(self):
+        ''' time() and critical_time() dominated by DRAM time. '''
+        timing = PipelineSegmentTiming(self.net1, 3)
+        timing.add('0', self._make_sched_res((3, 0, 0), 120, dram_time=100,
+                                             top_ti=3, top_tb=4))
+        timing.add('1', self._make_sched_res((3, 1, 0), 130, dram_time=140,
+                                             top_to=3, top_tb=8))
+        timing.add('1p', self._make_sched_res((3, 1, 1), 20, dram_time=10,
+                                              top_to=3, top_tb=2))
+        timing.add('2', self._make_sched_res((3, 2, 0), 138, dram_time=100,
+                                             top_ti=3, top_tb=2))
+        self.assertEqual(timing.critical_time(), 160)
+        self.assertEqual(timing.time(), 100 + 140 + 10 + 100)
+        self.assertEqual(timing.dram_time(), timing.time())
+        self.assertLess(timing.node_time(), timing.time())
+
     def _make_sched_res(self, sched_seq, time, top_ti=1, top_to=1, top_tb=1,
-                        top_ord=range(le.NUM)):
+                        top_ord=range(le.NUM), dram_time=0):
         dict_loop = OrderedDict()
         dict_loop['cost'] = 1.234
-        dict_loop['time'] = time
+        dict_loop['time'] = max(time, dram_time)
+        dict_loop['proc_time'] = time
+        dict_loop['bus_time'] = 0
+        dict_loop['dram_time'] = dram_time
         dict_loop['ti'] = [top_ti, 1, 1]
         dict_loop['to'] = [top_to, 1, 1]
         dict_loop['tb'] = [top_tb, 1, 1]
