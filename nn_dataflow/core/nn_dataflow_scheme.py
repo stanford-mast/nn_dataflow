@@ -166,6 +166,14 @@ class NNDataflowScheme(MutableMapping):
         '''
         return [t.dram_time() for t in self.seg_tlist]
 
+    def last_segment_time(self):
+        ''' Get the time for the last segment. '''
+        return self.seg_tlist[-1].time()
+
+    def last_segment_critical_time(self):
+        ''' Get the critical time for the last segment. '''
+        return self.seg_tlist[-1].critical_time()
+
     def perlayer_stats(self, stats_name):
         '''
         Get a dict of per-layer stats. Valid stats must be a static method.

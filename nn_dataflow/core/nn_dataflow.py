@@ -227,13 +227,27 @@ class NNDataflow(object):
                         curr_nndf_tops, options)
 
             # Filter by time limit.
-            nndf_tops += [nndf for nndf in curr_nndf_tops
-                          if nndf.segment_time_list()[-1] <= time_limit]
+            filtered_nndf_tops = [nndf for nndf in curr_nndf_tops
+                                  if nndf.last_segment_time() <= time_limit]
 
-            if not curr_nndf_tops or nndf_tops:
+            nndf_tops += filtered_nndf_tops
+
+            if not curr_nndf_tops or filtered_nndf_tops:
                 # Enter fast forwarding if 1) constraint is infeasible; or 2)
                 # already found with less strict constraint.
                 fast_forward = True
+            else:
+                assert curr_nndf_tops and not filtered_nndf_tops
+                # This is the case where all schemes are filtered out by the
+                # time limit.
+                assert all(nndf.last_segment_time() > time_limit
+                           for nndf in curr_nndf_tops)
+                if all(nndf.last_segment_critical_time() > time_limit
+                       for nndf in curr_nndf_tops):
+                    # Enter fast forwarding if the critical time does not meet
+                    # the time limit, in which case the more strict constraints
+                    # will not help.
+                    fast_forward = True
 
         # Always pick and keep top n.
         nndf_tops = sorted(nndf_tops, key=self.key_func)[:options.ntops]
