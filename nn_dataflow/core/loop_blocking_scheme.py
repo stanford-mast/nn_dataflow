@@ -458,7 +458,9 @@ class LoopBlockingScheme(object):
                                                  / self.num_nodes)),
                                    self.array_bus_width)
 
-        self.time = max(self.proc_time + self.bus_time, self.dram_time)
+        # Optimistically assume processing, multicast, and DRAM access are well
+        # overlapped, and ignore ramp-up/down.
+        self.time = max(self.proc_time, self.bus_time, self.dram_time)
 
         self.finalized_stats = True
 

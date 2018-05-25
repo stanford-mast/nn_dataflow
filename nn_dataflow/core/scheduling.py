@@ -86,7 +86,7 @@ class SchedulingResult(namedtuple('SchedulingResult',
     @property
     def total_node_time(self):
         ''' Get the total time on processing nodes. '''
-        return self.dict_loop['proc_time'] + self.dict_loop['bus_time']
+        return max(self.dict_loop['proc_time'], self.dict_loop['bus_time'])
 
     @property
     def total_dram_time(self):

@@ -107,7 +107,14 @@ class TestSchedulingResult(unittest.TestCase):
         result = SchedulingResult(dict_loop=self.dict_loop,
                                   dict_part=self.dict_part,
                                   ofmap_layout=self.ofmap_layout)
-        self.assertAlmostEqual(result.total_node_time, 59 + 40)
+        self.assertAlmostEqual(result.total_node_time, max(59, 40))
+
+        dict_loop = self.dict_loop
+        dict_loop['bus_time'] = 100
+        result = SchedulingResult(dict_loop=self.dict_loop,
+                                  dict_part=self.dict_part,
+                                  ofmap_layout=self.ofmap_layout)
+        self.assertAlmostEqual(result.total_node_time, max(59, 100))
 
     def test_total_dram_time(self):
         ''' Accessor total_dram_time. '''
