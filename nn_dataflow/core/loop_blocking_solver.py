@@ -177,7 +177,7 @@ def _solve_gbuf_reside(nested_loop_desc, resource, reside_dce):
         tz2 = goal_opt2(tx2, ty2)
 
     assert not math.isinf(tz2)
-    tz0 = lnum[2] / tz2
+    tz0 = lnum[2] // tz2
     tx1 = lnum[0] // tx0 // tx2
     ty1 = lnum[1] // ty0 // ty2
 

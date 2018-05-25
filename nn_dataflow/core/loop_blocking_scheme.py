@@ -20,6 +20,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from collections import OrderedDict
 import itertools
+import math
 
 from . import data_category_enum as de
 from . import loop_enum as le
@@ -448,11 +449,13 @@ class LoopBlockingScheme(object):
                                 for dce in range(de.NUM)]
 
         # DRAM access time.
-        self.dram_time = sum(self.access[me.DRAM]) / self.dram_bandwidth
+        self.dram_time = int(math.ceil(sum(self.access[me.DRAM])
+                                       / self.dram_bandwidth))
 
         # Array multicast uses separate bus for each data category.
         # Each data from GBUF takes one cycle to multicast to PEs.
-        self.bus_time = util.idivc(max(self.access[me.GBUF]) // self.num_nodes,
+        self.bus_time = util.idivc(int(math.ceil(1. * max(self.access[me.GBUF])
+                                                 / self.num_nodes)),
                                    self.array_bus_width)
 
         self.time = max(self.proc_time + self.bus_time, self.dram_time)

@@ -46,6 +46,8 @@ List of major changes and improvements
 
 - `idivc` with inf arguments.
 
+- Integer division `//` vs. `/`.
+
 
 ## [v1.4 -- v1.5] -- 2017-08-18
 

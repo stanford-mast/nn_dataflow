@@ -331,7 +331,7 @@ def part_layer_unit_nhops(layer, batch_size, part, node_region,
                 # Only writes need to send to the mid node, i.e., (f + 1) / 2
                 # rather than f times, approximately half.
                 dist = coord.hop_dist(coord_list[mid_idx])
-                nhops[de.OFM] += ofrng.size() * dist / 2
+                nhops[de.OFM] += util.idivc(ofrng.size() * dist, 2)
 
     # Filter access.
     if isinstance(layer, ConvLayer):

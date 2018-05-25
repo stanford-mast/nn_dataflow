@@ -475,7 +475,7 @@ class MapStrategyEyeriss(MapStrategy):
         # Due to folding, the overlapping ifmaps may need to be re-fetched,
         # resulting in amplified access for ifmaps.
         # Consider one flpeset, hifm rows are folded by fold.w.
-        amp_acc_ifm = acclayer.hifm * self.fold.w / self.layer.hifm
+        amp_acc_ifm = 1. * acclayer.hifm * self.fold.w / self.layer.hifm
 
         return ops, time, access, sz_gbuf, sz_regf, amp_acc_ifm
 
