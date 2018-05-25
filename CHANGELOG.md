@@ -24,15 +24,15 @@ List of major changes and improvements
 
   - Record search time.
 
+  - Add dimensional partitioning option, i.e., each partitioning can only be
+    along one dimension unless it is the only partitioning.
+
 
 ### Changed
 
 - Software models.
 
   - `Scheduling` breaks cost tie using time.
-
-  - Add dimensional partitioning option, i.e., each partitioning can only be
-    along one dimension unless it is the only partitioning.
 
 - Software engineering.
 
