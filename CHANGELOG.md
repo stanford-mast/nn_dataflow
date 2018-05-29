@@ -3,6 +3,10 @@ List of major changes and improvements
 
 ## [Unreleased]
 
+### Fixed
+
+- ITCN access calculation.
+
 
 ## [v1.4 -- v1.5] -- 2017-08-18
 

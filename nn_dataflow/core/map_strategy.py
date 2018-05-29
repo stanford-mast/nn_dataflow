@@ -390,11 +390,12 @@ class MapStrategyEyeriss(MapStrategy):
                     * flpesets_per_unitpass
 
             # All data from/to regf go through itcn.
-            access[me.ITCN][de.FIL] = acclayer.wfil * self.dim_lpeset.size() \
+            # = data per PE * # PEs * # rounds.
+            access[me.ITCN][de.FIL] = acclayer.wfil * self.dim_flpeset.size() \
                     * flpesets_per_unitpass
-            access[me.ITCN][de.IFM] = acclayer.wifm * self.dim_lpeset.size() \
+            access[me.ITCN][de.IFM] = acclayer.wifm * self.dim_flpeset.size() \
                     * flpesets_per_unitpass
-            access[me.ITCN][de.OFM] = acclayer.wofm * self.dim_lpeset.size() \
+            access[me.ITCN][de.OFM] = acclayer.wofm * self.dim_flpeset.size() \
                     * flpesets_per_unitpass
 
             # regf access is based on num of ops.
@@ -446,9 +447,10 @@ class MapStrategyEyeriss(MapStrategy):
                     * flpesets_per_unitpass
 
             # All data from/to regf go through itcn.
+            # = data per PE * # PEs * # rounds.
             access[me.ITCN][de.FIL] = 0
-            access[me.ITCN][de.IFM] = acclayer.wifm * self.dim_lpeset.size()
-            access[me.ITCN][de.OFM] = acclayer.wofm * self.dim_lpeset.size() \
+            access[me.ITCN][de.IFM] = acclayer.wifm * self.dim_flpeset.size()
+            access[me.ITCN][de.OFM] = acclayer.wofm * self.dim_flpeset.size() \
                     * flpesets_per_unitpass
 
             # regf access is based on num of ops.
