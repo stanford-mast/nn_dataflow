@@ -29,7 +29,7 @@ Krizhevsky, Sutskever, and Hinton, 2012
 
 NN = Network('AlexNet')
 
-NN.set_input(InputLayer(3, 224))
+NN.set_input_layer(InputLayer(3, 224))
 
 NN.add('conv1_a', ConvLayer(3, 48, 55, 11, 4), prevs=(NN.INPUT_LAYER_KEY,))
 NN.add('conv1_b', ConvLayer(3, 48, 55, 11, 4), prevs=(NN.INPUT_LAYER_KEY,))

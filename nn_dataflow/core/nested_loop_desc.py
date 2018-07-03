@@ -128,5 +128,5 @@ class NestedLoopDesc(namedtuple('NestedLoopDesc', NESTED_LOOP_DESC_LIST)):
                        for dce2 in range(de.NUM))
 
         return self.unit_access_at_of(mhe, dce) \
-                * self.data_loops[dce].data_cnt(self.loopcnt)
+                * util.prod(self.data_loops[dce].take(self.loopcnt))
 

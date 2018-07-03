@@ -478,7 +478,7 @@ class LoopBlockingScheme(object):
 
         `bl_t` are the loop blocking factors, indexed by LoopEnum.
         '''
-        return [self.nld.data_loops[dce].data_cnt(bl_t)
+        return [util.prod(self.nld.data_loops[dce].take(bl_t))
                 for dce in range(de.NUM)]
 
     def _innt_dim_loop(self, dce, bl_t, bl_ord):

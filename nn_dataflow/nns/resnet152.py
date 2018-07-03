@@ -29,7 +29,7 @@ He, Zhang, Ren, and Sun, 2015
 
 NN = Network('ResNet')
 
-NN.set_input(InputLayer(3, 224))
+NN.set_input_layer(InputLayer(3, 224))
 
 _PREVS = None
 

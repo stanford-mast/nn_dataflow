@@ -65,14 +65,14 @@ class NNDataflowScheme(MutableMapping):
             raise TypeError('NNDataflowScheme: sched_result must be '
                             'a SchedulingResult instance.')
 
-        prev_layers, _ = self.network.prev_layers(layer_name)
-        for pl in prev_layers:
-            if pl is None:
+        prevs, _ = self.network.prevs(layer_name)
+        for p in prevs:
+            if p is None:
                 continue
-            if pl not in self.res_dict:
+            if p not in self.res_dict:
                 raise KeyError('NNDataflowScheme: layer {} has its previous '
                                'layer {} not scheduled yet.'
-                               .format(layer_name, pl))
+                               .format(layer_name, p))
 
         self.res_dict[layer_name] = sched_result
         self.total_cost += sched_result.total_cost

@@ -35,7 +35,7 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
     The `type` attribute specifies the region type, which could be `PROC` for
     computation processing nodes or 'DATA' for data storage nodes.
 
-    NOTES: we cannot overload __contains__ and __iter__ as a node container,
+    NOTE: we cannot overload __contains__ and __iter__ as a node container,
     because the base namedtuple already defines them.
     '''
 
@@ -58,32 +58,23 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
         return ntp
 
     def contains_node(self, coordinate):
-        ''' Whether the region contains the given coordinate. '''
-        min_coord = self.origin
-        max_coord = self.origin + self.dim
-        return all(cmin <= c and c < cmax for c, cmin, cmax
-                   in zip(coordinate, min_coord, max_coord))
+        ''' Whether the region contains the given absolute node coordinate. '''
+        return coordinate in self.iter_node()
 
-    def node_iter(self):
-        ''' Iterate through all nodes in the region. '''
-        gens = []
-        for o, d in zip(self.origin, self.dim):
-            gens.append(xrange(o, o + d))
-        cnt = 0
-        for tp in itertools.product(*gens):
-            coord = PhyDim2(*tp)
-            assert self.contains_node(coord)
-            cnt += 1
-            yield coord
+    def iter_node(self):
+        ''' Iterate through all absolute node coordinates in the region. '''
+        for rel_coord in itertools.product(*[range(d) for d in self.dim]):
+            yield self.rel2abs(PhyDim2(*rel_coord))
 
     def rel2abs(self, rel_coordinate):
         ''' Convert relative node coordinate to absolute node coordinate. '''
         if not isinstance(rel_coordinate, PhyDim2):
             raise TypeError('NodeRegion: relative coordinate must be '
                             'a PhyDim2 object.')
+        if not all(0 <= c < d for c, d in zip(rel_coordinate, self.dim)):
+            raise ValueError('NodeRegion: relative coordinate {} is not in '
+                             'node region {}.'.format(rel_coordinate, self))
+
         abs_coordinate = self.origin + rel_coordinate
-        if not self.contains_node(abs_coordinate):
-            raise ValueError('NodeRegion: relative coordinate {} is not '
-                             'in node region {}'.format(rel_coordinate, self))
         return abs_coordinate
 

@@ -196,7 +196,7 @@ class MapStrategyEyeriss(MapStrategy):
             # Replicate to procpass. Also consider loop occupations.
             uaccess = [tuple() for _ in range(me.NUM)]
             # Loop occupations affect accesses.
-            aocc = [self.data_loops[dce].data_cnt(locc)
+            aocc = [util.prod(self.data_loops[dce].take(locc))
                     for dce in range(de.NUM)]
             # Replication uses the single DRAM, gbuf, itcn.
             for mhe in [me.DRAM, me.GBUF, me.ITCN]:

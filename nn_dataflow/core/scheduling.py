@@ -162,8 +162,8 @@ class Scheduling(object):
                              'input layer.')
 
         # Filter nodes. All memory nodes can store filters. Deduplicate.
-        filter_nodes = set(itertools.chain(src_data_region.node_iter(),
-                                           dst_data_region.node_iter()))
+        filter_nodes = set(itertools.chain(src_data_region.iter_node(),
+                                           dst_data_region.iter_node()))
 
         # Explore parallel partitioning schemes.
         for part in partition.gen_partition(self.layer, self.batch_size,

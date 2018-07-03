@@ -71,15 +71,15 @@ class TestNodeRegion(unittest.TestCase):
                 num += 1 if nr.contains_node(PhyDim2(h, w)) else 0
         self.assertEqual(num, nr.dim.size())
 
-    def test_node_iter(self):
+    def test_iter_node(self):
         ''' Get node iterator. '''
         nr = NodeRegion(dim=PhyDim2(4, 4),
                         origin=PhyDim2(1, 3),
                         type=NodeRegion.PROC)
         # No duplicates.
-        self.assertEqual(len(set(nr.node_iter())), nr.dim.size())
+        self.assertEqual(len(set(nr.iter_node())), nr.dim.size())
         # All nodes is contained.
-        for c in nr.node_iter():
+        for c in nr.iter_node():
             self.assertTrue(nr.contains_node(c))
 
     def test_rel2abs(self):
@@ -94,7 +94,7 @@ class TestNodeRegion(unittest.TestCase):
         self.assertSetEqual(set(nr.rel2abs(PhyDim2(h, w))
                                 for h in range(nr.dim.h)
                                 for w in range(nr.dim.w)),
-                            set(nr.node_iter()))
+                            set(nr.iter_node()))
 
     def test_rel2abs_invalid_type(self):
         ''' Get rel2abs invalid type. '''

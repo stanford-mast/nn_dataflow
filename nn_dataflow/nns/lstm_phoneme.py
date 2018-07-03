@@ -31,7 +31,7 @@ Graves and Schmidhuber, 2005
 
 NN = Network('PHONEME')
 
-NN.set_input(InputLayer(26, 1))
+NN.set_input_layer(InputLayer(26, 1))
 
 NN.add('init', FCLayer(26, 140))
 C = H = 'init'

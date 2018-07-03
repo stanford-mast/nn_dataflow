@@ -37,7 +37,7 @@ class TestNNDataflowScheme(unittest.TestCase):
 
     def setUp(self):
         self.network = Network('test_net')
-        self.network.set_input(InputLayer(3, 224))
+        self.network.set_input_layer(InputLayer(3, 224))
         self.network.add('c1', ConvLayer(3, 64, 224, 3))
         self.network.add('p1', PoolingLayer(64, 7, 32), prevs='c1')
         self.network.add('p2', PoolingLayer(64, 7, 32), prevs='c1')

@@ -39,6 +39,11 @@ List of major changes and improvements
   - Change `NNDataflowScheme` node-time product interface to explicitly be
     static cost.
 
+  - Improve method names:
+    - Remove `DataDimLoops.data_cnt`.
+    - Change `NodeRegion.node_iter` to `NodeRegion.iter_node`.
+    - Change `Network` method names to distinguish layer and layer name.
+
 
 ### Fixed
 

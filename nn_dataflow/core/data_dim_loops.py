@@ -54,12 +54,6 @@ class DataDimLoops(util.ContentHashClass):
         return [lpe_indexed[lpe] for lpe in range(le.NUM)
                 if lpe not in self.lpe_tuple]
 
-    def data_cnt(self, loop_cnt):
-        '''
-        Get the data unit count from the given loop counts.
-        '''
-        return util.prod(self.take(loop_cnt))
-
     def __repr__(self):
         return '{}({})'.format(
             self.__class__.__name__,

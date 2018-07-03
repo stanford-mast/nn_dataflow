@@ -144,17 +144,18 @@ class NNDataflow(object):
 
         del options
 
-        prev_layer_names, merge_symbol = self.network.prev_layers(layer_name)
-        assert prev_layer_names
+        prevs, merge_symbol = self.network.prevs(layer_name)
+        assert prevs
 
-        def _ofmap_layout(dfsch, pl_name):
-            return dfsch[pl_name].ofmap_layout if pl_name is not None \
+        def _ofmap_layout(dfsch, prev_layer_name):
+            return dfsch[prev_layer_name].ofmap_layout \
+                    if prev_layer_name is not None \
                     else dfsch.input_layout
 
         for idx, dfsch in enumerate(dfsch_list):
             # Merge all previous layer ofmap layouts to get the ifmap layout.
-            ifmap_layout = _ofmap_layout(dfsch, prev_layer_names[0])
-            for pl_name in prev_layer_names[1:]:
+            ifmap_layout = _ofmap_layout(dfsch, prevs[0])
+            for pl_name in prevs[1:]:
                 ifmap_layout = ifmap_layout.merge(merge_symbol,
                                                   _ofmap_layout(dfsch, pl_name))
 
