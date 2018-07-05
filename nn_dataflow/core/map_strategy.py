@@ -175,6 +175,8 @@ class MapStrategyEyeriss(MapStrategy):
                 sz_gbuf_unitpass, sz_regf_unitpass, amp_acc_ifm = \
                 self._calc_unitpass()
 
+        data_loops = self.layer.data_loops()
+
         # Apply replication.
         for lcnt, locc, rcnt in self._gen_repl():
 
@@ -196,7 +198,7 @@ class MapStrategyEyeriss(MapStrategy):
             # Replicate to procpass. Also consider loop occupations.
             uaccess = [tuple() for _ in range(me.NUM)]
             # Loop occupations affect accesses.
-            aocc = [util.prod(self.data_loops[dce].take(locc))
+            aocc = [util.prod(data_loops[dce].take(locc))
                     for dce in range(de.NUM)]
             # Replication uses the single DRAM, gbuf, itcn.
             for mhe in [me.DRAM, me.GBUF, me.ITCN]:
@@ -213,7 +215,7 @@ class MapStrategyEyeriss(MapStrategy):
             nld = NestedLoopDesc(loopcnt=lcnt, unit_access=unit_access,
                                  usize_gbuf=usize_gbuf, usize_regf=usize_regf,
                                  unit_ops=unit_ops, unit_time=unit_time,
-                                 data_loops=self.data_loops)
+                                 data_loops=data_loops)
 
             # Check num of ops.
             util.assert_float_eq_int(

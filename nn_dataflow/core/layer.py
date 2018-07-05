@@ -18,7 +18,10 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from . import data_category_enum as de
+from . import loop_enum as le
 from .. import util
+from .data_dim_loops import DataDimLoops
 
 class Layer(util.ContentHashClass):
     '''
@@ -62,6 +65,11 @@ class Layer(util.ContentHashClass):
 
         self.htrd = htrd
         self.wtrd = wtrd
+
+    @staticmethod
+    def data_loops():
+        ''' Dimension loops of the data. '''
+        raise NotImplementedError
 
     def input_layer(self):
         ''' Get the input layer parameters. '''
@@ -154,6 +162,14 @@ class InputLayer(Layer):
     NN input layer parameters.
     '''
 
+    @staticmethod
+    def data_loops():
+        dls = [None] * de.NUM
+        dls[de.FIL] = DataDimLoops()
+        dls[de.IFM] = DataDimLoops()
+        dls[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+        return tuple(dls)
+
     def input_layer(self):
         return None
 
@@ -193,6 +209,14 @@ class ConvLayer(Layer):
         hifm = self.hfil + (self.hofm - 1) * self.htrd
         wifm = self.wfil + (self.wofm - 1) * self.wtrd
         self.inlayer = Layer(nifm, (hifm, wifm))
+
+    @staticmethod
+    def data_loops():
+        dls = [None] * de.NUM
+        dls[de.FIL] = DataDimLoops(le.IFM, le.OFM)
+        dls[de.IFM] = DataDimLoops(le.IFM, le.BAT)
+        dls[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+        return tuple(dls)
 
     def input_layer(self):
         return self.inlayer
@@ -285,6 +309,14 @@ class LocalRegionLayer(Layer):
         hifm = self.hreg + (self.hofm - 1) * self.htrd
         wifm = self.wreg + (self.wofm - 1) * self.wtrd
         self.inlayer = Layer(nifm, (hifm, wifm))
+
+    @staticmethod
+    def data_loops():
+        dls = [None] * de.NUM
+        dls[de.FIL] = DataDimLoops()
+        dls[de.IFM] = DataDimLoops(le.OFM, le.BAT)
+        dls[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+        return tuple(dls)
 
     def input_layer(self):
         return self.inlayer

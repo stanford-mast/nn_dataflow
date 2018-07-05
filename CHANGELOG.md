@@ -14,6 +14,8 @@ List of major changes and improvements
 
   - Add various LSTMs.
 
+  - Add `data_loops` attribute with type `DataDimLoops` to each type of layer.
+
 - Hardware models:
 
   - Consider array bus width and its impact on data multicast latency.
