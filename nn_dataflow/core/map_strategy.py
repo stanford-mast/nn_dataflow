@@ -22,7 +22,6 @@ from . import data_category_enum as de
 from . import loop_enum as le
 from . import mem_hier_enum as me
 from .. import util
-from .data_dim_loops import DataDimLoops
 from .layer import Layer, ConvLayer, LocalRegionLayer
 from .nested_loop_desc import NestedLoopDesc
 from .phy_dim2 import PhyDim2
@@ -103,9 +102,6 @@ class MapStrategyEyeriss(MapStrategy):
                  .format(self.dim_ppeset, self.dim_array,
                          self.dim_lpeset, self.dim_flpeset))
 
-        # Loops of data.
-        self._calc_data_loops()
-
     def utilization(self):
         return self.util
 
@@ -144,13 +140,17 @@ class MapStrategyEyeriss(MapStrategy):
           into batch.
 
           # flpesets in a unitpass = fold.h
+          (temporally)
 
         - procpass: processing pass, unit pass after replication with
           repl.size(). A procpass includes all replication. See Chen, et al,
           ISCA'16, end of V.B.
 
           # unitpasses in a procpass = repl.size()
+          (spatially)
 
+        We first calculate execution stats (ops, time, accesses, sizes) for one
+        unit pass, then consider different replications to build a procpass.
         Processing pass is the unit for loop blocking, i.e., the innermost loop
         processes one procpass. So the unit ops/time/accesses are calculated on
         procpass unit.
@@ -164,7 +164,7 @@ class MapStrategyEyeriss(MapStrategy):
         - ppeset internal fragmentation: due to lpeset folding. E.g., folding
           27 rows by 2 results in two 14 rows, and 1 row is not used.
 
-        - loop occupation: due to partial full loops. E.g., for total of 32
+        - loop occupancy: due to partial full loops. E.g., for total of 32
           ifmaps, if each loop body processes 3 ifmaps, we need 11 ifmap loops,
           but the last one only has 2 ifmaps rather than 3.
         '''
@@ -181,11 +181,11 @@ class MapStrategyEyeriss(MapStrategy):
         for lcnt, locc, rcnt in self._gen_repl():
 
             # Number of ops.
-            # Replicate to procpass. Also consider loop occupations.
+            # Replicate to procpass. Also consider loop occupancies.
             unit_ops = ops_unitpass * self.repl.size() * util.prod(locc)
 
             # Time does not change with replication, and is not affected by
-            # loop occupation.
+            # loop occupancy.
             unit_time = time_unitpass
 
             # Buffered data size.
@@ -195,9 +195,9 @@ class MapStrategyEyeriss(MapStrategy):
             usize_regf = tuple(sz_regf_unitpass)
 
             # Unit access, i.e., data accesses for one processing pass.
-            # Replicate to procpass. Also consider loop occupations.
+            # Replicate to procpass. Also consider loop occupancies.
             uaccess = [tuple() for _ in range(me.NUM)]
-            # Loop occupations affect accesses.
+            # Loop occupancies affect accesses.
             aocc = [util.prod(data_loops[dce].take(locc))
                     for dce in range(de.NUM)]
             # Replication uses the single DRAM, gbuf, itcn.
@@ -205,7 +205,7 @@ class MapStrategyEyeriss(MapStrategy):
                 uaccess[mhe] = tuple(a * n * o for a, n, o
                                      in zip(access_unitpass[mhe], rcnt, aocc))
             # Replication uses different PEs. regf scales with op replication,
-            # i.e., affected by all loop occupations.
+            # i.e., affected by all loop occupancies.
             uaccess[me.REGF] = tuple(a * self.repl.size() * util.prod(locc)
                                      for a in access_unitpass[me.REGF])
             # Finalize.
@@ -311,25 +311,6 @@ class MapStrategyEyeriss(MapStrategy):
             'MapEyeriss: dim_ppeset {} does not fit in dim_array {}.' \
             .format(self.dim_ppeset, self.dim_array)
 
-    def _calc_data_loops(self):
-        '''
-        Calculate the loop of data according to the layer type.
-        '''
-        dls = [None] * de.NUM
-
-        if isinstance(self.layer, ConvLayer):
-            dls[de.FIL] = DataDimLoops(le.IFM, le.OFM)
-            dls[de.IFM] = DataDimLoops(le.IFM, le.BAT)
-            dls[de.OFM] = DataDimLoops(le.OFM, le.BAT)
-        else:
-            assert isinstance(self.layer, LocalRegionLayer)
-            # Both ifmaps and ofmaps use ofm loop.
-            dls[de.FIL] = DataDimLoops()
-            dls[de.IFM] = DataDimLoops(le.OFM, le.BAT)
-            dls[de.OFM] = DataDimLoops(le.OFM, le.BAT)
-
-        self.data_loops = tuple(dls)
-
     def _calc_unitpass(self):
         '''
         Calculate the ops, time, accessed data size, and buffered data size for
@@ -392,11 +373,12 @@ class MapStrategyEyeriss(MapStrategy):
                     * flpesets_per_unitpass
 
             # All data from/to regf go through itcn.
-            access[me.ITCN][de.FIL] = acclayer.wfil * self.dim_lpeset.size() \
+            # Data per PE * number of PEs * number of rounds (flpsets).
+            access[me.ITCN][de.FIL] = acclayer.wfil * self.dim_flpeset.size() \
                     * flpesets_per_unitpass
-            access[me.ITCN][de.IFM] = acclayer.wifm * self.dim_lpeset.size() \
+            access[me.ITCN][de.IFM] = acclayer.wifm * self.dim_flpeset.size() \
                     * flpesets_per_unitpass
-            access[me.ITCN][de.OFM] = acclayer.wofm * self.dim_lpeset.size() \
+            access[me.ITCN][de.OFM] = acclayer.wofm * self.dim_flpeset.size() \
                     * flpesets_per_unitpass
 
             # regf access is based on num of ops.
@@ -448,9 +430,10 @@ class MapStrategyEyeriss(MapStrategy):
                     * flpesets_per_unitpass
 
             # All data from/to regf go through itcn.
+            # Data per PE * number of PEs * number of rounds (flpsets).
             access[me.ITCN][de.FIL] = 0
-            access[me.ITCN][de.IFM] = acclayer.wifm * self.dim_lpeset.size()
-            access[me.ITCN][de.OFM] = acclayer.wofm * self.dim_lpeset.size() \
+            access[me.ITCN][de.IFM] = acclayer.wifm * self.dim_flpeset.size()
+            access[me.ITCN][de.OFM] = acclayer.wofm * self.dim_flpeset.size() \
                     * flpesets_per_unitpass
 
             # regf access is based on num of ops.
@@ -486,7 +469,7 @@ class MapStrategyEyeriss(MapStrategy):
         Generate all replication with ifmaps/ofmaps, to build procpass from
         unitpass.
 
-        Return the total loop count tuple, the loop occupation list, and the
+        Return the total loop count tuple, the loop occupancy list, and the
         replicated data counts.
         '''
         if isinstance(self.layer, ConvLayer):
@@ -516,7 +499,7 @@ class MapStrategyEyeriss(MapStrategy):
                 elif cnt_loops > min_cnt_loops:
                     continue
 
-                # Loop occupation.
+                # Loop occupancy.
                 locc = [1.] * le.NUM
                 locc[le.IFM] = 1. * self.layer.nifm / ifms / lcnt[le.IFM]
                 locc[le.OFM] = 1. * self.layer.nofm / ofms / lcnt[le.OFM]
@@ -543,7 +526,7 @@ class MapStrategyEyeriss(MapStrategy):
             # fold.w is equivalent to increasing batch size.
             lcnt[le.BAT] = self.batch_size * self.fold.w
 
-            # Loop occupation.
+            # Loop occupancy.
             locc = [1.] * le.NUM
             locc[le.OFM] = 1. * self.layer.nofm / ofms / lcnt[le.OFM]
 

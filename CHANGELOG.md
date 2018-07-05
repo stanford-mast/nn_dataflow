@@ -55,6 +55,8 @@ List of major changes and improvements
 
 - Integer division `//` vs. `/`.
 
+- ITCN access calculation for unit pass in `MapStrategy`.
+
 
 ## [v1.4 -- v1.5] -- 2017-08-18
 

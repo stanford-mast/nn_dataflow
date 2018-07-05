@@ -67,7 +67,7 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
                                        layer.total_ops(batch_size))
 
                 # Unit time and unit ops.
-                # The difference is due to the loop occupation, which is not
+                # The difference is due to the loop occupancy, which is not
                 # counted in utilization.
                 self.assertGreaterEqual(
                     nld.unit_time * ms.utilization() * self.dim_array.size(),
