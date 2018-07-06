@@ -373,9 +373,10 @@ class TestLocalRegionLayer(unittest.TestCase):
 
     def test_eltwiselayer(self):
         ''' EltwiseLayer init. '''
-        elayer = EltwiseLayer(64, 28)
-        self.assertEqual(elayer.ops_per_neuron(), 1)
-        self.assertEqual(elayer.total_ifmap_size(), elayer.total_ofmap_size())
+        elayer = EltwiseLayer(64, 28, 3)
+        self.assertEqual(elayer.ops_per_neuron(), 3)
+        self.assertEqual(elayer.nifm, 3 * elayer.nofm)
+        self.assertEqual(elayer.ifmap_size(), elayer.ofmap_size())
 
     def test_repr(self):
         ''' __repr__. '''
@@ -393,8 +394,8 @@ class TestLocalRegionLayer(unittest.TestCase):
             self.assertIn('PoolingLayer', repr(l))
             self.assertEqual(eval(repr(l)), l)
 
-        for l in [EltwiseLayer(64, 32),
-                  EltwiseLayer(64, 28)]:
+        for l in [EltwiseLayer(64, 32, 3),
+                  EltwiseLayer(64, 28, 4)]:
             self.assertIn('EltwiseLayer', repr(l))
             self.assertEqual(eval(repr(l)), l)
 
