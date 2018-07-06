@@ -34,13 +34,16 @@ class MapStrategy(object):
     array.
     '''
 
-    def __init__(self, layer, batch_size, dim_array):
+    def __init__(self, layer, batch_size, occupancy, dim_array):
         if not isinstance(layer, Layer):
             raise TypeError('MapStrategy: layer must be a Layer object.')
+        if not 0 < occupancy <= 1:
+            raise ValueError('MapStrategy: occupancy must be between 0 and 1.')
         if not isinstance(dim_array, PhyDim2):
             raise TypeError('MapStrategy: dim_array must be a PhyDim2 object.')
         self.layer = layer
         self.batch_size = batch_size
+        self.occupancy = occupancy
         self.dim_array = dim_array
 
     def utilization(self):
@@ -64,9 +67,10 @@ class MapStrategyEyeriss(MapStrategy):
     '''
     # pylint: disable=too-many-instance-attributes
 
-    def __init__(self, layer, batch_size, dim_array):
+    def __init__(self, layer, batch_size, occupancy, dim_array):
 
-        super(MapStrategyEyeriss, self).__init__(layer, batch_size, dim_array)
+        super(MapStrategyEyeriss, self).__init__(layer, batch_size, occupancy,
+                                                 dim_array)
 
         # Logic PE set.
         if isinstance(self.layer, ConvLayer):
@@ -181,8 +185,10 @@ class MapStrategyEyeriss(MapStrategy):
         for lcnt, locc, rcnt in self._gen_repl():
 
             # Number of ops.
-            # Replicate to procpass. Also consider loop occupancies.
-            unit_ops = ops_unitpass * self.repl.size() * util.prod(locc)
+            # Replicate to procpass. Also consider external occupancy and loop
+            # occupancies.
+            unit_ops = ops_unitpass * self.repl.size() \
+                    * self.occupancy * util.prod(locc)
 
             # Time does not change with replication, and is not affected by
             # loop occupancy.
@@ -205,8 +211,10 @@ class MapStrategyEyeriss(MapStrategy):
                 uaccess[mhe] = tuple(a * n * o for a, n, o
                                      in zip(access_unitpass[mhe], rcnt, aocc))
             # Replication uses different PEs. regf scales with op replication,
-            # i.e., affected by all loop occupancies.
-            uaccess[me.REGF] = tuple(a * self.repl.size() * util.prod(locc)
+            # i.e., affected by all loop occupancies. Also consider external
+            # occupancy.
+            uaccess[me.REGF] = tuple(a * self.repl.size() \
+                                     * self.occupancy * util.prod(locc)
                                      for a in access_unitpass[me.REGF])
             # Finalize.
             unit_access = tuple(uaccess)
@@ -219,7 +227,8 @@ class MapStrategyEyeriss(MapStrategy):
 
             # Check num of ops.
             util.assert_float_eq_int(
-                nld.total_ops(), self.layer.total_ops(self.batch_size),
+                nld.total_ops(),
+                self.layer.total_ops(self.batch_size) * self.occupancy,
                 'MapEyeriss: total number of physical ops is incorrect.')
 
             # Check unit access.
@@ -242,18 +251,18 @@ class MapStrategyEyeriss(MapStrategy):
                 .format(nld.total_access_at_of(me.DRAM, de.OFM)))
             util.assert_float_eq_int(
                 nld.unit_access_at_of(me.REGF, de.FIL) * util.prod(nld.loopcnt),
-                self.layer.total_ops(self.batch_size)
+                self.layer.total_ops(self.batch_size) * self.occupancy
                 if isinstance(self.layer, ConvLayer) else 0,
                 'MapEyeriss: unit access at REGF for FIL {} is incorrect.'
                 .format(nld.unit_access_at_of(me.REGF)))
             util.assert_float_eq_int(
                 nld.unit_access_at_of(me.REGF, de.IFM) * util.prod(nld.loopcnt),
-                self.layer.total_ops(self.batch_size),
+                self.layer.total_ops(self.batch_size) * self.occupancy,
                 'MapEyeriss: unit access at REGF for IFM {} is incorrect.'
                 .format(nld.unit_access_at_of(me.REGF)))
             util.assert_float_eq_int(
                 nld.unit_access_at_of(me.REGF, de.OFM) * util.prod(nld.loopcnt),
-                self.layer.total_ops(self.batch_size),
+                self.layer.total_ops(self.batch_size) * self.occupancy,
                 'MapEyeriss: unit access at REGF for OFM {} is incorrect.'
                 .format(nld.unit_access_at_of(me.REGF)))
 

@@ -74,13 +74,16 @@ class TestLoopBlockingFixture(unittest.TestCase):
         # Nested loop description after mapping.
         self.nld = {}
         self.nld['BASE'] = next(MapStrategyEyeriss(self.layer['BASE'],
-                                                   self.batch_size, dim_array)
+                                                   self.batch_size, 1,
+                                                   dim_array)
                                 .gen_nested_loop_desc())
         self.nld['LGFIL'] = next(MapStrategyEyeriss(self.layer['LGFIL'],
-                                                    self.batch_size, dim_array)
+                                                    self.batch_size, 1,
+                                                    dim_array)
                                  .gen_nested_loop_desc())
         self.nld['POOL'] = next(MapStrategyEyeriss(self.layer['POOL'],
-                                                   self.batch_size, dim_array)
+                                                   self.batch_size, 1,
+                                                   dim_array)
                                 .gen_nested_loop_desc())
         # Fake nested loop, with zero filter size.
         self.nld['ZERO_FIL'] = NestedLoopDesc(loopcnt=(12, 10, 4),

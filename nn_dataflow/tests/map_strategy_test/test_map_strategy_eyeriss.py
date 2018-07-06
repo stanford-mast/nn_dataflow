@@ -40,17 +40,18 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
     def test_invalid_layer(self):
         ''' Constructor with invalid layer type. '''
         with self.assertRaisesRegexp(TypeError, 'MapEyeriss: .*type.*'):
-            _ = MapStrategyEyeriss(Layer(1, 1), 4, self.dim_array)
+            _ = MapStrategyEyeriss(Layer(1, 1), 4, 1, self.dim_array)
 
     def test_nested_loop_desc_sanity(self):
         ''' Generated nested loop description sanity check. '''
 
         batch_size = 4
+        occ = 1
 
         for layer in self.convlayers.values() + self.fclayers.values() \
                 + self.lrlayers.values() + self.fake_layers.values():
 
-            ms = MapStrategyEyeriss(layer, batch_size, self.dim_array)
+            ms = MapStrategyEyeriss(layer, batch_size, occ, self.dim_array)
 
             for nld in ms.gen_nested_loop_desc():
 
@@ -124,13 +125,49 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
                     self.assertEqual(nld.data_loops[de.OFM],
                                      DataDimLoops(le.OFM, le.BAT))
 
+    def test_nested_loop_desc_occupancy(self):
+        ''' Nested loop description with occupancy. '''
+
+        batch_size = 4
+        occ0 = 1
+        occ1 = 0.8
+
+        for layer in self.convlayers.values() + self.fclayers.values() \
+                + self.lrlayers.values() + self.fake_layers.values():
+
+            ms0 = MapStrategyEyeriss(layer, batch_size, occ0, self.dim_array)
+            ms1 = MapStrategyEyeriss(layer, batch_size, occ1, self.dim_array)
+
+            for nld0, nld1 in zip(ms0.gen_nested_loop_desc(),
+                                  ms1.gen_nested_loop_desc()):
+
+                self.assertEqual(nld0.unit_time, nld1.unit_time)
+
+                self.assertTupleEqual(nld0.usize_gbuf, nld1.usize_gbuf)
+                self.assertTupleEqual(nld0.usize_regf, nld1.usize_regf)
+
+                self.assertAlmostEqual(nld0.unit_ops * occ1,
+                                       nld1.unit_ops * occ0)
+
+                for mhe in range(me.NUM):
+                    for dce in range(de.NUM):
+                        if mhe == me.REGF:
+                            self.assertAlmostEqual(
+                                nld0.unit_access_at_of(mhe, dce) * occ1,
+                                nld1.unit_access_at_of(mhe, dce) * occ0)
+                        else:
+                            self.assertAlmostEqual(
+                                nld0.unit_access_at_of(mhe, dce),
+                                nld1.unit_access_at_of(mhe, dce))
+
     def test_nested_loop_desc_fold_w(self):
         ''' Generated nested loop description when folding width. '''
 
         layer = self.convlayers['conv1']
         batch_size = 4
+        occ = 1
 
-        ms = MapStrategyEyeriss(layer, batch_size, self.dim_array)
+        ms = MapStrategyEyeriss(layer, batch_size, occ, self.dim_array)
 
         self.assertTupleEqual(ms.repl, (1, 1))
         self.assertEqual(ms.fold.h, 1)
@@ -170,8 +207,9 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
 
         layer = self.fake_layers['LGFIL']
         batch_size = 4
+        occ = 1
 
-        ms = MapStrategyEyeriss(layer, batch_size, self.dim_array)
+        ms = MapStrategyEyeriss(layer, batch_size, occ, self.dim_array)
 
         self.assertTupleEqual(ms.repl, (1, 1))
         self.assertGreater(ms.fold.h, 1)
@@ -227,10 +265,11 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
                            'conv5': 156}
 
         batch_size = 4
+        occ = 1
 
         for name, layer in self.convlayers.items():
 
-            ms = MapStrategyEyeriss(layer, batch_size, self.dim_array)
+            ms = MapStrategyEyeriss(layer, batch_size, occ, self.dim_array)
 
             # Two ways to calculate active PEs.
             # Physical PE set size. Max active PEs.

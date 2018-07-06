@@ -36,6 +36,8 @@ List of major changes and improvements
 
   - `Scheduling` breaks cost tie using time.
 
+  - Add external occupancy to `MapStrategy` and merge into `NestedLoopDesc`.
+
 - Software engineering.
 
   - Change `NNDataflowScheme` node-time product interface to explicitly be

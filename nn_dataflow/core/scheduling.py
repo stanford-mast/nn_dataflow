@@ -243,7 +243,7 @@ class Scheduling(object):
                                                        self.batch_size)
 
         # Mapping strategy.
-        map_strategy = self.map_strategy_class(p_layer, p_batch_size,
+        map_strategy = self.map_strategy_class(p_layer, p_batch_size, 1,
                                                resource.dim_array)
 
         # Explore PE array mapping schemes for partitioned layer.
