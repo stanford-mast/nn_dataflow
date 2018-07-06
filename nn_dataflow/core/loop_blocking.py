@@ -115,7 +115,7 @@ def _is_conv_loops(nested_loop_desc):
 
 
 def _gen_loopblocking_perprocess(
-        nested_loop_desc, resource, cost, part_occ, options,
+        nested_loop_desc, resource, cost, options,
         gen_tifm, gen_tofm, gen_tbat, gen_ords):
 
     def _gen_bl_ts():
@@ -139,14 +139,14 @@ def _gen_loopblocking_perprocess(
             if is_conv_loops and skip_conv(bl_ts, bl_ords):
                 continue
             lbs = LoopBlockingScheme(
-                nested_loop_desc, bl_ts, bl_ords, resource, part_occ, options)
+                nested_loop_desc, bl_ts, bl_ords, resource, options)
             yield lbs
 
     return heapq.nsmallest(options.ntops, _sweep(),
                            key=lambda lbs: (lbs.get_cost(cost), lbs.time))
 
 
-def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
+def gen_loopblocking(nested_loop_desc, resource, cost, options):
     '''
     Generator for loop blocking.
     '''
@@ -157,7 +157,7 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
 
         for bl_ts, bl_ords in gen(nested_loop_desc, resource, options):
             lbs = LoopBlockingScheme(nested_loop_desc, bl_ts, bl_ords,
-                                     resource, part_occ, options)
+                                     resource, options)
             yield lbs
         return
 
@@ -203,7 +203,7 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
     list_ords = list(gen_ords)
     for tifm, tofm in itertools.product(gen_tifm, gen_tofm):
         r = apply_func(_gen_loopblocking_perprocess,
-                       (nested_loop_desc, resource, cost, part_occ, options,
+                       (nested_loop_desc, resource, cost, options,
                         [tifm], [tofm], list_tbat, list_ords))
         results.append(r)
 

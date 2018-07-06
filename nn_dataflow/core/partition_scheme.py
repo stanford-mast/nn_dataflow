@@ -111,7 +111,7 @@ class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
     def part_layer(self, layer, batch_size):
         '''
         Get the partitioned layer structure and batch size. Return partitioned
-        layer, partitioned batch size, and partitioning op occupation.
+        layer, partitioned batch size, and partitioning op occupancy.
         '''
 
         p_nifm = util.idivc(layer.nifm, self.pdims[pe.INPP].size())

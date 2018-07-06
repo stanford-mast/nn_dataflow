@@ -191,7 +191,6 @@ class Scheduling(object):
                 [:options.ntops]
 
         # Check total op count.
-        # Initial occupation also applies to layer.
         total_layer_ops = self.layer.total_ops(self.batch_size)
         for t in tops:
             actual_layer_ops = t.dict_loop['ops']
@@ -243,7 +242,7 @@ class Scheduling(object):
                                                        self.batch_size)
 
         # Mapping strategy.
-        map_strategy = self.map_strategy_class(p_layer, p_batch_size, 1,
+        map_strategy = self.map_strategy_class(p_layer, p_batch_size, p_occ,
                                                resource.dim_array)
 
         # Explore PE array mapping schemes for partitioned layer.
@@ -251,7 +250,7 @@ class Scheduling(object):
 
             # Explore loop blocking schemes.
             for lbs in loop_blocking.gen_loopblocking(
-                    nested_loop_desc, resource, self.cost, p_occ, options):
+                    nested_loop_desc, resource, self.cost, options):
 
                 if lbs.is_valid():
                     top_lbs_list.append(lbs)

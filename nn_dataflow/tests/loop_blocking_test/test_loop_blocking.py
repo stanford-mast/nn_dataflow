@@ -162,10 +162,10 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         self.assertLessEqual(cnt, 8)
 
-    def _gen_loopblocking(self, wlkey='BASE', rsrckey='BASE', part_occ=1.,
+    def _gen_loopblocking(self, wlkey='BASE', rsrckey='BASE',
                           optkey='BASE'):
         ''' gen_loopblocking trampoline. '''
         return loop_blocking.gen_loopblocking(
             self.nld[wlkey], self.resource[rsrckey],
-            self.cost, part_occ, self.options[optkey])
+            self.cost, self.options[optkey])
 

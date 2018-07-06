@@ -43,7 +43,7 @@ class LoopBlockingScheme(object):
         REGF = 1
         NUM = 2
 
-    def __init__(self, nested_loop_desc, bl_ts, bl_ords, resource, part_occ,
+    def __init__(self, nested_loop_desc, bl_ts, bl_ords, resource,
                  options):
         '''
         Given blocking factors `bl_ts` and the loop orders `bl_ords`, construct
@@ -75,8 +75,6 @@ class LoopBlockingScheme(object):
         `bl_ords` indicate the loop orders of all levels, indexed by BL. Each
         entry is a permutation tuple indexed by LoopEnum and gives the
         positions of the loops at this level. Smaller number means inner loop.
-
-        `part_occ` is the partitioning occupation.
         '''
 
         # pylint: disable=invalid-name
@@ -161,9 +159,6 @@ class LoopBlockingScheme(object):
         self.dram_bandwidth = resource.dram_bandwidth
         # Parallel partitioning.
         self.num_nodes = resource.proc_region.dim.size()
-        # Occupation.
-        # Occupation only affects op counts and REGF accesses.
-        self.part_occ = part_occ
 
         # Stats: lazy evaluation.
         self.finalized_stats = False
@@ -267,7 +262,6 @@ class LoopBlockingScheme(object):
                             ('size', size),
                             ('unit_size', self.unit_size),
                             ('unit_cnt', self.unit_cnt),
-                            ('part_occ', self.part_occ),
                             ('ti', tuple(lp_ts[le.IFM])),
                             ('to', tuple(lp_ts[le.OFM])),
                             ('tb', tuple(lp_ts[le.BAT])),
@@ -421,14 +415,12 @@ class LoopBlockingScheme(object):
         Lazily calculate stats.
         '''
 
-        self.ops = self.nld.unit_ops * self.lcnt * self.num_nodes \
-                * self.part_occ
+        self.ops = self.nld.unit_ops * self.lcnt * self.num_nodes
         self.proc_time = self.nld.unit_time * self.lcnt
 
-        self.access[me.REGF] = [v * self.lcnt * t
-                                * self.num_nodes * self.part_occ for v, t
-                                in zip(self.nld.unit_access[me.REGF],
-                                       [1, 1, 2])]
+        self.access[me.REGF] = [v * self.lcnt * t * self.num_nodes
+                                for v, t in zip(self.nld.unit_access[me.REGF],
+                                                [1, 1, 2])]
 
         self.access[me.ITCN] = [self.nld.total_access_at_of(me.ITCN, dce)
                                 * self.fetch[self.BL.REGF][dce]

@@ -339,7 +339,7 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
 
         for bl_ts, bl_ords in self._gen_loopblocking_all():
 
-            lbs = self._lbs(bl_ts, bl_ords, part_occ=self.part_occ)
+            lbs = self._lbs(bl_ts, bl_ords)
 
             if not lbs.is_valid():
                 self.assertIsNone(lbs.get_scheme_dict(self.cost))
@@ -356,8 +356,6 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
                 for dce in range(de.NUM):
                     self.assertAlmostEqual(sdict['size'][lvl][dce],
                                            lbs.data_size(lvl, dce))
-
-            self.assertAlmostEqual(sdict['part_occ'], self.part_occ)
 
             self.assertEqual(util.prod(sdict['ti']),
                              self.nld['BASE'].loopcnt[le.IFM])
@@ -386,25 +384,4 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
                 for dce in range(de.NUM):
                     self.assertAlmostEqual(access1[mhe][dce],
                                            access2[mhe][dce])
-
-    def test_part_occ(self):
-        ''' Impact of part_occ. '''
-
-        for bl_ts, bl_ords in self._gen_loopblocking_all():
-
-            lbs = self._lbs(bl_ts, bl_ords, part_occ=1, rsrckey='LG')
-
-            lbs_ = copy.deepcopy(lbs)
-            ops = lbs_.get_scheme_dict(self.cost)['ops']
-            time = lbs_.get_scheme_dict(self.cost)['time']
-            del lbs_
-
-            for part_occ in [0.9, 0.8, 0.7]:
-                lbs_ = copy.deepcopy(lbs)
-                lbs_.part_occ = part_occ
-
-                self.assertAlmostEqual(lbs_.get_scheme_dict(self.cost)['ops'],
-                                       ops * part_occ)
-                self.assertAlmostEqual(lbs_.get_scheme_dict(self.cost)['time'],
-                                       time)
 

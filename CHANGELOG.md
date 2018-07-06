@@ -36,7 +36,8 @@ List of major changes and improvements
 
   - `Scheduling` breaks cost tie using time.
 
-  - Add external occupancy to `MapStrategy` and merge into `NestedLoopDesc`.
+  - Add external occupancy to `MapStrategy` and merge into `NestedLoopDesc`;
+    use it for partitioning occupancy.
 
 - Software engineering.
 

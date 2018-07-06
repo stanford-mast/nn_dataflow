@@ -135,17 +135,14 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.cost = Cost(mac_op=1, mem_hier=(200, 6, 2, 1),
                          noc_hop=50, unit_static=50)
 
-        # Partition occupation.
-        self.part_occ = 0.91
-
 
     def _lbs(self, bl_ts, bl_ords=None, wlkey='BASE', rsrckey='BASE',
-             optkey='BASE', part_occ=1):
+             optkey='BASE'):
         ''' Make a LoopBlockingScheme instance. '''
         bl_ords = (tuple(range(le.NUM)), tuple(range(le.NUM))) \
                 if not bl_ords else bl_ords
         return LoopBlockingScheme(self.nld[wlkey], bl_ts, bl_ords,
-                                  self.resource[rsrckey], part_occ,
+                                  self.resource[rsrckey],
                                   self.options[optkey])
 
     def _gen_loopblocking_all(self, wlkey='BASE'):
