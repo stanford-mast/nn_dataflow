@@ -144,7 +144,7 @@ class NNDataflow(object):
 
         del options
 
-        prevs, merge_symbol = self.network.prevs(layer_name)
+        prevs = self.network.prevs(layer_name)
         assert prevs
 
         def _ofmap_layout(dfsch, prev_layer_name):

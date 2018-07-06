@@ -12,6 +12,9 @@ List of major changes and improvements
 
   - Add `EltwiseLayer`.
 
+  - Allow only concatenation of layers; summation of layers turns into an
+    additional `EltwiseLayer`.
+
   - Add various LSTMs.
 
   - Add `data_loops` attribute with type `DataDimLoops` to each type of layer.

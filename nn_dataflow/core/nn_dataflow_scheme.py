@@ -65,7 +65,7 @@ class NNDataflowScheme(MutableMapping):
             raise TypeError('NNDataflowScheme: sched_result must be '
                             'a SchedulingResult instance.')
 
-        prevs, _ = self.network.prevs(layer_name)
+        prevs = self.network.prevs(layer_name)
         for p in prevs:
             if p is None:
                 continue

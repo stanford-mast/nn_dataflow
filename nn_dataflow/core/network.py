@@ -35,8 +35,6 @@ class Network(object):
         self.prevs_dict = {}
         self.nexts_dict = {}
 
-        self._merge_symbol_cache = {}
-
     def set_input_layer(self, input_layer):
         '''
         Set the input layer.
@@ -94,7 +92,7 @@ class Network(object):
 
         # Ensure dimension matching between layers.
         try:
-            self._merge_symbol(layer_name)
+            self._check_prevs(layer_name)
         except ValueError:
             del self.layer_dict[layer_name]
             del self.prevs_dict[layer_name]
@@ -105,10 +103,10 @@ class Network(object):
 
     def prevs(self, layer_name):
         '''
-        Get the previous layers of the given layer name, and the merge approach.
+        Get the previous layers of the given layer name.
 
-        Return a tuple of all the previous layer names, and the merge symbol.
-        Use `None` to represent the input layer in the returned tuple.
+        Return a tuple of all the previous layer names. Use `None` to represent
+        the input layer in the returned tuple.
         '''
         if layer_name == self.INPUT_LAYER_KEY:
             raise ValueError('Network: cannot get previous layers for '
@@ -117,9 +115,8 @@ class Network(object):
         prevs = tuple(None if p == self.INPUT_LAYER_KEY else p
                       for p in self.prevs_dict[layer_name])
         assert prevs
-        merge_symbol = self._merge_symbol(layer_name)
 
-        return prevs, merge_symbol
+        return prevs
 
     def nexts(self, layer_name):
         '''
@@ -147,7 +144,7 @@ class Network(object):
         '''
         firsts = []
         for layer_name in self:
-            prevs, _ = self.prevs(layer_name)
+            prevs = self.prevs(layer_name)
             if prevs == (None,):
                 firsts.append(layer_name)
         return tuple(firsts)
@@ -163,14 +160,10 @@ class Network(object):
                 lasts.append(layer_name)
         return tuple(lasts)
 
-    def _merge_symbol(self, layer_name):
+    def _check_prevs(self, layer_name):
         '''
-        Get the symbol to merge the previous layers as the input to the given
-        layer.
+        Check the previous layers of the given layer name.
         '''
-        if layer_name in self._merge_symbol_cache:
-            return self._merge_symbol_cache[layer_name]
-
         layer = self.layer_dict[layer_name]
 
         prevs = self.prevs_dict[layer_name]
@@ -179,7 +172,6 @@ class Network(object):
         # Compare the ifmap dimensions of this layer, with all the ofmaps of
         # the previous layers.
         sum_nfmaps = 0
-        same_nfmaps = True
 
         for p in prevs:
             pl = self.layer_dict[p]
@@ -193,23 +185,10 @@ class Network(object):
                                          (layer.hofm, layer.wofm)))
 
             sum_nfmaps += pl.nofm
-            same_nfmaps = same_nfmaps and pl.nofm == layer.nifm
 
-        if sum_nfmaps == layer.nifm:
-            if same_nfmaps:
-                assert len(prevs) == 1
-            # Fmaps are concatenated.
-            symbol = '|'
-        elif same_nfmaps:
-            # Fmaps are summed up.
-            symbol = '+'
-        else:
-            raise ValueError('Network: cannot figure out how to merge {}, '
-                             'which are the previous layers of {}'
-                             .format(' '.join(prevs), layer_name))
-
-        self._merge_symbol_cache[layer_name] = symbol
-        return symbol
+        if sum_nfmaps != layer.nifm:
+            raise ValueError('Network: {} cannot be the previous layers of {}.'
+                             .format(' | '.join(prevs), layer_name))
 
     def __contains__(self, layer_name):
         ''' Whether the network contains a layer. '''
@@ -239,10 +218,8 @@ class Network(object):
     def __str__(self):
         str_ = 'Network: {}\n'.format(self.net_name)
         for layer_name in self:
-            prevs, merge_symbol = self.prevs(layer_name)
-            prev_str = merge_symbol.join(['None' if n is None else n
-                                          for n in prevs])
-            str_ += '  Layer {} <- {}\n'.format(
-                layer_name, ' {} '.format(prev_str))
+            prevs = self.prevs(layer_name)
+            prev_str = ' | '.join(['None' if n is None else n for n in prevs])
+            str_ += '  Layer {} <- {}\n'.format(layer_name, prev_str)
         return str_
 

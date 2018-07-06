@@ -21,7 +21,8 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import unittest
 
 from nn_dataflow.core import Network
-from nn_dataflow.core import Layer, InputLayer, ConvLayer, FCLayer, PoolingLayer
+from nn_dataflow.core import Layer, InputLayer, ConvLayer, FCLayer, \
+        PoolingLayer, EltwiseLayer
 
 class TestNetwork(unittest.TestCase):
     ''' Tests for Network. '''
@@ -66,8 +67,9 @@ class TestNetwork(unittest.TestCase):
 
         self.network.add('f2', FCLayer(64, 2000, 7), prevs='p1')
         self.network.add('f3', FCLayer(3000, 1000), prevs=('f1', 'f2'))
-        self.network.add('f4', FCLayer(1000, 1000), prevs=('f1', 'f3'))
-        self.assertEqual(len(self.network), 6)
+        self.network.add('e4', EltwiseLayer(1000, 1, 2), prevs=('f1', 'f3'))
+        self.network.add('f4', FCLayer(1000, 1000), prevs='e4')
+        self.assertEqual(len(self.network), 7)
 
     def test_add_same_key(self):
         ''' Modifier add same key. '''
@@ -117,17 +119,17 @@ class TestNetwork(unittest.TestCase):
             network.add('c2', ConvLayer(64, 128, 220, 3))
         self.assertEqual(len(network), 1)
 
-        with self.assertRaisesRegexp(ValueError, 'Network: .*merge.*c1.*p1.*'):
+        with self.assertRaisesRegexp(ValueError, 'Network: .*c1.*prev.*p1.*'):
             network.add('p1', PoolingLayer(32, 7, 32))
         self.assertEqual(len(network), 1)
-        with self.assertRaisesRegexp(ValueError, 'Network: .*merge.*c1.*c2.*'):
+        with self.assertRaisesRegexp(ValueError, 'Network: .*c1.*prev.*c2.*'):
             network.add('c2', ConvLayer(32, 128, 224, 3))
         self.assertEqual(len(network), 1)
 
         network.add('c2', ConvLayer(64, 128, 224, 3))
 
         with self.assertRaisesRegexp(ValueError,
-                                     r'Network: .*merge.*c1\s*c2.*p1.*'):
+                                     r'Network: .*c1 | c2.*prev.*p1.*'):
             network.add('p1', PoolingLayer(128, 7, 32), prevs=('c1', 'c2'))
         self.assertEqual(len(network), 2)
 
@@ -135,41 +137,25 @@ class TestNetwork(unittest.TestCase):
         ''' Get prevs. '''
         self.network.add('f2', FCLayer(64, 2000, 7), prevs='p1')
         self.network.add('f3', FCLayer(3000, 1000), prevs=('f1', 'f2'))
-        self.network.add('f4', FCLayer(1000, 1000), prevs=('f1', 'f3'))
 
-        prevs, symbol = self.network.prevs('f1')
+        prevs = self.network.prevs('f1')
         self.assertTupleEqual(prevs, ('p1',))
-        self.assertEqual(symbol, '|')
 
-        prevs, symbol = self.network.prevs('f2')
+        prevs = self.network.prevs('f2')
         self.assertTupleEqual(prevs, ('p1',))
-        self.assertEqual(symbol, '|')
-        prevs, symbol = self.network.prevs('f3')
+        prevs = self.network.prevs('f3')
         self.assertTupleEqual(prevs, ('f1', 'f2'))
-        self.assertEqual(symbol, '|')
-
-        prevs, symbol = self.network.prevs('f4')
-        self.assertTupleEqual(prevs, ('f1', 'f3'))
-        self.assertEqual(symbol, '+')
 
     def test_prevs_first(self):
         ''' Get prevs first layer. '''
         self.network.add('c2', ConvLayer(3, 3, 224, 1),
                          prevs=self.network.INPUT_LAYER_KEY)
-        self.network.add('c3', ConvLayer(3, 4, 224, 1),
-                         prevs=(self.network.INPUT_LAYER_KEY, 'c2'))
 
-        prevs, symbol = self.network.prevs('c1')
+        prevs = self.network.prevs('c1')
         self.assertTupleEqual(prevs, (None,))
-        self.assertEqual(symbol, '|')
 
-        prevs, symbol = self.network.prevs('c2')
+        prevs = self.network.prevs('c2')
         self.assertTupleEqual(prevs, (None,))
-        self.assertEqual(symbol, '|')
-
-        prevs, symbol = self.network.prevs('c3')
-        self.assertTupleEqual(prevs, (None, 'c2'))
-        self.assertEqual(symbol, '+')
 
     def test_prevs_input(self):
         ''' Get prevs input layer. '''
@@ -180,19 +166,20 @@ class TestNetwork(unittest.TestCase):
         ''' Get nexts. '''
         self.network.add('f2', FCLayer(64, 2000, 7), prevs='p1')
         self.network.add('f3', FCLayer(3000, 1000), prevs=('f1', 'f2'))
-        self.network.add('f4', FCLayer(1000, 1000), prevs=('f1', 'f3'))
+        self.network.add('e4', EltwiseLayer(1000, 1, 2), prevs=('f1', 'f3'))
+        self.network.add('f4', FCLayer(1000, 1000), prevs='e4')
 
         nexts = self.network.nexts('p1')
         self.assertTupleEqual(nexts, ('f1', 'f2'))
 
         nexts = self.network.nexts('f1')
-        self.assertTupleEqual(nexts, ('f3', 'f4'))
+        self.assertTupleEqual(nexts, ('f3', 'e4'))
 
         nexts = self.network.nexts('f2')
         self.assertTupleEqual(nexts, ('f3',))
 
         nexts = self.network.nexts('f3')
-        self.assertTupleEqual(nexts, ('f4',))
+        self.assertTupleEqual(nexts, ('e4',))
 
     def test_nexts_last(self):
         ''' Get nexts first layer. '''
@@ -213,7 +200,7 @@ class TestNetwork(unittest.TestCase):
 
         self.network.add('c2', ConvLayer(3, 3, 224, 1),
                          prevs=self.network.INPUT_LAYER_KEY)
-        self.network.add('c3', ConvLayer(3, 4, 224, 1),
+        self.network.add('c3', ConvLayer(6, 4, 224, 1),
                          prevs=(self.network.INPUT_LAYER_KEY, 'c2'))
         nexts = self.network.nexts(self.network.INPUT_LAYER_KEY)
         self.assertTupleEqual(nexts, ('c1', 'c2', 'c3'))
@@ -225,7 +212,7 @@ class TestNetwork(unittest.TestCase):
 
         self.network.add('c2', ConvLayer(3, 3, 224, 1),
                          prevs=self.network.INPUT_LAYER_KEY)
-        self.network.add('c3', ConvLayer(3, 4, 224, 1),
+        self.network.add('c3', ConvLayer(6, 4, 224, 1),
                          prevs=(self.network.INPUT_LAYER_KEY, 'c2'))
 
         firsts = self.network.firsts()
@@ -268,8 +255,10 @@ class TestNetwork(unittest.TestCase):
         self.assertEqual(len(self.network), 4)
         self.network.add('f3', FCLayer(3000, 1000), prevs=('f1', 'f2'))
         self.assertEqual(len(self.network), 5)
-        self.network.add('f4', FCLayer(1000, 1000), prevs=('f1', 'f3'))
+        self.network.add('e4', EltwiseLayer(1000, 1, 2), prevs=('f1', 'f3'))
         self.assertEqual(len(self.network), 6)
+        self.network.add('f4', FCLayer(1000, 1000), prevs='e4')
+        self.assertEqual(len(self.network), 7)
 
     def test_iter(self):
         ''' Accessor iter. '''
