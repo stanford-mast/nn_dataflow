@@ -32,6 +32,8 @@ List of major changes and improvements
   - Add dimensional partitioning option, i.e., each partitioning can only be
     along one dimension unless it is the only partitioning.
 
+  - Add utility `IntRange` for integer ranges.
+
 
 ### Changed
 
