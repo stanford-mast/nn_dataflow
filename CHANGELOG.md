@@ -44,6 +44,9 @@ List of major changes and improvements
   - Add external occupancy to `MapStrategy` and merge into `NestedLoopDesc`;
     use it for partitioning occupancy.
 
+  - `FmapRange.beg_end()` returns an `IntRange` instance if with a single
+    attribute argument, or a list of `IntRange` otherwise.
+
 - Software engineering.
 
   - Change `NNDataflowScheme` node-time product interface to explicitly be
@@ -64,6 +67,8 @@ List of major changes and improvements
 - Integer division `//` vs. `/`.
 
 - ITCN access calculation for unit pass in `MapStrategy`.
+
+- `FmapRange` comparison.
 
 
 ## [v1.4 -- v1.5] -- 2017-08-18
