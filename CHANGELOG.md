@@ -47,6 +47,12 @@ List of major changes and improvements
   - `FmapRange.beg_end()` returns an `IntRange` instance if with a single
     attribute argument, or a list of `IntRange` otherwise.
 
+  - Move partitioning scheme sub-`FmapRange` method, which is used to get
+    partitioned fmap ranges, to `PartitionScheme`.
+
+  - Move partitioning scheme projection, which is used to generate ofmap
+    layout, to `PartitionScheme`.
+
 - Software engineering.
 
   - Change `NNDataflowScheme` node-time product interface to explicitly be
