@@ -53,6 +53,8 @@ List of major changes and improvements
   - Move partitioning scheme projection, which is used to generate ofmap
     layout, to `PartitionScheme`.
 
+  - `DataLayout` refactored: use `PartitionScheme` to replace `FmapRangeMap`.
+
 - Software engineering.
 
   - Change `NNDataflowScheme` node-time product interface to explicitly be
