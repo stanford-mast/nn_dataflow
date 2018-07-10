@@ -55,6 +55,9 @@ List of major changes and improvements
 
   - `DataLayout` refactored: use `PartitionScheme` to replace `FmapRangeMap`.
 
+  - `partition` module refactored: use new `DataLayout` class and new
+    `PartitionScheme` methods.
+
 - Software engineering.
 
   - Change `NNDataflowScheme` node-time product interface to explicitly be
