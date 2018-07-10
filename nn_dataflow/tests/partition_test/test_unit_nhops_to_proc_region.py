@@ -296,7 +296,7 @@ class TestUnitNhopsToProcRegion(TestPartitionFixture):
         ''' Make a DataLayout instance. '''
         frng = FmapRange((0,) * 4, (self.batch_size, nfm, hfm, wfm))
 
-        region = NodeRegion(origin=origin, dim=dims, type=NodeRegion.DATA)
+        region = NodeRegion(origin=origin, dim=dims, type=NodeRegion.DRAM)
 
         # From top to bottom: h, w, b, n.
         order = (pe.OFMP, pe.BATP, pe.OUTP, pe.INPP)

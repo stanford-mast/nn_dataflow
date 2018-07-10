@@ -25,6 +25,7 @@ from .phy_dim2 import PhyDim2
 
 NODE_REGION_LIST = ['dim',
                     'origin',
+                    'dist',
                     'type',
                    ]
 
@@ -33,7 +34,7 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
     A node region defined by the dimension and origin offset.
 
     The `type` attribute specifies the region type, which could be `PROC` for
-    computation processing nodes or 'DATA' for data storage nodes.
+    computation processing nodes or 'DRAM' for off-chip data storage nodes.
 
     NOTE: we cannot overload __contains__ and __iter__ as a node container,
     because the base namedtuple already defines them.
@@ -41,16 +42,24 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
 
     # Type enums.
     PROC = 0
-    DATA = 1
+    DRAM = 1
     NUM = 2
 
     def __new__(cls, *args, **kwargs):
-        ntp = super(NodeRegion, cls).__new__(cls, *args, **kwargs)
+
+        # Set default values.
+        kwargs2 = kwargs.copy()
+        if len(args) <= NODE_REGION_LIST.index('dist'):
+            kwargs2.setdefault('dist', PhyDim2(1, 1))
+
+        ntp = super(NodeRegion, cls).__new__(cls, *args, **kwargs2)
 
         if not isinstance(ntp.dim, PhyDim2):
             raise TypeError('NodeRegion: dim must be a PhyDim2 object.')
         if not isinstance(ntp.origin, PhyDim2):
             raise TypeError('NodeRegion: origin must be a PhyDim2 object.')
+        if not isinstance(ntp.dist, PhyDim2):
+            raise TypeError('NodeRegion: dist must be a PhyDim2 object.')
 
         if ntp.type not in range(cls.NUM):
             raise ValueError('NodeRegion: type must be a valid type enum.')
@@ -75,6 +84,6 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
             raise ValueError('NodeRegion: relative coordinate {} is not in '
                              'node region {}.'.format(rel_coordinate, self))
 
-        abs_coordinate = self.origin + rel_coordinate
+        abs_coordinate = self.origin + rel_coordinate * self.dist
         return abs_coordinate
 

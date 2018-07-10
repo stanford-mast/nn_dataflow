@@ -38,6 +38,11 @@ class TestPartitionScheme(unittest.TestCase):
         self.ps2 = PartitionScheme(order=range(pe.NUM),
                                    pdims=[(2, 2), (5, 5), (3, 3), (1, 1)])
 
+        self.nr1 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps1.dim(),
+                              type=NodeRegion.PROC)
+        self.nr2 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps2.dim(),
+                              type=NodeRegion.PROC)
+
     def test_invalid_order(self):
         ''' Invalid order. '''
         with self.assertRaisesRegexp(ValueError, 'PartitionScheme: .*order.*'):
@@ -128,12 +133,7 @@ class TestPartitionScheme(unittest.TestCase):
 
     def test_coordinate(self):
         ''' Get coordinate. '''
-        nr1 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps1.dim(),
-                         type=NodeRegion.PROC)
-        nr2 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps2.dim(),
-                         type=NodeRegion.PROC)
-
-        for ps, nr in zip([self.ps1, self.ps2], [nr1, nr2]):
+        for ps, nr in zip([self.ps1, self.ps2], [self.nr1, self.nr2]):
 
             coord_list = [ps.coordinate(nr, pidx) for pidx in ps.gen_pidx()]
 
@@ -149,11 +149,11 @@ class TestPartitionScheme(unittest.TestCase):
         pidx = [PhyDim2(0, 0)] * pe.NUM
         pidx[pe.OUTP] = PhyDim2(1, 1)
 
-        self.assertEqual(self.ps1.coordinate(nr1, pidx),
+        self.assertEqual(self.ps1.coordinate(self.nr1, pidx),
                          self.ps1.dim(pe.OFMP, pe.INPP)
                          * PhyDim2(1, 1))
 
-        self.assertEqual(self.ps2.coordinate(nr2, pidx),
+        self.assertEqual(self.ps2.coordinate(self.nr2, pidx),
                          self.ps2.dim(pe.OFMP, pe.BATP, pe.INPP)
                          * PhyDim2(1, 1))
 
@@ -258,7 +258,7 @@ class TestPartitionScheme(unittest.TestCase):
 
         def _make_region(dim):
             return NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(*dim),
-                              type=NodeRegion.DATA)
+                              type=NodeRegion.DRAM)
 
         # Shrink.
         part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
@@ -359,7 +359,7 @@ class TestPartitionScheme(unittest.TestCase):
         with self.assertRaisesRegexp(ValueError, 'PartitionScheme: .*region.*'):
             _ = self.ps1.projection(NodeRegion(origin=PhyDim2(0, 0),
                                                dim=PhyDim2(0, 0),
-                                               type=NodeRegion.DATA))
+                                               type=NodeRegion.DRAM))
 
     def test_repr(self):
         ''' __repr__. '''

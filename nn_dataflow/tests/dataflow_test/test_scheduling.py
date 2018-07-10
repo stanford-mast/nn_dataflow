@@ -52,7 +52,7 @@ class TestScheduling(unittest.TestCase):
             proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
                                    type=NodeRegion.PROC),
             data_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 1),
-                                     type=NodeRegion.DATA),),
+                                     type=NodeRegion.DRAM),),
             dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
 

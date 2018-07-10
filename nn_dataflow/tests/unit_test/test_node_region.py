@@ -49,6 +49,14 @@ class TestNodeRegion(unittest.TestCase):
                            origin=(1, 3),
                            type=NodeRegion.PROC)
 
+    def test_invalid_dist(self):
+        ''' Invalid dist. '''
+        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*dist.*'):
+            _ = NodeRegion(dim=PhyDim2(4, 4),
+                           origin=PhyDim2(1, 3),
+                           dist=(1, 1),
+                           type=NodeRegion.PROC)
+
     def test_invalid_type(self):
         ''' Invalid type. '''
         with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*type.*'):
@@ -90,6 +98,21 @@ class TestNodeRegion(unittest.TestCase):
 
         self.assertTupleEqual(nr.rel2abs(PhyDim2(0, 3)), (1, 6))
         self.assertTupleEqual(nr.rel2abs(PhyDim2(2, 1)), (3, 4))
+
+        self.assertSetEqual(set(nr.rel2abs(PhyDim2(h, w))
+                                for h in range(nr.dim.h)
+                                for w in range(nr.dim.w)),
+                            set(nr.iter_node()))
+
+    def test_rel2abs_dist(self):
+        ''' Get rel2abs dist. '''
+        nr = NodeRegion(dim=PhyDim2(4, 4),
+                        origin=PhyDim2(1, 3),
+                        dist=PhyDim2(5, 3),
+                        type=NodeRegion.PROC)
+
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(0, 3)), (1, 12))
+        self.assertTupleEqual(nr.rel2abs(PhyDim2(2, 1)), (11, 6))
 
         self.assertSetEqual(set(nr.rel2abs(PhyDim2(h, w))
                                 for h in range(nr.dim.h)

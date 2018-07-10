@@ -33,14 +33,14 @@ class TestDataLayout(unittest.TestCase):
     def setUp(self):
         self.frng1 = FmapRange((0, 0, 0, 0), (4, 4, 16, 16))
         self.region1 = NodeRegion(dim=PhyDim2(2, 2), origin=PhyDim2(1, 1),
-                                  type=NodeRegion.DATA)
+                                  type=NodeRegion.DRAM)
         self.part1 = PartitionScheme(order=range(pe.NUM),
                                      pdims=(PhyDim2(1, 1), PhyDim2(2, 1),
                                             PhyDim2(1, 2), PhyDim2(1, 1)))
 
         self.frng2 = FmapRange((0, 0, 0, 0), (4, 3, 16, 16))
         self.region2 = NodeRegion(dim=PhyDim2(2, 1), origin=PhyDim2(0, 0),
-                                  type=NodeRegion.DATA)
+                                  type=NodeRegion.DRAM)
         self.part2 = PartitionScheme(order=range(pe.NUM),
                                      pdims=(PhyDim2(2, 1), PhyDim2(1, 1),
                                             PhyDim2(1, 1), PhyDim2(1, 1)))

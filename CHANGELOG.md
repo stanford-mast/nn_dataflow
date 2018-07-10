@@ -37,6 +37,12 @@ List of major changes and improvements
 
 ### Changed
 
+- Hardware models.
+
+  - `NodeRegion` adds `dist` attribute for inter-node distance.
+
+  - `NodeRegion` renames `DATA` enum to `DRAM`.
+
 - Software models.
 
   - `Scheduling` breaks cost tie using time.

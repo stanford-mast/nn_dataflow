@@ -48,7 +48,7 @@ class TestNNDataflow(unittest.TestCase):
                                                         type=NodeRegion.PROC),
                                  data_regions=(NodeRegion(origin=PhyDim2(0, 0),
                                                           dim=PhyDim2(1, 1),
-                                                          type=NodeRegion.DATA),
+                                                          type=NodeRegion.DRAM),
                                               ),
                                  dim_array=PhyDim2(16, 16),
                                  size_gbuf=128 * 1024 // 2,  # 128 kB
@@ -135,7 +135,7 @@ class TestNNDataflow(unittest.TestCase):
                                                         type=NodeRegion.PROC),
                                  data_regions=(NodeRegion(origin=PhyDim2(0, 0),
                                                           dim=PhyDim2(1, 1),
-                                                          type=NodeRegion.DATA),
+                                                          type=NodeRegion.DRAM),
                                               ),
                                  dim_array=PhyDim2(16, 16),
                                  size_gbuf=128 * 1024 // 2,  # 128 kB
@@ -254,7 +254,7 @@ class TestNNDataflow(unittest.TestCase):
                                                    type=NodeRegion.PROC),
                             data_regions=(NodeRegion(origin=PhyDim2(0, 0),
                                                      dim=PhyDim2(1, 1),
-                                                     type=NodeRegion.DATA),),
+                                                     type=NodeRegion.DRAM),),
                             dim_array=PhyDim2(12, 14),
                             size_gbuf=108 * 1024 // 2,  # 108 kB
                             size_regf=261,  # 225 + 12 + 24
@@ -344,7 +344,7 @@ class TestNNDataflow(unittest.TestCase):
                                                    type=NodeRegion.PROC),
                             data_regions=(NodeRegion(origin=PhyDim2(0, 0),
                                                      dim=PhyDim2(1, 1),
-                                                     type=NodeRegion.DATA),),
+                                                     type=NodeRegion.DRAM),),
                             dim_array=PhyDim2(16, 16),
                             size_gbuf=576056 // 2,  # 576 kB
                             size_regf=1024 // 2,  # 1 kB
@@ -370,7 +370,7 @@ class TestNNDataflow(unittest.TestCase):
                                                    type=NodeRegion.PROC),
                             data_regions=(NodeRegion(origin=PhyDim2(0, 0),
                                                      dim=PhyDim2(4, 4),
-                                                     type=NodeRegion.DATA),),
+                                                     type=NodeRegion.DRAM),),
                             dim_array=PhyDim2(14, 14),
                             size_gbuf=133032 // 2,  # 133 kB
                             size_regf=512 // 2,  # 512 B

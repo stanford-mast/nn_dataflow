@@ -65,7 +65,7 @@ class TestMapStrategyFixture(unittest.TestCase):
         proc_region = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                  type=NodeRegion.PROC)
         data_regions = (NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
-                                   type=NodeRegion.DATA),)
+                                   type=NodeRegion.DRAM),)
         # Eyeriss, ISSCC'16, JSSC'17.
         self.resource['BASE'] = Resource(
             proc_region=proc_region, data_regions=data_regions,

@@ -114,15 +114,15 @@ def do_scheduling(args):
         # Memory nodes are on two sides.
         data_regions = (NodeRegion(dim=PhyDim2(h=dim_nodes.h, w=1),
                                    origin=PhyDim2(h=0, w=0),
-                                   type=NodeRegion.DATA),
+                                   type=NodeRegion.DRAM),
                         NodeRegion(dim=PhyDim2(h=dim_nodes.h, w=1),
                                    origin=PhyDim2(h=0, w=dim_nodes.w - 1),
-                                   type=NodeRegion.DATA))
+                                   type=NodeRegion.DRAM))
     elif args.mem_type == '3D':
-        # All nodes have memory.
+        # Memory nodes are on the top.
         data_regions = (NodeRegion(dim=dim_nodes,
                                    origin=PhyDim2(0, 0),
-                                   type=NodeRegion.DATA),)
+                                   type=NodeRegion.DRAM),)
 
     resource = Resource(proc_region=proc_region,
                         data_regions=data_regions,
