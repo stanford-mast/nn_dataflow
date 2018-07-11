@@ -22,8 +22,10 @@ import unittest
 from collections import OrderedDict
 
 from nn_dataflow.core import DataLayout
-from nn_dataflow.core import FmapRange, FmapRangeMap
+from nn_dataflow.core import FmapRange
 from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import ParallelEnum as pe
+from nn_dataflow.core import PartitionScheme
 from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import SchedulingResult
 
@@ -45,12 +47,15 @@ class TestSchedulingResult(unittest.TestCase):
                                      ])
         self.dict_part = OrderedDict([('cost', 9.876),
                                       ('total_nhops', [123, 456, 789]),
+                                      ('num_nodes', 4),
                                      ])
 
-        frmap = FmapRangeMap()
-        frmap.add(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)), (PhyDim2(0, 0),))
-        self.ofmap_layout = DataLayout(origin=PhyDim2(0, 0), frmap=frmap,
-                                       type=NodeRegion.DATA)
+        part = PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM)
+        self.ofmap_layout = DataLayout(
+            frngs=(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)),),
+            regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                type=NodeRegion.DRAM),),
+            parts=(part,))
 
     def test_valid_args(self):
         ''' Valid arguments. '''
@@ -123,6 +128,20 @@ class TestSchedulingResult(unittest.TestCase):
                                   ofmap_layout=self.ofmap_layout)
         self.assertAlmostEqual(result.total_dram_time, 120)
 
+    def test_total_proc_time(self):
+        ''' Accessor total_proc_time. '''
+        result = SchedulingResult(dict_loop=self.dict_loop,
+                                  dict_part=self.dict_part,
+                                  ofmap_layout=self.ofmap_layout)
+        self.assertAlmostEqual(result.total_proc_time, 59)
+
+        dict_loop = self.dict_loop
+        dict_loop['bus_time'] = 100
+        result = SchedulingResult(dict_loop=self.dict_loop,
+                                  dict_part=self.dict_part,
+                                  ofmap_layout=self.ofmap_layout)
+        self.assertAlmostEqual(result.total_proc_time, 59)
+
     def test_total_ops(self):
         ''' Accessor total_ops. '''
         result = SchedulingResult(dict_loop=self.dict_loop,
@@ -144,4 +163,36 @@ class TestSchedulingResult(unittest.TestCase):
                                   dict_part=self.dict_part,
                                   ofmap_layout=self.ofmap_layout)
         self.assertEqual(result.total_noc_hops, 1368)
+
+    def test_num_nodes(self):
+        ''' Accessor num_nodes. '''
+        result = SchedulingResult(dict_loop=self.dict_loop,
+                                  dict_part=self.dict_part,
+                                  ofmap_layout=self.ofmap_layout)
+        self.assertEqual(result.num_nodes, 4)
+
+    def test_cmp_key(self):
+        ''' Get cmp_key. '''
+        result1 = SchedulingResult(dict_loop=self.dict_loop,
+                                   dict_part=self.dict_part,
+                                   ofmap_layout=self.ofmap_layout)
+
+        dict_loop = self.dict_loop.copy()
+        dict_loop['cost'] = 2
+        dict_loop['time'] = 12.34
+        dict_part = self.dict_part.copy()
+        dict_part['cost'] = 10
+        result2 = SchedulingResult(dict_loop=dict_loop,
+                                   dict_part=dict_part,
+                                   ofmap_layout=self.ofmap_layout)
+
+        self.assertGreater(result2.cmp_key(), result1.cmp_key())
+
+        dict_loop = dict_loop.copy()
+        dict_loop['time'] = 23.4
+        result3 = SchedulingResult(dict_loop=dict_loop,
+                                   dict_part=dict_part,
+                                   ofmap_layout=self.ofmap_layout)
+
+        self.assertGreater(result3.cmp_key(), result2.cmp_key())
 

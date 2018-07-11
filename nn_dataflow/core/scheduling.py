@@ -26,6 +26,7 @@ from . import partition
 from .. import util
 from .cost import Cost
 from .data_layout import DataLayout
+from .fmap_range import FmapPosition, FmapRange
 from .layer import Layer
 from .map_strategy import MapStrategy
 from .resource import Resource
@@ -35,7 +36,7 @@ class SchedulingCondition(namedtuple('SchedulingCondition',
                                       'ifmap_layout',
                                      ])):
     '''
-    Layer scheduling condition (constraints).
+    Layer scheduling condition.
     '''
 
     def __new__(cls, *args, **kwargs):
@@ -94,6 +95,11 @@ class SchedulingResult(namedtuple('SchedulingResult',
         return self.dict_loop['dram_time']
 
     @property
+    def total_proc_time(self):
+        ''' Get the total active processing time. '''
+        return self.dict_loop['proc_time']
+
+    @property
     def total_ops(self):
         ''' Get the total ops. '''
         # dict_loop stats are over all nodes.
@@ -109,6 +115,15 @@ class SchedulingResult(namedtuple('SchedulingResult',
     def total_noc_hops(self):
         ''' Get the total NoC hops. '''
         return sum(self.dict_part['total_nhops'])
+
+    @property
+    def num_nodes(self):
+        ''' Get the number of processing nodes. '''
+        return self.dict_part['num_nodes']
+
+    def cmp_key(self):
+        ''' Key function for comparison. '''
+        return self.total_cost, self.total_time
 
 
 class Scheduling(object):
@@ -140,55 +155,63 @@ class Scheduling(object):
 
     def schedule_search(self, condition, options):
         '''
-        Search the best schedule results under the given condition and options.
+        Search the best scheduling results.
         '''
         tops = []
 
-        proc_region = condition.resource.proc_region
-        src_data_region = condition.resource.src_data_region()
-        dst_data_region = condition.resource.dst_data_region()
+        resource = condition.resource
+        proc_region = resource.proc_region
 
         # Ifmap layout.
         ifmap_layout = condition.ifmap_layout
-        if not ifmap_layout.is_in_region(src_data_region):
-            raise ValueError('Scheduling: ifmap layout contains invalid '
-                             'source memory nodes.')
-        cifrng = ifmap_layout.frmap.complete_fmap_range()
-        if cifrng.size('b') != self.batch_size \
-                or cifrng.size('n') != self.layer.nifm \
-                or not self.layer.is_valid_padding_sifm([cifrng.size('h'),
-                                                         cifrng.size('w')]):
+        if not ifmap_layout.is_in(resource.src_data_region):
+            raise ValueError('Scheduling: ifmap layout is not contained in '
+                             'source data region.')
+        ifrng = ifmap_layout.complete_fmap_range()
+        if self.batch_size != ifrng.size('b') \
+                or self.layer.nifm != ifrng.size('n') \
+                or not self.layer.is_valid_padding_sifm([ifrng.size('h'),
+                                                         ifrng.size('w')]):
             raise ValueError('Scheduling: ifmap layout does not match '
                              'input layer.')
 
         # Filter nodes. All memory nodes can store filters. Deduplicate.
-        filter_nodes = set(itertools.chain(src_data_region.iter_node(),
-                                           dst_data_region.iter_node()))
+        filter_nodes = set(itertools.chain(
+            resource.src_data_region.iter_node(),
+            resource.dst_data_region.iter_node()))
 
         # Explore parallel partitioning schemes.
         for part in partition.gen_partition(self.layer, self.batch_size,
                                             proc_region.dim, options,
                                             guaranteed=True):
+            # Explore single-node schedules.
+            lbs_tops = list(self.schedule_search_per_node(
+                part, resource, options))
+            if not lbs_tops:
+                continue
+
             # Ofmap layout.
-            ofmap_layout = partition.get_ofmap_layout(
-                self.layer, self.batch_size, part, dst_data_region)
+            ofmap_range = FmapRange(
+                FmapPosition(b=0, n=0, h=0, w=0),
+                FmapPosition(b=self.batch_size, n=self.layer.nofm,
+                             h=self.layer.hofm, w=self.layer.wofm))
+            ofmap_data_region = resource.dst_data_region
+            ofmap_layout = DataLayout(
+                frngs=(ofmap_range,),
+                regions=(ofmap_data_region,),
+                parts=(part.projection(ofmap_data_region, appl2frng=True),))
 
             # Partition NoC hop cost.
-            unit_nhops = partition.part_layer_unit_nhops(
-                self.layer, self.batch_size, part, proc_region,
+            unit_nhops = partition.unit_nhops_to_proc_region(
+                self.layer, self.batch_size, proc_region, part,
                 filter_nodes, ifmap_layout, ofmap_layout, options)
 
-            # Explore single-node schedules.
-            for lbs in self.schedule_search_per_node(
-                    part, condition.resource, options):
-
-                # Make scheduling result.
-                r = self._get_result(lbs, part, unit_nhops, ofmap_layout)
-                tops.append(r)
+            # Make scheduling result.
+            tops += [self._get_result(lbs, part, unit_nhops, ofmap_layout)
+                     for lbs in lbs_tops]
 
         # Pick the top n.
-        tops = sorted(tops, key=lambda r: (r.total_cost, r.total_time)) \
-                [:options.ntops]
+        tops = sorted(tops, key=SchedulingResult.cmp_key)[:options.ntops]
 
         # Check total op count.
         total_layer_ops = self.layer.total_ops(self.batch_size)
@@ -198,11 +221,11 @@ class Scheduling(object):
 
         # Check ofmap layout matches the layer.
         for t in tops:
-            cofrng = t.ofmap_layout.frmap.complete_fmap_range()
-            assert cofrng.size('b') == self.batch_size \
-                    and cofrng.size('n') == self.layer.nofm \
-                    and cofrng.size('h') == self.layer.hofm \
-                    and cofrng.size('w') == self.layer.wofm
+            ofrng = t.ofmap_layout.complete_fmap_range()
+            assert ofrng.size('b') == self.batch_size \
+                    and ofrng.size('n') == self.layer.nofm \
+                    and ofrng.size('h') == self.layer.hofm \
+                    and ofrng.size('w') == self.layer.wofm
 
         return list(tops)
 
@@ -212,18 +235,16 @@ class Scheduling(object):
         '''
         return (self.pernode_sched_cache_hits, self.pernode_sched_cache_misses)
 
-    def schedule_search_per_node(self, part, resource, options):
+    def schedule_search_per_node(self, *args):
         '''
         Search the best mapping strategies and loop blocking schemes for a
-        single node after partitioning, given the partitioning scheme and
-        resource.
-
-        Return the top LoopBlockingScheme instances.
+        single node after partitioning. Return the top LoopBlockingScheme
+        instances.
         '''
 
         # NOTE: need to ensure the key's __eq__ and __hash__ have been
         # redefined.
-        cache_key = (part, resource, options)
+        cache_key = tuple(args)
 
         cache_val = self.pernode_sched_cache.get(cache_key, None)
 
@@ -235,7 +256,9 @@ class Scheduling(object):
         # Cache miss.
         self.pernode_sched_cache_misses += 1
 
-        top_lbs_list = []
+        part, resource, options = args
+
+        lbs_tops = []
 
         # Partitioned layer.
         p_layer, p_batch_size, p_occ = part.part_layer(self.layer,
@@ -253,11 +276,11 @@ class Scheduling(object):
                     nested_loop_desc, resource, self.cost, options):
 
                 if lbs.is_valid():
-                    top_lbs_list.append(lbs)
+                    lbs_tops.append(lbs)
 
-        self.pernode_sched_cache[cache_key] = top_lbs_list
+        self.pernode_sched_cache[cache_key] = lbs_tops
 
-        return top_lbs_list
+        return lbs_tops
 
     def _get_result(self, lbs, part, unit_nhops, ofmap_layout):
         '''

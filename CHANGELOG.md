@@ -49,7 +49,8 @@ List of major changes and improvements
 
 - Software models.
 
-  - `Scheduling` breaks cost tie using time.
+  - `Scheduling` breaks cost tie using time, using a compare key function of
+    `SchedulingResult`.
 
   - Add external occupancy to `MapStrategy` and merge into `NestedLoopDesc`;
     use it for partitioning occupancy.
