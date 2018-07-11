@@ -64,11 +64,12 @@ class TestMapStrategyFixture(unittest.TestCase):
         self.resource = {}
         proc_region = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                  type=NodeRegion.PROC)
-        data_regions = (NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
-                                   type=NodeRegion.DRAM),)
+        data_region = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                 type=NodeRegion.DRAM)
         # Eyeriss, ISSCC'16, JSSC'17.
         self.resource['BASE'] = Resource(
-            proc_region=proc_region, data_regions=data_regions,
+            proc_region=proc_region,
+            src_data_region=data_region, dst_data_region=data_region,
             dim_array=PhyDim2(12, 14), size_gbuf=108*1024, size_regf=520,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
 

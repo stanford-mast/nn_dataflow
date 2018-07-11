@@ -62,8 +62,8 @@ in one clock cycle.
 Other options include:
 
 - ``--mem-type``: ``2D`` or ``3D``. With 2D memory, memory channels are only on
-  the left and right sides of the chip; with 3D memory, memory channels are on
-  the top of all tile nodes (one per each).
+  the four corners of the chip; with 3D memory, memory channels are on the top
+  of all tile nodes (one per each).
 - ``--bus-width``: the multicast bus bit width in the PE array for one data
   type. Set to 0 to ignore multicast overheads.
 - ``--dram-bw``: ``float`` or ``inf``. Total DRAM bandwidth for all tile nodes,

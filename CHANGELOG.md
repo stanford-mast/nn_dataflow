@@ -39,9 +39,13 @@ List of major changes and improvements
 
 - Hardware models.
 
+  - 2D memory type is changed to constant four node on the chip corners.
+
   - `NodeRegion` adds `dist` attribute for inter-node distance.
 
   - `NodeRegion` renames `DATA` enum to `DRAM`.
+
+  - Limit to single source/destination data regions in `Resource`.
 
 - Software models.
 
