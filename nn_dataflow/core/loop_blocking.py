@@ -22,11 +22,10 @@ import heapq
 import itertools
 from multiprocessing import Pool
 
-from . import data_category_enum as de
 from . import loop_blocking_solver
 from . import loop_enum as le
 from .. import util
-from .data_dim_loops import DataDimLoops
+from .layer import ConvLayer
 from .loop_blocking_scheme import LoopBlockingScheme
 
 '''
@@ -106,14 +105,6 @@ def skip_conv(bl_ts, bl_ords):
     return False
 
 
-def _is_conv_loops(nested_loop_desc):
-    return (nested_loop_desc.data_loops[de.FIL] == DataDimLoops(le.IFM, le.OFM)
-            and nested_loop_desc.data_loops[de.IFM] \
-                    == DataDimLoops(le.IFM, le.BAT)
-            and nested_loop_desc.data_loops[de.OFM] \
-                    == DataDimLoops(le.OFM, le.BAT))
-
-
 def _gen_loopblocking_perprocess(
         nested_loop_desc, resource, cost, options,
         gen_tifm, gen_tofm, gen_tbat, gen_ords):
@@ -134,7 +125,7 @@ def _gen_loopblocking_perprocess(
 
     def _sweep():
         ''' Sweep all. '''
-        is_conv_loops = _is_conv_loops(nested_loop_desc)
+        is_conv_loops = (nested_loop_desc.data_loops == ConvLayer.data_loops())
         for bl_ts, bl_ords in itertools.product(_gen_bl_ts(), gen_ords):
             if is_conv_loops and skip_conv(bl_ts, bl_ords):
                 continue
@@ -152,7 +143,8 @@ def gen_loopblocking(nested_loop_desc, resource, cost, options):
     '''
 
     # Solver only works for CONV layer.
-    if options.sw_solve_loopblocking and _is_conv_loops(nested_loop_desc):
+    if options.sw_solve_loopblocking \
+            and nested_loop_desc.data_loops == ConvLayer.data_loops():
         gen = loop_blocking_solver.gen_loopblocking_gbuf_reside
 
         for bl_ts, bl_ords in gen(nested_loop_desc, resource, options):

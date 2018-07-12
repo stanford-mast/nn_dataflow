@@ -109,10 +109,7 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         acc_dict = {}
 
-        for lbs in self._gen_loopblocking(rsrckey='LG'):
-
-            if not lbs.is_valid():
-                continue
+        for lbs in self._gen_loopblocking(rsrckey='LG', skip_invalid=True):
 
             sdict = lbs.get_scheme_dict(self.cost)
 
@@ -136,10 +133,7 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         cost_prev = -float('inf')
 
-        for lbs in self._gen_loopblocking(rsrckey='LG'):
-
-            if not lbs.is_valid():
-                continue
+        for lbs in self._gen_loopblocking(rsrckey='LG', skip_invalid=True):
 
             cost_curr = lbs.get_cost(self.cost)
             self.assertLessEqual(cost_prev, cost_curr)
@@ -163,9 +157,11 @@ class TestLoopBlocking(TestLoopBlockingFixture):
         self.assertLessEqual(cnt, 8)
 
     def _gen_loopblocking(self, wlkey='BASE', rsrckey='BASE',
-                          optkey='BASE'):
+                          optkey='BASE', skip_invalid=False):
         ''' gen_loopblocking trampoline. '''
-        return loop_blocking.gen_loopblocking(
-            self.nld[wlkey], self.resource[rsrckey],
-            self.cost, self.options[optkey])
+        for lbs in loop_blocking.gen_loopblocking(
+                self.nld[wlkey], self.resource[rsrckey],
+                self.cost, self.options[optkey]):
+            if not skip_invalid or lbs.is_valid():
+                yield lbs
 

@@ -24,6 +24,7 @@ import math
 
 from nn_dataflow.core import Cost
 from nn_dataflow.core import DataCategoryEnum as de
+from nn_dataflow.core import LoopBlockingScheme
 from nn_dataflow.core import LoopEnum as le
 from nn_dataflow.core import MemHierEnum as me
 from nn_dataflow import util
@@ -384,4 +385,58 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
                 for dce in range(de.NUM):
                     self.assertAlmostEqual(access1[mhe][dce],
                                            access2[mhe][dce])
+
+    def test_ordered_loops(self):
+        ''' Get ordered_loops. '''
+        assert list(range(le.NUM)) == [le.IFM, le.OFM, le.BAT]
+
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((3, 5, 2), (2, 0, 1)),
+            [(le.IFM, 3), (le.BAT, 2), (le.OFM, 5)])
+
+        # Trivial loops at different positions.
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((3, 5, 1), (0, 1, 2)),
+            [(le.OFM, 5), (le.IFM, 3)])
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((3, 5, 1), (1, 2, 0)),
+            [(le.OFM, 5), (le.IFM, 3)])
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((3, 5, 1), (0, 2, 1)),
+            [(le.OFM, 5), (le.IFM, 3)])
+
+        # Different loops are trivial.
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((1, 5, 2), (0, 2, 1)),
+            [(le.OFM, 5), (le.BAT, 2)])
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((3, 1, 2), (0, 2, 1)),
+            [(le.BAT, 2), (le.IFM, 3)])
+
+        # Multiple trivial loops.
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((1, 5, 1), (0, 1, 2)),
+            [(le.OFM, 5)])
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((1, 1, 1), (0, 1, 2)),
+            [])
+
+        for bl_t, bl_ord in itertools.product(
+                itertools.product(*[range(1, 8)] * 3),
+                itertools.permutations(range(le.NUM))):
+
+            ord_loops = LoopBlockingScheme.ordered_loops(bl_t, bl_ord)
+            self.assertTrue(all(len(tpl) == 2 for tpl in ord_loops))
+            self.assertFalse(any(tpl[1] <= 1 for tpl in ord_loops))
+            self.assertEqual(len(ord_loops), le.NUM - bl_t.count(1))
+            self.assertTrue(all(tpl[1] == bl_t[tpl[0]] for tpl in ord_loops))
+
+            rev_loops = LoopBlockingScheme.ordered_loops(bl_t, bl_ord,
+                                                         reverse=True)
+            ord_lpes = LoopBlockingScheme.ordered_loops(bl_t, bl_ord,
+                                                        lpe_only=True)
+            self.assertEqual(len(rev_loops), len(ord_loops))
+            self.assertEqual(len(ord_lpes), len(ord_loops))
+            self.assertListEqual(list(reversed(rev_loops)), ord_loops)
+            self.assertListEqual([tpl[0] for tpl in ord_loops], ord_lpes)
 

@@ -325,6 +325,25 @@ class LoopBlockingScheme(object):
 
         assert num == self.lcnt
 
+    @classmethod
+    def ordered_loops(cls, bl_t, bl_ord, lpe_only=False, reverse=False):
+        '''
+        Get the ordered loops from outermost to innermost according to the loop
+        blocking factors `bl_t` and the loop order `bl_ord`, both indexed by
+        LoopEnum. Trivial loops are ignored.
+
+        If `reverse` is True, ordering the loops from innermost to outermost.
+
+        Return a list of pairs of LoopEnum and blocking factor. If `lpe_only`
+        is True, return a list of LoopEnum only.
+        '''
+        ord_lpes = list(sorted([lpe for lpe in range(le.NUM) if bl_t[lpe] > 1],
+                               key=(lambda lpe: bl_ord[lpe]),
+                               reverse=not reverse))
+        if not lpe_only:
+            return [(lpe, bl_t[lpe]) for lpe in ord_lpes]
+        return ord_lpes
+
     def _set_unit_cnt(self):
         '''
         Set the buffered unit counts for all data categories at all blocking
