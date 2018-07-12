@@ -21,7 +21,8 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import unittest
 from collections import OrderedDict
 
-from nn_dataflow.core import partition
+from nn_dataflow.core import DataLayout
+from nn_dataflow.core import FmapPosition, FmapRange
 from nn_dataflow.core import InputLayer, ConvLayer, FCLayer, PoolingLayer
 from nn_dataflow.core import MemHierEnum as me
 from nn_dataflow.core import Network
@@ -41,16 +42,23 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.network.add('c1', ConvLayer(3, 64, 224, 3))
         self.network.add('p1', PoolingLayer(64, 7, 32), prevs='c1')
         self.network.add('p2', PoolingLayer(64, 7, 32), prevs='c1')
-        self.network.add('f1', FCLayer(64, 1000, 7), prevs=['p1', 'p2'])
+        self.network.add('f1', FCLayer(128, 1000, 7), prevs=['p1', 'p2'])
 
         self.batch_size = 4
 
-        self.input_layout = partition.get_ofmap_layout(
-            self.network.input_layer(), self.batch_size,
-            PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
-            NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(2, 1),
-                       type=NodeRegion.DATA))
+        input_layer = self.network.input_layer()
+        self.input_layout = DataLayout(
+            frngs=(FmapRange((0, 0, 0, 0),
+                             FmapPosition(b=self.batch_size,
+                                          n=input_layer.nofm,
+                                          h=input_layer.hofm,
+                                          w=input_layer.wofm)),),
+            regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(2, 1),
+                                type=NodeRegion.DRAM),),
+            parts=(PartitionScheme(order=range(pe.NUM),
+                                   pdims=[(1, 1)] * pe.NUM),))
 
+        c1_layer = self.network['c1']
         self.c1res = SchedulingResult(
             dict_loop=OrderedDict([('cost', 1.), ('time', 2.), ('ops', 4.),
                                    ('proc_time', 2), ('bus_time', 0),
@@ -60,12 +68,18 @@ class TestNNDataflowScheme(unittest.TestCase):
             dict_part=OrderedDict([('cost', 0.5), ('total_nhops', [4, 5, 6]),
                                    ('num_nodes', 4),
                                   ]),
-            ofmap_layout=partition.get_ofmap_layout(
-                self.network['c1'], self.batch_size,
-                PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
-                NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
-                           type=NodeRegion.DATA)))
+            ofmap_layout=DataLayout(
+                frngs=(FmapRange((0, 0, 0, 0),
+                                 FmapPosition(b=self.batch_size,
+                                              n=c1_layer.nofm,
+                                              h=c1_layer.hofm,
+                                              w=c1_layer.wofm)),),
+                regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
+                                    type=NodeRegion.DRAM),),
+                parts=(PartitionScheme(order=range(pe.NUM),
+                                       pdims=[(1, 1)] * pe.NUM),)))
 
+        p1_layer = self.network['p1']
         self.pres = SchedulingResult(
             dict_loop=OrderedDict([('cost', 0.1), ('time', 0.05), ('ops', 0.1),
                                    ('proc_time', 0.05), ('bus_time', 0),
@@ -75,11 +89,16 @@ class TestNNDataflowScheme(unittest.TestCase):
             dict_part=OrderedDict([('cost', 0.5), ('total_nhops', [.4, .5, .6]),
                                    ('num_nodes', 2),
                                   ]),
-            ofmap_layout=partition.get_ofmap_layout(
-                self.network['p1'], self.batch_size,
-                PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
-                NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
-                           type=NodeRegion.DATA)))
+            ofmap_layout=DataLayout(
+                frngs=(FmapRange((0, 0, 0, 0),
+                                 FmapPosition(b=self.batch_size,
+                                              n=p1_layer.nofm,
+                                              h=p1_layer.hofm,
+                                              w=p1_layer.wofm)),),
+                regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
+                                    type=NodeRegion.DRAM),),
+                parts=(PartitionScheme(order=range(pe.NUM),
+                                       pdims=[(1, 1)] * pe.NUM),)))
 
         self.dtfl = NNDataflowScheme(self.network, self.input_layout)
         self.dtfl['c1'] = self.c1res
@@ -112,7 +131,7 @@ class TestNNDataflowScheme(unittest.TestCase):
         ''' Invalid input_layout. '''
         with self.assertRaisesRegexp(TypeError,
                                      'NNDataflowScheme: .*input_layout*'):
-            _ = NNDataflowScheme(self.network, self.input_layout.frmap)
+            _ = NNDataflowScheme(self.network, self.input_layout.frngs)
 
     def test_setgetitem(self):
         ''' __set/getitem__. '''
@@ -228,4 +247,41 @@ class TestNNDataflowScheme(unittest.TestCase):
         with self.assertRaisesRegexp(AttributeError,
                                      'NNDataflowScheme: .*not_supported.*'):
             _ = self.dtfl.perlayer_stats('not_supported')
+
+    def test_cmp_key(self):
+        ''' Get cmp_key. '''
+        f1_layer = self.network['f1']
+        f1res = SchedulingResult(
+            dict_loop=OrderedDict([('cost', 1.), ('time', 2.), ('ops', 4.),
+                                   ('proc_time', 2), ('bus_time', 0),
+                                   ('dram_time', 0),
+                                   ('access', [[7, 8, 9]] * me.NUM),
+                                  ]),
+            dict_part=OrderedDict([('cost', 0.5), ('total_nhops', [4, 5, 6]),
+                                   ('num_nodes', 4),
+                                  ]),
+            ofmap_layout=DataLayout(
+                frngs=(FmapRange((0, 0, 0, 0),
+                                 FmapPosition(b=self.batch_size,
+                                              n=f1_layer.nofm,
+                                              h=f1_layer.hofm,
+                                              w=f1_layer.wofm)),),
+                regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                    type=NodeRegion.DRAM),),
+                parts=(PartitionScheme(order=range(pe.NUM),
+                                       pdims=[(1, 1)] * pe.NUM),)))
+
+        nndf1 = self.dtfl.copy()
+        nndf1['f1'] = f1res
+
+        dict_loop = f1res.dict_loop
+        dict_loop['cost'] = 2.
+        f1res2 = SchedulingResult(dict_loop=dict_loop,
+                                  dict_part=f1res.dict_part,
+                                  ofmap_layout=f1res.ofmap_layout)
+
+        nndf2 = self.dtfl.copy()
+        nndf2['f1'] = f1res2
+
+        self.assertGreater(nndf2.cmp_key(), nndf1.cmp_key())
 

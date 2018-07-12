@@ -45,6 +45,7 @@ class NNDataflowScheme(MutableMapping):
         self.input_layout = input_layout
 
         self.res_dict = OrderedDict()
+
         self.total_cost = 0
         self.total_time = 0
 
@@ -75,6 +76,7 @@ class NNDataflowScheme(MutableMapping):
                                .format(layer_name, p))
 
         self.res_dict[layer_name] = sched_result
+
         self.total_cost += sched_result.total_cost
         self.total_time += sched_result.total_time
 
@@ -98,12 +100,11 @@ class NNDataflowScheme(MutableMapping):
         Shallow copy of layer SchedulingResult is sufficient, since they are
         read-only.
         '''
-        df = NNDataflowScheme(self.network, self.input_layout)
-        for layer_name in self.res_dict:
-            df[layer_name] = self.res_dict[layer_name]
-        assert util.isclose(df.total_cost, self.total_cost, rel_tol=1e-5)
-        assert util.isclose(df.total_time, self.total_time, rel_tol=1e-5)
-        return df
+        nndf = NNDataflowScheme(self.network, self.input_layout)
+        nndf.update(self)
+        assert util.isclose(nndf.total_cost, self.total_cost, rel_tol=1e-5)
+        assert util.isclose(nndf.total_time, self.total_time, rel_tol=1e-5)
+        return nndf
 
     @property
     def total_ops(self):
@@ -125,7 +126,7 @@ class NNDataflowScheme(MutableMapping):
 
     def total_static_cost(self, unit_static):
         ''' Get the total static cost. '''
-        return unit_static * sum(sr.total_time * sr.dict_part['num_nodes']
+        return unit_static * sum(sr.total_time * sr.num_nodes
                                  for sr in self.values())
 
     def perlayer_stats(self, stats_name):
@@ -148,12 +149,15 @@ class NNDataflowScheme(MutableMapping):
     def active_node_pes(sched_result):
         ''' Layer active node PE counts. '''
         return 1. * sched_result.total_ops \
-                / sched_result.dict_loop['proc_time'] \
-                / sched_result.dict_part['num_nodes']
+                / sched_result.total_proc_time / sched_result.num_nodes
 
     @staticmethod
     def total_dram_bandwidth(sched_result):
         ''' Layer total DRAM bandwidth in elements per cycle. '''
         return 1. * sched_result.total_accesses[me.DRAM] \
                 / sched_result.total_time
+
+    def cmp_key(self):
+        ''' Key function for comparison. '''
+        return self.total_cost, self.total_time
 
