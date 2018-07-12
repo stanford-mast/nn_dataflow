@@ -60,14 +60,15 @@ class TestNNDataflowScheme(unittest.TestCase):
 
         c1_layer = self.network['c1']
         self.c1res = SchedulingResult(
-            dict_loop=OrderedDict([('cost', 1.), ('time', 2.), ('ops', 4.),
-                                   ('proc_time', 2), ('bus_time', 0),
-                                   ('dram_time', 0),
-                                   ('access', [[7, 8, 9]] * me.NUM),
-                                  ]),
-            dict_part=OrderedDict([('cost', 0.5), ('total_nhops', [4, 5, 6]),
-                                   ('num_nodes', 4),
-                                  ]),
+            scheme=OrderedDict([('cost', 1.5), ('time', 2.), ('ops', 4.),
+                                ('num_nodes', 4),
+                                ('cost_loop', 1.), ('cost_part', 0.5),
+                                ('proc_time', 2), ('bus_time', 0),
+                                ('dram_time', 0),
+                                ('access', [[7, 8, 9]] * me.NUM),
+                                ('total_nhops', [4, 5, 6]),
+                                ('fetch', [[1, 1, 1], [2, 2, 2]]),
+                               ]),
             ofmap_layout=DataLayout(
                 frngs=(FmapRange((0, 0, 0, 0),
                                  FmapPosition(b=self.batch_size,
@@ -80,15 +81,16 @@ class TestNNDataflowScheme(unittest.TestCase):
                                        pdims=[(1, 1)] * pe.NUM),)))
 
         p1_layer = self.network['p1']
-        self.pres = SchedulingResult(
-            dict_loop=OrderedDict([('cost', 0.1), ('time', 0.05), ('ops', 0.1),
-                                   ('proc_time', 0.05), ('bus_time', 0),
-                                   ('dram_time', 0),
-                                   ('access', [[.7, .8, .9]] * me.NUM),
-                                  ]),
-            dict_part=OrderedDict([('cost', 0.5), ('total_nhops', [.4, .5, .6]),
-                                   ('num_nodes', 2),
-                                  ]),
+        self.p1res = SchedulingResult(
+            scheme=OrderedDict([('cost', 0.6), ('time', 0.05), ('ops', 0.1),
+                                ('num_nodes', 2),
+                                ('cost_loop', 0.1), ('cost_part', 0.5),
+                                ('proc_time', 0.05), ('bus_time', 0),
+                                ('dram_time', 0),
+                                ('access', [[.7, .8, .9]] * me.NUM),
+                                ('total_nhops', [.4, .5, .6]),
+                                ('fetch', [[1, 1, 1], [2, 2, 2]]),
+                               ]),
             ofmap_layout=DataLayout(
                 frngs=(FmapRange((0, 0, 0, 0),
                                  FmapPosition(b=self.batch_size,
@@ -102,8 +104,8 @@ class TestNNDataflowScheme(unittest.TestCase):
 
         self.dtfl = NNDataflowScheme(self.network, self.input_layout)
         self.dtfl['c1'] = self.c1res
-        self.dtfl['p1'] = self.pres
-        self.dtfl['p2'] = self.pres
+        self.dtfl['p1'] = self.p1res
+        self.dtfl['p2'] = self.p1res
 
     def test_init(self):
         ''' Initial. '''
@@ -160,7 +162,7 @@ class TestNNDataflowScheme(unittest.TestCase):
 
         with self.assertRaisesRegexp(TypeError,
                                      'NNDataflowScheme: .*SchedulingResult*'):
-            df['c1'] = self.c1res.dict_loop
+            df['c1'] = self.c1res.scheme
 
     def test_setitem_already_exists(self):
         ''' __setitem__ already exists. '''
@@ -175,7 +177,7 @@ class TestNNDataflowScheme(unittest.TestCase):
         df = NNDataflowScheme(self.network, self.input_layout)
 
         with self.assertRaisesRegexp(KeyError, 'NNDataflowScheme: .*p1*'):
-            df['p1'] = self.pres
+            df['p1'] = self.p1res
 
     def test_delitem(self):
         ''' __delitem__. '''
@@ -252,14 +254,14 @@ class TestNNDataflowScheme(unittest.TestCase):
         ''' Get cmp_key. '''
         f1_layer = self.network['f1']
         f1res = SchedulingResult(
-            dict_loop=OrderedDict([('cost', 1.), ('time', 2.), ('ops', 4.),
-                                   ('proc_time', 2), ('bus_time', 0),
-                                   ('dram_time', 0),
-                                   ('access', [[7, 8, 9]] * me.NUM),
-                                  ]),
-            dict_part=OrderedDict([('cost', 0.5), ('total_nhops', [4, 5, 6]),
-                                   ('num_nodes', 4),
-                                  ]),
+            scheme=OrderedDict([('cost', 1.5), ('time', 2.), ('ops', 4.),
+                                ('num_nodes', 4),
+                                ('cost_loop', 1.), ('cost_part', 0.5),
+                                ('proc_time', 2), ('bus_time', 0),
+                                ('dram_time', 0),
+                                ('access', [[7, 8, 9]] * me.NUM),
+                                ('total_nhops', [4, 5, 6]),
+                                ('fetch', [[1, 1, 1], [2, 2, 2]])]),
             ofmap_layout=DataLayout(
                 frngs=(FmapRange((0, 0, 0, 0),
                                  FmapPosition(b=self.batch_size,
@@ -274,10 +276,9 @@ class TestNNDataflowScheme(unittest.TestCase):
         nndf1 = self.dtfl.copy()
         nndf1['f1'] = f1res
 
-        dict_loop = f1res.dict_loop
-        dict_loop['cost'] = 2.
-        f1res2 = SchedulingResult(dict_loop=dict_loop,
-                                  dict_part=f1res.dict_part,
+        scheme = f1res.scheme
+        scheme['cost'] = 2.
+        f1res2 = SchedulingResult(scheme=scheme,
                                   ofmap_layout=f1res.ofmap_layout)
 
         nndf2 = self.dtfl.copy()

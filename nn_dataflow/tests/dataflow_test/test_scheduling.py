@@ -132,15 +132,15 @@ class TestScheduling(unittest.TestCase):
 
             # Combination of loop blocking and partitioning.
             for r in res:
-                self.assertEqual(r.total_cost,
-                                 r.dict_loop['cost'] + r.dict_part['cost'])
-                self.assertEqual(r.dict_loop['ops'],
-                                 layer.total_ops(self.batch_size))
-                self.assertSequenceEqual(r.dict_part['total_nhops'],
+                self.assertAlmostEqual(r.total_cost,
+                                       r.scheme['cost_loop']
+                                       + r.scheme['cost_part'])
+                self.assertEqual(r.total_ops, layer.total_ops(self.batch_size))
+                self.assertSequenceEqual(r.scheme['total_nhops'],
                                          [nh * f for nh, f
-                                          in zip(r.dict_part['unit_nhops'],
-                                                 r.dict_loop['fetch'][0])])
-                self.assertEqual(r.dict_part['num_nodes'],
+                                          in zip(r.scheme['unit_nhops'],
+                                                 r.scheme['fetch'][0])])
+                self.assertEqual(r.num_nodes,
                                  self.resource.proc_region.dim.size())
 
             # Ofmap layout.

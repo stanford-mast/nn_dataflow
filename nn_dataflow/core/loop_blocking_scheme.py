@@ -18,7 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from collections import OrderedDict
 import itertools
 import math
 
@@ -235,38 +234,6 @@ class LoopBlockingScheme(object):
         c += self.time * cost.unit_static * self.num_nodes
 
         return c
-
-    def get_scheme_dict(self, cost):
-        '''
-        Get an OrderedDict of scheme summary.
-        '''
-        if not self.is_valid():
-            return None
-
-        if not self.finalized_stats:
-            self._calc_stats()
-
-        size = [[self.data_size(bl, dce) for dce in range(de.NUM)]
-                for bl in range(self.BL.NUM)]
-
-        lp_ts = zip(*self.bl_ts)
-
-        return OrderedDict([('cost', self.get_cost(cost)),
-                            ('ops', self.ops),
-                            ('time', self.time),
-                            ('proc_time', self.proc_time),
-                            ('bus_time', self.bus_time),
-                            ('dram_time', self.dram_time),
-                            ('access', self.access),
-                            ('fetch', self.fetch),
-                            ('size', size),
-                            ('unit_size', self.unit_size),
-                            ('unit_cnt', self.unit_cnt),
-                            ('ti', tuple(lp_ts[le.IFM])),
-                            ('to', tuple(lp_ts[le.OFM])),
-                            ('tb', tuple(lp_ts[le.BAT])),
-                            ('orders', self.bl_ords),
-                           ])
 
     def gen_index(self):
         '''

@@ -21,7 +21,9 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import itertools
 from collections import OrderedDict, namedtuple
 
+from . import data_category_enum as de
 from . import loop_blocking
+from . import loop_enum as le
 from . import partition
 from .. import util
 from .cost import Cost
@@ -53,8 +55,7 @@ class SchedulingCondition(namedtuple('SchedulingCondition',
 
 
 class SchedulingResult(namedtuple('SchedulingResult',
-                                  ['dict_loop',
-                                   'dict_part',
+                                  ['scheme',
                                    'ofmap_layout',
                                   ])):
     '''
@@ -64,10 +65,9 @@ class SchedulingResult(namedtuple('SchedulingResult',
     def __new__(cls, *args, **kwargs):
         ntp = super(SchedulingResult, cls).__new__(cls, *args, **kwargs)
 
-        if not isinstance(ntp.dict_loop, OrderedDict) \
-                or not isinstance(ntp.dict_part, OrderedDict):
-            raise TypeError('SchedulingResult: dict_loop and dict_part '
-                            'must be OrderedDict instances.')
+        if not isinstance(ntp.scheme, OrderedDict):
+            raise TypeError('SchedulingResult: scheme must be an OrderedDict '
+                            'instance.')
         if not isinstance(ntp.ofmap_layout, DataLayout):
             raise TypeError('SchedulingResult: ofmap_layout must be '
                             'a DataLayout instance.')
@@ -77,49 +77,47 @@ class SchedulingResult(namedtuple('SchedulingResult',
     @property
     def total_cost(self):
         ''' Get the total cost. '''
-        return self.dict_loop['cost'] + self.dict_part['cost']
+        return self.scheme['cost']
 
     @property
     def total_time(self):
         ''' Get the dataflow total time. '''
-        return self.dict_loop['time']
+        return self.scheme['time']
 
     @property
     def total_node_time(self):
         ''' Get the total time on processing nodes. '''
-        return max(self.dict_loop['proc_time'], self.dict_loop['bus_time'])
+        return max(self.scheme['proc_time'], self.scheme['bus_time'])
 
     @property
     def total_dram_time(self):
         ''' Get the total time on DRAM access. '''
-        return self.dict_loop['dram_time']
+        return self.scheme['dram_time']
 
     @property
     def total_proc_time(self):
         ''' Get the total active processing time. '''
-        return self.dict_loop['proc_time']
+        return self.scheme['proc_time']
 
     @property
     def total_ops(self):
         ''' Get the total ops. '''
-        # dict_loop stats are over all nodes.
-        return self.dict_loop['ops']
+        return self.scheme['ops']
 
     @property
     def total_accesses(self):
         ''' Get the total accesses at all memory hierarchies as a list. '''
-        # dict_loop stats are over all nodes.
-        return [sum(acc) for acc in self.dict_loop['access']]
+        return [sum(acc) for acc in self.scheme['access']]
 
     @property
     def total_noc_hops(self):
         ''' Get the total NoC hops. '''
-        return sum(self.dict_part['total_nhops'])
+        return sum(self.scheme['total_nhops'])
 
     @property
     def num_nodes(self):
         ''' Get the number of processing nodes. '''
-        return self.dict_part['num_nodes']
+        return self.scheme['num_nodes']
 
     def cmp_key(self):
         ''' Key function for comparison. '''
@@ -207,7 +205,7 @@ class Scheduling(object):
                 filter_nodes, ifmap_layout, ofmap_layout, options)
 
             # Make scheduling result.
-            tops += [self._get_result(lbs, part, unit_nhops, ofmap_layout)
+            tops += [self._get_result(lbs, part, ofmap_layout, unit_nhops)
                      for lbs in lbs_tops]
 
         # Pick the top n.
@@ -216,8 +214,7 @@ class Scheduling(object):
         # Check total op count.
         total_layer_ops = self.layer.total_ops(self.batch_size)
         for t in tops:
-            actual_layer_ops = t.dict_loop['ops']
-            assert util.isclose(total_layer_ops, actual_layer_ops, rel_tol=1e-4)
+            assert util.isclose(total_layer_ops, t.total_ops, rel_tol=1e-4)
 
         # Check ofmap layout matches the layer.
         for t in tops:
@@ -282,25 +279,46 @@ class Scheduling(object):
 
         return lbs_tops
 
-    def _get_result(self, lbs, part, unit_nhops, ofmap_layout):
+    def _get_result(self, lbs, part, ofmap_layout, unit_nhops):
         '''
         Make the schedule result from loop blocking and partitioning.
         '''
-
-        # Loop blocking.
-        dict_loop = lbs.get_scheme_dict(self.cost)
-
-        # Partitioning.
         total_nhops = [unh * f for unh, f
                        in zip(unit_nhops, lbs.get_top_level_fetch())]
+        cost_loop = lbs.get_cost(self.cost)
         cost_part = self.cost.noc_hop * sum(total_nhops)
-        dict_part = OrderedDict([('cost', cost_part),
-                                 ('num_nodes', part.size()),
-                                 ('total_nhops', total_nhops),
-                                 ('part', part),
-                                 ('unit_nhops', unit_nhops)])
 
-        return SchedulingResult(dict_loop=dict_loop,
-                                dict_part=dict_part,
-                                ofmap_layout=ofmap_layout)
+        scheme = OrderedDict()
+
+        # Overall stats.
+        scheme['cost'] = cost_loop + cost_part
+        scheme['time'] = lbs.time
+        scheme['ops'] = lbs.ops
+        scheme['num_nodes'] = part.size()
+        scheme['cost_loop'] = cost_loop
+        scheme['cost_part'] = cost_part
+        scheme['proc_time'] = lbs.proc_time
+        scheme['bus_time'] = lbs.bus_time
+        scheme['dram_time'] = lbs.dram_time
+        scheme['access'] = lbs.access
+        scheme['total_nhops'] = total_nhops
+        scheme['fetch'] = lbs.fetch
+
+        # Loop blocking.
+        lp_ts = zip(*lbs.bl_ts)
+        scheme['ti'] = tuple(lp_ts[le.IFM])
+        scheme['to'] = tuple(lp_ts[le.OFM])
+        scheme['tb'] = tuple(lp_ts[le.BAT])
+        scheme['tvals'] = lbs.bl_ts
+        scheme['orders'] = lbs.bl_ords
+        scheme['size'] = [[lbs.data_size(bl, dce) for dce in range(de.NUM)]
+                          for bl in range(lbs.BL.NUM)]
+        scheme['unit_size'] = lbs.unit_size
+        scheme['unit_cnt'] = lbs.unit_cnt
+
+        # Partitioning.
+        scheme['part'] = part
+        scheme['unit_nhops'] = unit_nhops
+
+        return SchedulingResult(scheme=scheme, ofmap_layout=ofmap_layout)
 

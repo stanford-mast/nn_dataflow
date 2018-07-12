@@ -19,6 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from nn_dataflow.core import loop_blocking
+from nn_dataflow.core import DataCategoryEnum as de
 
 from . import TestLoopBlockingFixture
 
@@ -55,8 +56,8 @@ class TestLoopBlocking(TestLoopBlockingFixture):
                                  msg=('test_skip_not_reg: access mismatch. '
                                       'orig {}, reg {}.'
                                       .format(sch, reg_sch)))
-            size = lbs.get_scheme_dict(self.cost)['size']
-            reg_size = reg_lbs.get_scheme_dict(self.cost)['size']
+            size = self._get_lbs_size(lbs)
+            reg_size = self._get_lbs_size(reg_lbs)
             self.assertTrue(all(all(ss1 >= ss2 for ss1, ss2 in zip(s1, s2))
                                 for s1, s2 in zip(size, reg_size)),
                             'test_skip_not_reg: reg size is larger than eqv.\n'
@@ -111,20 +112,16 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         for lbs in self._gen_loopblocking(rsrckey='LG', skip_invalid=True):
 
-            sdict = lbs.get_scheme_dict(self.cost)
-
             # Make the keys hashable (list -> tuple).
-            size = tuple(tuple(ss for ss in s) for s in sdict['size'])
-            access = tuple(tuple(int(aa) for aa in a) for a in sdict['access'])
+            size = tuple(tuple(ss for ss in s) for s in self._get_lbs_size(lbs))
+            access = tuple(tuple(int(aa) for aa in a) for a in lbs.access)
             keys = (size, access)
 
             self.assertNotIn(keys, acc_dict,
                              'test_gen_loopblocking_no_eqv: found equivalents. '
-                             'keys: access {} size {}\n  {}\n  {}'
-                             .format(access, size,
-                                     sdict,
-                                     acc_dict.get(keys)))
-            acc_dict[keys] = sdict
+                             'keys: access {} size {}'
+                             .format(access, size))
+            acc_dict[keys] = lbs
 
     def test_gen_loopblocking_ntops(self):
         ''' gen_loopblocking ntops. '''
@@ -164,4 +161,11 @@ class TestLoopBlocking(TestLoopBlockingFixture):
                 self.cost, self.options[optkey]):
             if not skip_invalid or lbs.is_valid():
                 yield lbs
+
+    @staticmethod
+    def _get_lbs_size(lbs):
+        ''' Get the size info. '''
+        assert lbs.is_valid()
+        return [[lbs.data_size(bl, dce) for dce in range(de.NUM)]
+                for bl in range(lbs.BL.NUM)]
 

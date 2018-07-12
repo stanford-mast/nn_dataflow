@@ -69,6 +69,9 @@ List of major changes and improvements
   - `partition` module refactored: use new `DataLayout` class and new
     `PartitionScheme` methods.
 
+  - `SchedulingResult` uses a combined `OrderedDict` to replace `dict_loop` and
+    `dict_part`.
+
 - Software engineering.
 
   - Change `NNDataflowScheme` node-time product interface to explicitly be

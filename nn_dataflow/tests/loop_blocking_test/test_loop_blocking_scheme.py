@@ -18,7 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-import copy
 import itertools
 import math
 
@@ -27,7 +26,6 @@ from nn_dataflow.core import DataCategoryEnum as de
 from nn_dataflow.core import LoopBlockingScheme
 from nn_dataflow.core import LoopEnum as le
 from nn_dataflow.core import MemHierEnum as me
-from nn_dataflow import util
 
 from . import TestLoopBlockingFixture
 
@@ -334,57 +332,6 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
                         rsrckey='SM')
         self.assertFalse(lbs.is_valid())
         self.assertTrue(math.isinf(lbs.get_cost(self.cost)))
-
-    def test_scheme_dict(self):
-        ''' get_scheme_dict. '''
-
-        for bl_ts, bl_ords in self._gen_loopblocking_all():
-
-            lbs = self._lbs(bl_ts, bl_ords)
-
-            if not lbs.is_valid():
-                self.assertIsNone(lbs.get_scheme_dict(self.cost))
-                continue
-
-            sdict = lbs.get_scheme_dict(self.cost)
-
-            self.assertAlmostEqual(sdict['cost'], lbs.get_cost(self.cost))
-            self.assertAlmostEqual(sdict['ops'], lbs.ops)
-            self.assertAlmostEqual(sdict['time'], lbs.time)
-
-            self.assertEqual(id(sdict['access']), id(lbs.get_access()))
-            for lvl in [0, 1]:
-                for dce in range(de.NUM):
-                    self.assertAlmostEqual(sdict['size'][lvl][dce],
-                                           lbs.data_size(lvl, dce))
-
-            self.assertEqual(util.prod(sdict['ti']),
-                             self.nld['BASE'].loopcnt[le.IFM])
-            self.assertEqual(util.prod(sdict['to']),
-                             self.nld['BASE'].loopcnt[le.OFM])
-            self.assertEqual(util.prod(sdict['tb']),
-                             self.nld['BASE'].loopcnt[le.BAT])
-
-    def test_scheme_dict_eval_order(self):
-        ''' get_scheme_dict eval order. '''
-
-        for bl_ts, bl_ords in self._gen_loopblocking_all():
-
-            lbs1 = self._lbs(bl_ts, bl_ords, rsrckey='LG')
-
-            lbs2 = copy.deepcopy(lbs1)
-
-            access1 = lbs1.get_access()
-            sdict1 = lbs1.get_scheme_dict(self.cost)
-
-            sdict2 = lbs2.get_scheme_dict(self.cost)
-            access2 = lbs2.get_access()
-
-            self.assertAlmostEqual(sdict1['cost'], sdict2['cost'])
-            for mhe in range(me.NUM):
-                for dce in range(de.NUM):
-                    self.assertAlmostEqual(access1[mhe][dce],
-                                           access2[mhe][dce])
 
     def test_ordered_loops(self):
         ''' Get ordered_loops. '''
