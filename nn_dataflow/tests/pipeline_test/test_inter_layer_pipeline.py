@@ -292,7 +292,9 @@ class TestInterLayerPipeline(TestPipelineFixture):
 
             # No pipelining.
             options = Option()
-            segs_n = set(ilp.gen_segment(options))
+            segs_n_lst = list(ilp.gen_segment(options))
+            segs_n = set(segs_n_lst)
+            self.assertEqual(len(segs_n_lst), len(segs_n))
             for seg in segs_n:
                 self.assertEqual(len(seg), 1)
                 self.assertEqual(len(seg[0]), 1)
@@ -300,7 +302,9 @@ class TestInterLayerPipeline(TestPipelineFixture):
 
             # Spatial pipelining.
             options = Option(partition_interlayer=True)
-            segs_sp = set(ilp.gen_segment(options))
+            segs_sp_lst = list(ilp.gen_segment(options))
+            segs_sp = set(segs_sp_lst)
+            self.assertEqual(len(segs_sp_lst), len(segs_sp))
             for seg in segs_sp:
                 for ltpl in seg:
                     self.assertLessEqual(sum(1 for l in ltpl
@@ -310,7 +314,9 @@ class TestInterLayerPipeline(TestPipelineFixture):
 
             # Temporal pipelining.
             options = Option(hw_gbuf_save_writeback=True)
-            segs_tp = set(ilp.gen_segment(options))
+            segs_tp_lst = list(ilp.gen_segment(options))
+            segs_tp = set(segs_tp_lst)
+            self.assertEqual(len(segs_tp_lst), len(segs_tp))
             for seg in segs_tp:
                 self.assertEqual(len(seg), 1)
             self.assertTrue(segs_tp.issuperset(segs_n))
@@ -318,7 +324,9 @@ class TestInterLayerPipeline(TestPipelineFixture):
             # Spatial and temporal pipelining.
             options = Option(partition_interlayer=True,
                              hw_gbuf_save_writeback=True)
-            segs_stp = set(ilp.gen_segment(options))
+            segs_stp_lst = list(ilp.gen_segment(options))
+            segs_stp = set(segs_stp_lst)
+            self.assertEqual(len(segs_stp_lst), len(segs_stp))
             self.assertSetEqual(segs_stp, segs_tp | segs_sp)
             # Only single-layer and single-vertex segments have the same
             # spatial and temporal pipelining.

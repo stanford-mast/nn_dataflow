@@ -69,7 +69,7 @@ class InterLayerPipeline(object):
                   'max_util_drop': self.max_util_drop,
                  }
 
-        # No pipelining, each vertex sequentially occupies the whole resource.
+        # No pipelining, each layer sequentially occupies the whole resource.
         for layer in self.network:
             seg = ((layer,),)
             segment = PipelineSegment(seg, **kwargs)
@@ -80,6 +80,10 @@ class InterLayerPipeline(object):
         for vseg in self._gen_vseg():
 
             if len(vseg) > options.layer_pipeline_max_degree:
+                continue
+
+            if len(vseg) == 1 and len(self.dag_vertex_list[vseg[0]]) == 1:
+                # An individual layer, already returned in no-pipelining case.
                 continue
 
             # Use set to eliminate duplicates.
