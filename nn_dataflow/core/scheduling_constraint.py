@@ -25,7 +25,6 @@ from . import loop_enum as le
 class SchedulingConstraint(namedtuple('SchedulingConstraint',
                                       ['top_bl_t',
                                        'top_bl_lpe',
-                                       'fmap_tpart',
                                       ])):
     '''
     Layer scheduling constraint.
@@ -35,10 +34,9 @@ class SchedulingConstraint(namedtuple('SchedulingConstraint',
     mapping strategy may increase the effective batch size.
     '''
 
-    def __new__(cls, top_bl_t=None, top_bl_lpe=None, fmap_tpart=1):
+    def __new__(cls, top_bl_t=None, top_bl_lpe=None):
         ntp = super(SchedulingConstraint, cls).__new__(
-            cls, top_bl_t=top_bl_t, top_bl_lpe=top_bl_lpe,
-            fmap_tpart=fmap_tpart)
+            cls, top_bl_t=top_bl_t, top_bl_lpe=top_bl_lpe)
 
         if ntp.top_bl_t is not None:
             if not isinstance(ntp.top_bl_t, tuple):
@@ -52,10 +50,6 @@ class SchedulingConstraint(namedtuple('SchedulingConstraint',
             if ntp.top_bl_lpe not in range(le.NUM):
                 raise ValueError('SchedulingConstraint: top_bl_lpe must be '
                                  'None or a LoopEnum.')
-
-        if not isinstance(ntp.fmap_tpart, int):
-            raise TypeError('SchedulingConstraint: fmap_tpart must be an '
-                            'integer.')
 
         return ntp
 

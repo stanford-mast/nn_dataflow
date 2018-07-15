@@ -50,8 +50,7 @@ class TestScheduling(unittest.TestCase):
                          noc_hop=50, unit_static=50)
 
         self.none_cstr = SchedulingConstraint()
-        self.cstr = SchedulingConstraint(top_bl_t=(None, 1, self.batch_size),
-                                         fmap_tpart=2)
+        self.cstr = SchedulingConstraint(top_bl_t=(None, 1, self.batch_size))
 
         self.resource = Resource(
             proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
@@ -145,8 +144,6 @@ class TestScheduling(unittest.TestCase):
             # Constraint.
             for r in res:
                 self.assertEqual(r.dict_loop['to'][0], 1)
-                self.assertEqual(r.dict_part['fmap_tpart'],
-                                 self.cstr.fmap_tpart)
 
             # Ofmap layout.
             for r in res:
@@ -161,7 +158,6 @@ class TestScheduling(unittest.TestCase):
     def test_schedule_search_ilayout(self):
         ''' Invalid ifmap_layout. '''
         layer = self.layers['BASE']
-        ifmap_layout = self.ifmap_layouts['BASE']
 
         schd = Scheduling(layer, self.batch_size, self.cost,
                           MapStrategyEyeriss)

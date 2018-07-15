@@ -22,7 +22,7 @@ from collections import namedtuple
 
 from . import loop_enum as le
 from .. import util
-from .layer import ConvLayer, LocalRegionLayer
+from .layer import ConvLayer
 from .network import Network
 from .resource import Resource
 from .scheduling_constraint import SchedulingConstraint
@@ -87,11 +87,6 @@ class PipelineSegment(object):
         Yield the segment constraint tuple, and information for pruning and
         early termination. The information includes:
 
-        - opt_step: if True, starting from (including) the current constraint,
-          the optimality will guarantee to drop to be lower than the previous
-          ones. Therefore, if we have already found valid schedules at this
-          point, we can skip all the following constraints.
-
         - ff_end: if True, starting from (including) the current constraint,
           the constraints will have NO strictness relation with the previous
           ones. Between two ff_end points, the constraints are guaranteed to be
@@ -100,17 +95,12 @@ class PipelineSegment(object):
 
         Rules for constraints.
 
-        1. Fmap temporal partitioning factor.
-
-        Apply to all layers in the segment. Should be approximately dividable
-        by hofm of all the layers in the segment.
-
-        2. Top BAT loop factor.
+        1. Top BAT loop factor.
 
         With a single spatial scheduling, there is no constraint on top BAT
         loop factor. Otherwise all layers must share the same factor.
 
-        3. Fully buffered data category (ifmaps or ofmaps).
+        2. Fully buffered data category (ifmaps or ofmaps).
 
         Only CONV layers require fully buffered data. Local-region layers
         process data in a streaming manner. We group each CONV layer, and all
@@ -138,88 +128,38 @@ class PipelineSegment(object):
           buffer ifmaps.
         '''
 
-        # Fmap temporal partitioning factor candidates.
-        fmap_tpart_cands = []
-        l_lst = [l for ltpl in self.seg for l in ltpl]
-        hofm_lst = [self.network[l].hofm for l in l_lst]
-        for f in range(1, min(hofm_lst) + 1):
-            # Large factor should divide the fmap height.
-            if f > 4 and not all(h % f == 0 for h in hofm_lst):
-                continue
-            # Backtrace layers, find out the pyramid enlargement for hofm.
-            tp_hofm_dict = {}
-            for l in reversed(l_lst):
-                layer = self.network[l]
-                tp_hofm = util.idivc(layer.hofm, f)
-                if l in tp_hofm_dict:
-                    # Already determined by the later layer. Check enlargement.
-                    if tp_hofm_dict[l] > 1.5 * tp_hofm:
-                        break
-                else:
-                    # No later layer, partition hofm directly.
-                    tp_hofm_dict[l] = tp_hofm
-                # Determine previous layers according to its ifmap size.
-                if isinstance(layer, ConvLayer):
-                    tp_hifm = ConvLayer(
-                        1, 1, (tp_hofm, layer.wofm),
-                        (layer.hfil, layer.wfil),
-                        (layer.htrd, layer.wtrd)).hifm
-                else:
-                    assert isinstance(layer, LocalRegionLayer)
-                    tp_hifm = LocalRegionLayer(
-                        1, (tp_hofm, layer.wofm), layer.nreg,
-                        (layer.hreg, layer.wreg),
-                        (layer.htrd, layer.wtrd)).hifm
-                prev_layers, _ = self.network.prev_layers(l)
-                for pl in prev_layers:
-                    tp_hofm_dict[pl] = tp_hifm
-            else:
-                # No violation.
-                fmap_tpart_cands.append(f)
-        if not fmap_tpart_cands:
-            return
-        assert fmap_tpart_cands[0] == 1
-
         # Top BAT factors, sorted from smallest to largest.
-        def _top_tb_cands(fmap_tpart):
-            # Fmap temporal partitioning factor contributes to batch size.
+        def _top_tb_cands():
             cands = [None] if len(self.seg) == 1 else \
-                (t for t, _ in util.factorize(self.batch_size * fmap_tpart, 2))
+                (t for t, _ in util.factorize(self.batch_size, 2))
             return sorted(cands)
 
         # Start with fully buffer ofmaps or not.
         sfbo_cands = [False] if len(self.seg) == 1 else [True, False]
 
         # Pruning info.
-        opt_step = False
         ff_end = False
         constraint_set = set()
 
-        for fmap_tpart in fmap_tpart_cands:
+        for sfbo in sfbo_cands:
 
-            for sfbo in sfbo_cands:
+            for top_tb in _top_tb_cands():
 
-                for top_tb in _top_tb_cands(fmap_tpart):
+                conditions = (top_tb, sfbo)
 
-                    conditions = (fmap_tpart, top_tb, sfbo)
+                constraint = self._make_constraint(*conditions)
 
-                    constraint = self._make_constraint(*conditions)
+                if constraint and constraint not in constraint_set:
 
-                    if constraint and constraint not in constraint_set:
+                    yield constraint, ff_end
 
-                        yield constraint, opt_step, ff_end
+                    # Reset info until next set.
+                    ff_end = False
 
-                        # Reset info until next set.
-                        opt_step = False
-                        ff_end = False
+                    constraint_set.add(constraint)
 
-                        constraint_set.add(constraint)
-
-                # Smaller top tb factors are more strict than larger ones.
-                ff_end = True
-
-            # Stop using larger fmap temporal partitioning if small ones work.
-            opt_step = True
+            # Smaller top tb factors are more strict than larger ones.
+            ff_end = True
 
     def __getitem__(self, index):
         return self.seg[index]
@@ -531,7 +471,7 @@ class PipelineSegment(object):
         See gen_constraint() for the rules.
         '''
 
-        fmap_tpart, top_tb, sfbo = conditions
+        top_tb, sfbo = conditions
 
         # Single spatial scheduling does not have requirements for top tb and
         # starting fully buffering.
@@ -609,8 +549,7 @@ class PipelineSegment(object):
 
         # Make SchedulingConstraint instances.
         constraint = tuple(tuple(SchedulingConstraint(top_bl_t=tuple(top_bl_t),
-                                                      top_bl_lpe=top_bl_lpe,
-                                                      fmap_tpart=fmap_tpart)
+                                                      top_bl_lpe=top_bl_lpe)
                                  for top_bl_t in tlst)
                            for tlst in top_bl_t_list)
 
@@ -626,7 +565,6 @@ class PipelineSegment(object):
                 if cstr.top_bl_t[le.OFM] == 1:
                     # Fully buffer ofmaps.
                     req_size_gbuf += self.network[layer].total_ofmap_size()
-                req_size_gbuf //= cstr.fmap_tpart
 
                 if req_size_gbuf > \
                         resource.size_gbuf * resource.proc_region.dim.size():

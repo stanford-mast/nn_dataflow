@@ -196,7 +196,7 @@ class TestNNDataflow(unittest.TestCase):
         # Multiple nodes for spatial pipelining.
         resource = self.resource._replace(
             proc_region=NodeRegion(origin=PhyDim2(0, 0),
-                                   dim=PhyDim2(2, 2),
+                                   dim=PhyDim2(8, 8),
                                    type=NodeRegion.PROC),
             dim_array=PhyDim2(1, 1),
         )

@@ -7,8 +7,6 @@ List of major changes and improvements
 
 - Software models.
 
-  - Add fmap temporal partitioning.
-
   - Add scheduling constraints for loop blocking and partitioning.
     - The batch loop blocking factor is allowed to be inexact but a multiple of
       the constrained factor.
@@ -45,9 +43,6 @@ List of major changes and improvements
 
 
 ### Fixed
-
-- Remove assertion to allow lower array utilization which could occur during
-  mapping small layers, e.g., with fmap temporal partitioning.
 
 - Allow `DataLayout` with different types to merge, which results in the more
   conservative type.

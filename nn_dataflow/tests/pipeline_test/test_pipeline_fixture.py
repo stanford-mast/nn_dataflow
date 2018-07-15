@@ -281,16 +281,14 @@ class TestPipelineFixture(unittest.TestCase):
             self.assertTrue(all(isinstance(c, SchedulingConstraint)
                                 for c in ctpl))
 
-        # Same fmap tpart and top tb.
-        fmap_tpart = constraint[0][0].fmap_tpart
+        # Same top tb.
         top_tb = constraint[0][0].top_bl_t[le.BAT]
-        self.assertTrue(all(c.fmap_tpart == fmap_tpart
-                            and c.top_bl_t[le.BAT] == top_tb
+        self.assertTrue(all(c.top_bl_t[le.BAT] == top_tb
                             for ctpl in constraint for c in ctpl))
 
-        # Top tb is a factor of batch size and fmap tpart.
+        # Top tb is a factor of batch size.
         if top_tb:
-            self.assertEqual((segment.batch_size * fmap_tpart) % top_tb, 0)
+            self.assertEqual((segment.batch_size) % top_tb, 0)
 
         # Data availability.
 

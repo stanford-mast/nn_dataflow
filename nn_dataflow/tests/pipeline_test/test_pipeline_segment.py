@@ -300,7 +300,7 @@ class TestPipelineSegment(TestPipelineFixture):
                 segment = self._make_segment((idx,), ilp.network)
                 self.assertTrue(segment.valid)
 
-                for constraint, _, _ in segment.gen_constraint():
+                for constraint, _ in segment.gen_constraint():
                     self._validate_constraint(segment, constraint)
 
                     # No top loop constraint for single-vertex segment.
@@ -319,7 +319,7 @@ class TestPipelineSegment(TestPipelineFixture):
                 if not segment.valid:
                     continue
 
-                for constraint, _, _ in segment.gen_constraint():
+                for constraint, _ in segment.gen_constraint():
                     self._validate_constraint(segment, constraint)
 
         # Special cases.
@@ -329,7 +329,7 @@ class TestPipelineSegment(TestPipelineFixture):
         segment = PipelineSegment((('0', '1'), ('2', '3')), net,
                                   self.batch_size, self.resource)
 
-        for constraint, _, _ in segment.gen_constraint():
+        for constraint, _ in segment.gen_constraint():
             self._validate_constraint(segment, constraint)
 
     def test_gen_constraint_temporal(self):
@@ -343,7 +343,7 @@ class TestPipelineSegment(TestPipelineFixture):
                 if not segment.valid:
                     continue
 
-                for constraint, _, _ in segment.gen_constraint():
+                for constraint, _ in segment.gen_constraint():
                     self._validate_constraint(segment, constraint)
 
                     # Single spatial scheduling in temporal pipelining do not
@@ -352,73 +352,6 @@ class TestPipelineSegment(TestPipelineFixture):
                         for c in ctpl:
                             self.assertIsNone(c.top_bl_t[le.BAT])
                             self.assertIsNone(c.top_bl_lpe)
-
-    def test_gen_constraint_opt_step(self):
-        ''' gen_constraint() pruning info opt_step. '''
-
-        for net_name in self.net:
-
-            if not net_name.startswith('net') and net_name != 'zfnet':
-                # Use ZFNet to give the real fmap dimensions.
-                continue
-            net = self.net[net_name]
-
-            for segment in self._gen_all_segment(net):
-                if not segment.valid:
-                    continue
-
-                ostep_set_ref = None
-                ostep_set = set()
-                last_fmap_tpart = 1
-
-                for constraint, ostep, _ in segment.gen_constraint():
-
-                    fmap_tpart = constraint[0][0].fmap_tpart
-
-                    if ostep:
-                        # Comes a new opt step. Close the current one.
-
-                        # Update fmap tpart.
-                        self.assertGreater(fmap_tpart, last_fmap_tpart,
-                                           'test_gen_constraint_opt_step: '
-                                           'fmap tpart is not monotonically '
-                                           'increasing across opt steps. '
-                                           '{} -> {}.'
-                                           .format(last_fmap_tpart, fmap_tpart))
-                        last_fmap_tpart = fmap_tpart
-
-                        # Compare to ref.
-                        ostep_set_2 = set()
-                        for cstr in ostep_set:
-                            # Replace fmap tpart and top tb.
-                            # Different fmap tpart may lead to different top tb.
-                            cstr_2 = tuple(tuple(c._replace(
-                                fmap_tpart=0,
-                                top_bl_t=(c.top_bl_t[:le.BAT]
-                                          + (0,)
-                                          + c.top_bl_t[le.BAT + 1:]))
-                                                 for c in ctpl)
-                                           for ctpl in cstr)
-                            ostep_set_2.add(cstr_2)
-                        # Larger fmap tpart value may introduce more valid
-                        # constraints.
-                        self.assertTrue(
-                            ostep_set_ref is None
-                            or ostep_set_ref.issubset(ostep_set_2),
-                            'test_gen_constraint_opt_step: constraints '
-                            'differ across opt steps. '
-                            'Network {}, segment {}.'
-                            .format(net_name, segment))
-                        ostep_set_ref = ostep_set_2
-
-                        ostep_set.clear()
-
-                    ostep_set.add(constraint)
-                    self.assertEqual(fmap_tpart, last_fmap_tpart,
-                                     'test_gen_constraint_opt_step: fmap tpart '
-                                     'is not constant within an opt step. '
-                                     '{} != {}.'
-                                     .format(fmap_tpart, last_fmap_tpart))
 
     def test_gen_constraint_ff_end(self):
         ''' gen_constraint() pruning info ff_end. '''
@@ -437,15 +370,9 @@ class TestPipelineSegment(TestPipelineFixture):
                 last_top_tb = 0
                 last_cstr = None
 
-                for constraint, ostep, ff_end in segment.gen_constraint():
+                for constraint, ff_end in segment.gen_constraint():
 
                     top_tb = constraint[0][0].top_bl_t[le.BAT]
-
-                    if ostep:
-                        self.assertTrue(ff_end,
-                                        'test_gen_constraint_ff_end: '
-                                        'ff_end must be True when a new '
-                                        'opt step starts.')
 
                     if last_top_tb is None:
                         self.assertTrue(ff_end,
@@ -475,21 +402,4 @@ class TestPipelineSegment(TestPipelineFixture):
 
                     last_cstr = cstr
                     last_top_tb = top_tb
-
-    def test_gen_constraint_fmap_tpart(self):
-        ''' gen_constraint() valid fmap_tpart. '''
-
-        net = self.net['net6']
-
-        segment = self._make_segment((0, 1, 2, 3), net, max_util_drop=1.)
-        self.assertTrue(segment.valid)
-
-        fmap_tpart_set = set()
-        for constraint, _, _ in segment.gen_constraint():
-            fmap_tpart_set.add(constraint[0][0].fmap_tpart)
-
-        # The candidates will be 1 to 6. 5 is not valid due to dividability,
-        # and 6 is not valid due to pyramid enlargement.
-        self.assertNotIn(5, fmap_tpart_set)
-        self.assertNotIn(6, fmap_tpart_set)
 

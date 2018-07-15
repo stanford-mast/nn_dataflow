@@ -197,13 +197,9 @@ class NNDataflow(object):
         fast_forward = False
 
         # Explore constraints.
-        for constraint, opt_step, ff_end in segment.gen_constraint():
+        for constraint, ff_end in segment.gen_constraint():
 
             # Prune.
-            if opt_step:
-                if nndf_tops:
-                    # Already found, skip sub-optimal constraints.
-                    break
             if ff_end:
                 # Exit fast forwarding.
                 fast_forward = False

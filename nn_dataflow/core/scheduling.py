@@ -269,8 +269,7 @@ class Scheduling(object):
 
         # Partitioned layer.
         p_layer, p_batch_size, p_occ = part.part_layer(self.layer,
-                                                       self.batch_size,
-                                                       constraint.fmap_tpart)
+                                                       self.batch_size)
 
         # Mapping strategy.
         map_strategy = self.map_strategy_class(p_layer, p_batch_size,
@@ -310,7 +309,6 @@ class Scheduling(object):
                                  ('num_nodes', part.size()),
                                  ('total_nhops', total_nhops),
                                  ('part', part),
-                                 ('fmap_tpart', constraint.fmap_tpart),
                                  ('unit_nhops', unit_nhops)])
 
         return SchedulingResult(dict_loop=dict_loop,

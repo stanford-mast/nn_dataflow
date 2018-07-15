@@ -30,29 +30,23 @@ class TestSchedulingConstraint(unittest.TestCase):
     def test_valid_args(self):
         ''' Valid arguments. '''
         constraint = SchedulingConstraint(top_bl_t=(1, 1, 2),
-                                          top_bl_lpe=le.BAT,
-                                          fmap_tpart=2)
+                                          top_bl_lpe=le.BAT)
         self.assertEqual(constraint.top_bl_t, (1, 1, 2))
         self.assertEqual(constraint.top_bl_lpe, le.BAT)
-        self.assertEqual(constraint.fmap_tpart, 2)
 
         constraint = SchedulingConstraint(top_bl_t=(1, 1, 2))
         self.assertIsNone(constraint.top_bl_lpe)
-        self.assertEqual(constraint.fmap_tpart, 1)
 
         constraint = SchedulingConstraint(top_bl_t=(1, None, None))
         self.assertEqual(constraint.top_bl_t, (1, None, None))
         self.assertIsNone(constraint.top_bl_lpe)
-        self.assertEqual(constraint.fmap_tpart, 1)
 
         constraint = SchedulingConstraint(top_bl_lpe=le.BAT)
         self.assertIsNone(constraint.top_bl_t)
-        self.assertEqual(constraint.fmap_tpart, 1)
 
         constraint = SchedulingConstraint()
         self.assertIsNone(constraint.top_bl_t)
         self.assertIsNone(constraint.top_bl_lpe)
-        self.assertEqual(constraint.fmap_tpart, 1)
 
     def test_invalid_top_bl_t(self):
         ''' Invalid top_bl_t. '''
@@ -69,12 +63,6 @@ class TestSchedulingConstraint(unittest.TestCase):
         with self.assertRaisesRegexp(ValueError,
                                      'SchedulingConstraint: .*top_bl_lpe.*'):
             _ = SchedulingConstraint(top_bl_lpe=le.NUM)
-
-    def test_invalid_fmap_tpart(self):
-        ''' Invalid fmap_tpart. '''
-        with self.assertRaisesRegexp(TypeError,
-                                     'SchedulingConstraint: .*fmap_tpart.*'):
-            _ = SchedulingConstraint(fmap_tpart=1.5)
 
     def test_is_valid_top_bl_t(self):
         ''' Whether is_valid_top_bl for top_bl_t. '''

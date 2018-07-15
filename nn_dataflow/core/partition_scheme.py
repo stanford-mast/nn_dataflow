@@ -108,19 +108,15 @@ class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
                      in zip(coord, self.pdims[penum], pidx[penum])]
         return node_region.rel2abs(PhyDim2(*coord))
 
-    def part_layer(self, layer, batch_size, fmap_tpart=1):
+    def part_layer(self, layer, batch_size):
         '''
         Get the partitioned layer structure and batch size. Return partitioned
         layer, partitioned batch size, and partitioning op occupation.
-
-        `fmap_tpart` is the fmap temporal partitioning factor. It only applies
-        to the height dimension of the fmaps, and break the height to increase
-        the batch size.
         '''
 
         p_nifm = util.idivc(layer.nifm, self.pdims[pe.INPP].size())
         p_nofm = util.idivc(layer.nofm, self.pdims[pe.OUTP].size())
-        p_hofm = util.idivc(layer.hofm, self.pdims[pe.OFMP].h * fmap_tpart)
+        p_hofm = util.idivc(layer.hofm, self.pdims[pe.OFMP].h)
         p_wofm = util.idivc(layer.wofm, self.pdims[pe.OFMP].w)
 
         if isinstance(layer, ConvLayer):
@@ -137,8 +133,7 @@ class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
         else:
             raise TypeError('PartitionScheme: unrecognized layer type.')
 
-        p_batch_size = util.idivc(batch_size, self.pdims[pe.BATP].size()) \
-                * fmap_tpart
+        p_batch_size = util.idivc(batch_size, self.pdims[pe.BATP].size())
 
         p_occ = 1. * layer.total_ops(batch_size) \
                 / (p_layer.total_ops(p_batch_size) * self.size())
