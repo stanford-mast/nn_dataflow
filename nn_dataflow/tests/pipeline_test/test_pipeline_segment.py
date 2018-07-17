@@ -20,7 +20,6 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import itertools
 
-from nn_dataflow.core import LoopEnum as le
 from nn_dataflow.core import NodeRegion
 from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import PipelineSegment
@@ -306,8 +305,8 @@ class TestPipelineSegment(TestPipelineFixture):
                     # No top loop constraint for single-vertex segment.
                     for ctpl in constraint:
                         for c in ctpl:
-                            self.assertTupleEqual(c.top_bl_t, (None,) * le.NUM)
-                            self.assertEqual(c.top_bl_lpe, None)
+                            self.assertTrue(c.topifm == 0 and c.topofm == 0
+                                            and c.topbat == 0)
 
         # Spatial pipelining.
 
@@ -350,8 +349,7 @@ class TestPipelineSegment(TestPipelineFixture):
                     # require top BAT loop.
                     for ctpl in constraint:
                         for c in ctpl:
-                            self.assertIsNone(c.top_bl_t[le.BAT])
-                            self.assertIsNone(c.top_bl_lpe)
+                            self.assertEqual(c.topbat, 0)
 
     def test_gen_constraint_ff_end(self):
         ''' gen_constraint() pruning info ff_end. '''
@@ -367,25 +365,26 @@ class TestPipelineSegment(TestPipelineFixture):
                 if not segment.valid:
                     continue
 
-                last_top_tb = 0
+                last_top_tb = None
                 last_cstr = None
 
                 for constraint, ff_end in segment.gen_constraint():
 
-                    top_tb = constraint[0][0].top_bl_t[le.BAT]
+                    top_tb = constraint[0][0].topbat
 
-                    if last_top_tb is None:
+                    if last_top_tb == 0:
                         self.assertTrue(ff_end,
                                         'test_gen_constraint_ff_end: '
                                         'ff_end must be True when previous '
-                                        'top tb is None.')
+                                        'top tb is 0.')
 
-                    # Replace top tb.
-                    cstr = tuple(tuple(c._replace(
-                        top_bl_t=(c.top_bl_t[:le.BAT]
-                                  + (0,)
-                                  + c.top_bl_t[le.BAT + 1:]))
-                                       for c in ctpl) for ctpl in constraint)
+                    # Convert to dict, and replace top tb.
+                    cstr = []
+                    for ctpl in constraint:
+                        cstr.append([])
+                        for c in ctpl:
+                            cstr[-1].append(c.__dict__)
+                            cstr[-1][-1]['topbat'] = 0
 
                     if last_cstr and not ff_end:
                         self.assertEqual(cstr, last_cstr,

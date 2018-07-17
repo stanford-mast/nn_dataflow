@@ -25,7 +25,7 @@ from .. import util
 from .layer import ConvLayer
 from .network import Network
 from .resource import Resource
-from .scheduling_constraint import SchedulingConstraint
+from .scheduling_constraint import SchedulingConstraintLayerPipeline as Cstr
 
 class PipelineSegment(object):
     '''
@@ -478,6 +478,9 @@ class PipelineSegment(object):
         assert len(self.seg) > 1 or top_tb is None
         assert len(self.seg) > 1 or not sfbo
 
+        if top_tb is None:
+            top_tb = 0
+
         # Scheduling indices for the last CONV layer.
         last_idx = PipelineSegment.SchedIndex(-1, 0)
         # Whether to fully buffer ofmaps for the last group (defer applying to
@@ -485,7 +488,7 @@ class PipelineSegment(object):
         last_fbo = False
 
         # Top loop factor for each layer.
-        top_bl_t_list = [[[None] * le.NUM for _ in ltpl] for ltpl in self.seg]
+        top_bl_t_list = [[[0] * le.NUM for _ in ltpl] for ltpl in self.seg]
 
         for sp_idx, ltpl in enumerate(self.seg):
 
@@ -545,11 +548,10 @@ class PipelineSegment(object):
         # The last group ofmaps go to memory, do not need to fully buffer.
         # Ignore final last_fbo value.
 
-        top_bl_lpe = le.BAT if top_tb is not None else None
-
         # Make SchedulingConstraint instances.
-        constraint = tuple(tuple(SchedulingConstraint(top_bl_t=tuple(top_bl_t),
-                                                      top_bl_lpe=top_bl_lpe)
+        constraint = tuple(tuple(Cstr(topbat=top_bl_t[le.BAT],
+                                      topifm=top_bl_t[le.IFM],
+                                      topofm=top_bl_t[le.OFM])
                                  for top_bl_t in tlst)
                            for tlst in top_bl_t_list)
 
@@ -559,10 +561,10 @@ class PipelineSegment(object):
 
                 # Required GBUF size.
                 req_size_gbuf = 0
-                if cstr.top_bl_t[le.IFM] == 1:
+                if cstr.topifm == 1:
                     # Fully buffer ifmaps.
                     req_size_gbuf += self.network[layer].total_ifmap_size()
-                if cstr.top_bl_t[le.OFM] == 1:
+                if cstr.topifm == 1:
                     # Fully buffer ofmaps.
                     req_size_gbuf += self.network[layer].total_ofmap_size()
 

@@ -23,7 +23,6 @@ import unittest
 
 from nn_dataflow.core import InputLayer, ConvLayer, FCLayer, PoolingLayer
 from nn_dataflow.core import InterLayerPipeline
-from nn_dataflow.core import LoopEnum as le
 from nn_dataflow.core import Network
 from nn_dataflow.core import NodeRegion
 from nn_dataflow.core import PhyDim2
@@ -282,8 +281,8 @@ class TestPipelineFixture(unittest.TestCase):
                                 for c in ctpl))
 
         # Same top tb.
-        top_tb = constraint[0][0].top_bl_t[le.BAT]
-        self.assertTrue(all(c.top_bl_t[le.BAT] == top_tb
+        top_tb = constraint[0][0].topbat
+        self.assertTrue(all(c.topbat == top_tb
                             for ctpl in constraint for c in ctpl))
 
         # Top tb is a factor of batch size.
@@ -380,7 +379,7 @@ class TestPipelineFixture(unittest.TestCase):
                     if OutAccPat.DBF in prev_oaps:
                         # Some source data require double-buffering, must
                         # fully buffer CONV input.
-                        self.assertEqual(cstr.top_bl_t[le.IFM], 1,
+                        self.assertEqual(cstr.topifm, 1,
                                          '_validate_constraint: input of '
                                          'layer {} ({}) not fully buffered '
                                          'but with DBF source.\n'
@@ -389,15 +388,15 @@ class TestPipelineFixture(unittest.TestCase):
                                                  prev_layers, prev_oaps))
 
                     oap = None
-                    if cstr.top_bl_t[le.IFM] == 1:
-                        if cstr.top_bl_t[le.OFM] == 1:
+                    if cstr.topifm == 1:
+                        if cstr.topofm == 1:
                             # Fully buffer both, can access output in any way.
                             # This is fine as we require to buffer either input
                             # or output for CONV (see below).
                             oap = OutAccPat.ANY
                         else:
                             oap = OutAccPat.SEQ
-                    elif cstr.top_bl_t[le.OFM] == 1:
+                    elif cstr.topofm == 1:
                         oap = OutAccPat.DBF
                     elif fb_out:
                         # Output is only available to local-region layers.
@@ -417,7 +416,7 @@ class TestPipelineFixture(unittest.TestCase):
                     # Stream process, no requirement on source.
 
                     oap = OutAccPat.ANY
-                    if cstr.top_bl_t[le.OFM] == 1:
+                    if cstr.topofm == 1:
                         # Fully buffer output.
                         oap = OutAccPat.DBF
                     elif OutAccPat.SEQ in prev_oaps:
@@ -425,7 +424,7 @@ class TestPipelineFixture(unittest.TestCase):
                         oap = OutAccPat.SEQ
 
                 # Realize deferred fully buffering output.
-                if cstr.top_bl_t[le.OFM] == 1:
+                if cstr.topofm == 1:
                     fb_out = False  # reset
 
                 # Overwrite the previous temporal scheduling.

@@ -45,7 +45,8 @@ from .pipeline_segment import PipelineSegment
 from .pipeline_segment_timing import PipelineSegmentTiming
 from .resource import Resource
 from .scheduling import SchedulingCondition, SchedulingResult, Scheduling
-from .scheduling_constraint import SchedulingConstraint
+from .scheduling_constraint import SchedulingConstraint, \
+        SchedulingConstraintLayerPipeline
 
 from .nn_dataflow import NNDataflow
 

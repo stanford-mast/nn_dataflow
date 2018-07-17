@@ -7,9 +7,10 @@ List of major changes and improvements
 
 - Software models.
 
-  - Add scheduling constraints for loop blocking and partitioning.
-    - The batch loop blocking factor is allowed to be inexact but a multiple of
-      the constrained factor.
+  - Add `SchedulingConstraint` class to specify loop blocking and partitioning
+    constraints.
+    - Add subclass `SchedulingConstraintLayerPipeline` for layer pipelining
+      constraints.
 
   - Add `InterLayerPipeline`.
     - Layers are organized into `PipelineSegment`, which are simultaneously

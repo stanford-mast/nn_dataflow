@@ -151,8 +151,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
 
         # Constraint.
         self.none_cstr = SchedulingConstraint()
-        self.cstr = SchedulingConstraint(top_bl_t=(1, None, 1),
-                                         top_bl_lpe=le.IFM)
+        self.cstr = SchedulingConstraint(topifm=1, topbat=1)
 
         # Cost.
         self.cost = Cost(mac_op=1, mem_hier=(200, 6, 2, 1),

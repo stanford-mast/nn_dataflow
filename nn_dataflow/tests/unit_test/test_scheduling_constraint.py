@@ -22,95 +22,189 @@ import itertools
 import unittest
 
 from nn_dataflow.core import LoopEnum as le
-from nn_dataflow.core import SchedulingConstraint
+from nn_dataflow.core import ParallelEnum as pe
+from nn_dataflow.core import PartitionScheme
+from nn_dataflow.core import SchedulingConstraint, \
+        SchedulingConstraintLayerPipeline
 
-class TestSchedulingConstraint(unittest.TestCase):
+class TestSchedulingConstraintFixture(unittest.TestCase):
+    ''' Base fixture class for SchedulingConstraint tests. '''
+
+    @staticmethod
+    def _gen_bl(t_end=9):
+        ''' Generator for bl_t and bl_ord. '''
+        return itertools.product(itertools.product(*[range(1, t_end)] * le.NUM),
+                                 itertools.permutations(range(le.NUM)))
+
+
+class TestSchedulingConstraint(TestSchedulingConstraintFixture):
     ''' Tests for SchedulingConstraint. '''
 
     def test_valid_args(self):
         ''' Valid arguments. '''
-        constraint = SchedulingConstraint(top_bl_t=(1, 1, 2),
-                                          top_bl_lpe=le.BAT)
-        self.assertEqual(constraint.top_bl_t, (1, 1, 2))
-        self.assertEqual(constraint.top_bl_lpe, le.BAT)
+        cstr = SchedulingConstraint(topbat=2, topifm=1, topofm=4)
+        self.assertEqual(cstr.topbat, 2)
+        self.assertEqual(cstr.topifm, 1)
+        self.assertEqual(cstr.topofm, 4)
 
-        constraint = SchedulingConstraint(top_bl_t=(1, 1, 2))
-        self.assertIsNone(constraint.top_bl_lpe)
+        cstr = SchedulingConstraint(topbat=2, topofm=4)
+        self.assertEqual(cstr.topbat, 2)
+        self.assertEqual(cstr.topifm, 0)
+        self.assertEqual(cstr.topofm, 4)
 
-        constraint = SchedulingConstraint(top_bl_t=(1, None, None))
-        self.assertEqual(constraint.top_bl_t, (1, None, None))
-        self.assertIsNone(constraint.top_bl_lpe)
+        cstr = SchedulingConstraint()
+        self.assertEqual(cstr.topbat, 0)
+        self.assertEqual(cstr.topifm, 0)
+        self.assertEqual(cstr.topofm, 0)
 
-        constraint = SchedulingConstraint(top_bl_lpe=le.BAT)
-        self.assertIsNone(constraint.top_bl_t)
+    def test_invalid_args(self):
+        ''' Invalid arguments. '''
+        with self.assertRaisesRegexp(ValueError,
+                                     'SchedulingConstraint: '
+                                     '.*positive integers.*'):
+            _ = SchedulingConstraint(topbat=-1, topofm=2.)
 
-        constraint = SchedulingConstraint()
-        self.assertIsNone(constraint.top_bl_t)
-        self.assertIsNone(constraint.top_bl_lpe)
+    def test_null_constraint(self):
+        ''' Null constraint. '''
+        cstr = SchedulingConstraint()
 
-    def test_invalid_top_bl_t(self):
-        ''' Invalid top_bl_t. '''
-        with self.assertRaisesRegexp(TypeError,
-                                     'SchedulingConstraint: .*top_bl_t.*'):
-            _ = SchedulingConstraint(top_bl_t=[1, 1, 2])
+        self.assertTrue(cstr.is_valid_top_bl((1, 1, 2), (0, 1, 2)))
+        self.assertTrue(cstr.is_valid_top_bl((3, 4, 5), (2, 1, 0)))
+        self.assertTrue(cstr.is_valid_top_bl((1, 1, 1), (1, 2, 0)))
+
+        self.assertTrue(cstr.is_valid_part(PartitionScheme(
+            order=range(pe.NUM), pdims=[(2, 2)] * pe.NUM)))
+
+    def test_is_valid_top_bl(self):
+        ''' Whether is_valid_top_bl. '''
+        cstr = SchedulingConstraint(topbat=2, topofm=4)
+        for bl_t, bl_ord in self._gen_bl():
+            valid = (bl_t[le.BAT] == 2 and bl_t[le.OFM] == 4)
+            self.assertEqual(cstr.is_valid_top_bl(bl_t, bl_ord), valid)
+
+        cstr = SchedulingConstraint(topifm=4)
+        for bl_t, bl_ord in self._gen_bl():
+            valid = (bl_t[le.IFM] == 4)
+            self.assertEqual(cstr.is_valid_top_bl(bl_t, bl_ord), valid)
+
+        cstr = SchedulingConstraint()
+        for bl_t, bl_ord in self._gen_bl():
+            self.assertTrue(cstr.is_valid_top_bl(bl_t, bl_ord))
+
+    def test_repr(self):
+        ''' __repr__. '''
+        cstr = SchedulingConstraint(topbat=2)
+        self.assertIn('SchedulingConstraint(', repr(cstr))
+        self.assertIn('topbat=2', repr(cstr))
+        self.assertIn('topifm=0', repr(cstr))
+        self.assertIn('topofm=0', repr(cstr))
+
+
+class TestSchedulingConstraintLayerPipeline(TestSchedulingConstraintFixture):
+    ''' Tests for SchedulingConstraintLayerPipeline. '''
+
+    def test_valid_args(self):
+        ''' Valid arguments. '''
+        cstr = SchedulingConstraintLayerPipeline(
+            topbat=2, topifm=1, topofm=4, fbifm=True, fbofm=False)
+        self.assertEqual(cstr.topbat, 2)
+        self.assertEqual(cstr.topifm, 1)
+        self.assertEqual(cstr.topofm, 4)
+
+        cstr = SchedulingConstraintLayerPipeline(topbat=2, topofm=4, fbifm=True)
+        self.assertEqual(cstr.topbat, 2)
+        self.assertEqual(cstr.topifm, 1)
+        self.assertEqual(cstr.topofm, 4)
+
+        cstr = SchedulingConstraintLayerPipeline()
+        self.assertEqual(cstr.topbat, 0)
+        self.assertEqual(cstr.topifm, 0)
+        self.assertEqual(cstr.topofm, 0)
+
+        cstr = SchedulingConstraintLayerPipeline(fbifm=True, fbofm=True)
+        self.assertEqual(cstr.topbat, 0)
+        self.assertEqual(cstr.topifm, 1)
+        self.assertEqual(cstr.topofm, 1)
+
+    def test_invalid_args(self):
+        ''' Invalid arguments. '''
+        with self.assertRaisesRegexp(ValueError,
+                                     'SchedulingConstraintLayerPipeline: '
+                                     '.*IFM.*'):
+            _ = SchedulingConstraintLayerPipeline(topifm=2, fbifm=True)
 
         with self.assertRaisesRegexp(ValueError,
-                                     'SchedulingConstraint: .*top_bl_t.*'):
-            _ = SchedulingConstraint(top_bl_t=(1, 2))
+                                     'SchedulingConstraintLayerPipeline: '
+                                     '.*OFM.*'):
+            _ = SchedulingConstraintLayerPipeline(topofm=2, fbofm=True)
 
-    def test_invalid_top_bl_lpe(self):
-        ''' Invalid top_bl_lpe. '''
         with self.assertRaisesRegexp(ValueError,
-                                     'SchedulingConstraint: .*top_bl_lpe.*'):
-            _ = SchedulingConstraint(top_bl_lpe=le.NUM)
+                                     'SchedulingConstraintLayerPipeline: '
+                                     '.*IFM.*OFM.*'):
+            _ = SchedulingConstraintLayerPipeline(topifm=2, topofm=2)
 
-    def test_is_valid_top_bl_t(self):
-        ''' Whether is_valid_top_bl for top_bl_t. '''
-        top_bl_ord = range(le.NUM)
+    def test_null_constraint(self):
+        ''' Null constraint. '''
+        cstr = SchedulingConstraintLayerPipeline()
 
-        constraint = SchedulingConstraint(top_bl_t=(1, 1, 2))
-        self.assertTrue(constraint.is_valid_top_bl((1, 1, 2), top_bl_ord))
-        self.assertFalse(constraint.is_valid_top_bl((1, 2, 2), top_bl_ord))
-        self.assertFalse(constraint.is_valid_top_bl((1, 2, 1), top_bl_ord))
-        self.assertFalse(constraint.is_valid_top_bl((2, 2, 2), top_bl_ord))
+        self.assertTrue(cstr.is_valid_top_bl((1, 1, 2), (0, 1, 2)))
+        self.assertTrue(cstr.is_valid_top_bl((3, 4, 5), (2, 1, 0)))
+        self.assertTrue(cstr.is_valid_top_bl((1, 1, 1), (1, 2, 0)))
 
-        constraint = SchedulingConstraint(top_bl_t=(1, None, 3))
-        for t1 in range(10):
-            self.assertTrue(constraint.is_valid_top_bl((1, t1, 3), top_bl_ord))
+    def test_is_valid_top_bl(self):
+        ''' Whether is_valid_top_bl. '''
+        cstr = SchedulingConstraintLayerPipeline(topbat=2, topofm=4, fbifm=True)
+        for bl_t, bl_ord in self._gen_bl():
+            valid = (bl_t[le.BAT] == 2 and bl_t[le.IFM] == 1
+                     and bl_t[le.OFM] == 4
+                     and bl_ord[le.BAT] > bl_ord[le.OFM])
+            self.assertEqual(cstr.is_valid_top_bl(bl_t, bl_ord), valid)
 
-        constraint = SchedulingConstraint()
-        for top_bl_t in itertools.product(range(5), range(5), range(5)):
-            self.assertTrue(constraint.is_valid_top_bl(top_bl_t, top_bl_ord))
+        cstr = SchedulingConstraintLayerPipeline(topifm=4, fbofm=True)
+        for bl_t, bl_ord in self._gen_bl():
+            valid = (bl_t[le.IFM] == 4 and bl_t[le.OFM] == 1
+                     and (bl_ord[le.IFM] > bl_ord[le.BAT]
+                          or bl_t[le.BAT] == 1))
+            self.assertEqual(cstr.is_valid_top_bl(bl_t, bl_ord), valid)
 
-        # Multiple of le.BAT factor.
-        constraint = SchedulingConstraint(top_bl_t=(None, None, 3))
-        for t2 in range(3, 21, 3):
-            self.assertTrue(constraint.is_valid_top_bl((1, 1, t2), top_bl_ord))
+        cstr = SchedulingConstraintLayerPipeline(topofm=4)
+        for bl_t, bl_ord in self._gen_bl():
+            valid = (bl_t[le.OFM] == 4
+                     and (bl_ord[le.OFM] > bl_ord[le.BAT]
+                          or bl_t[le.BAT] == 1)
+                     and (bl_ord[le.OFM] > bl_ord[le.IFM]
+                          or bl_t[le.IFM] == 1))
+            self.assertEqual(cstr.is_valid_top_bl(bl_t, bl_ord), valid)
 
-    def test_is_valid_top_bl_ord(self):
-        ''' Whether is_valid_top_bl for top_bl_ord. '''
-        top_bl_t = [2] * le.NUM
+        cstr = SchedulingConstraintLayerPipeline(fbifm=True)
+        for bl_t, bl_ord in self._gen_bl():
+            valid = (bl_t[le.IFM] == 1)
+            self.assertEqual(cstr.is_valid_top_bl(bl_t, bl_ord), valid)
 
-        constraint = SchedulingConstraint()
-        for top_bl_ord in itertools.permutations(range(le.NUM)):
-            self.assertTrue(constraint.is_valid_top_bl(top_bl_t, top_bl_ord))
+        cstr = SchedulingConstraintLayerPipeline()
+        for bl_t, bl_ord in self._gen_bl():
+            self.assertTrue(cstr.is_valid_top_bl(bl_t, bl_ord))
 
-        constraint = SchedulingConstraint(top_bl_lpe=le.BAT)
-        self.assertTrue(constraint.is_valid_top_bl(top_bl_t, (0, 1, 2)))
-        self.assertTrue(constraint.is_valid_top_bl(top_bl_t, (1, 0, 2)))
-        self.assertFalse(constraint.is_valid_top_bl(top_bl_t, (0, 2, 1)))
-        self.assertFalse(constraint.is_valid_top_bl(top_bl_t, (2, 0, 1)))
-        self.assertFalse(constraint.is_valid_top_bl(top_bl_t, (1, 2, 0)))
-        self.assertFalse(constraint.is_valid_top_bl(top_bl_t, (2, 1, 0)))
+    def test_is_valid_part(self):
+        ''' Whether is_valid_part. '''
+        cstr = SchedulingConstraintLayerPipeline(
+            topbat=2, topifm=1, topofm=4, fbifm=True, fbofm=False)
+        self.assertTrue(cstr.is_valid_part(PartitionScheme(
+            order=range(pe.NUM), pdims=[(2, 2)] * pe.NUM)))
 
-        top_bl_t[le.IFM] = 1
-        self.assertTrue(constraint.is_valid_top_bl(top_bl_t, (2, 0, 1)))
+        cstr = SchedulingConstraintLayerPipeline(topbat=2, topofm=4, fbifm=True)
+        self.assertTrue(cstr.is_valid_part(PartitionScheme(
+            order=range(pe.NUM), pdims=[(2, 2)] * pe.NUM)))
 
-        top_bl_t[le.OFM] = 1
-        for top_bl_ord in itertools.permutations(range(le.NUM)):
-            self.assertTrue(constraint.is_valid_top_bl(top_bl_t, top_bl_ord))
+        cstr = SchedulingConstraintLayerPipeline()
+        self.assertTrue(cstr.is_valid_part(PartitionScheme(
+            order=range(pe.NUM), pdims=[(2, 2)] * pe.NUM)))
 
-        top_bl_t = (1, 1, 1)
-        for top_bl_ord in itertools.permutations(range(le.NUM)):
-            self.assertTrue(constraint.is_valid_top_bl(top_bl_t, top_bl_ord))
+    def test_repr(self):
+        ''' __repr__. '''
+        cstr = SchedulingConstraintLayerPipeline(topbat=2, fbifm=True)
+        self.assertIn('SchedulingConstraintLayerPipeline', repr(cstr))
+        self.assertIn('topbat=2', repr(cstr))
+        self.assertIn('topifm=1', repr(cstr))
+        self.assertIn('topofm=0', repr(cstr))
 

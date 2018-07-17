@@ -50,7 +50,7 @@ class TestScheduling(unittest.TestCase):
                          noc_hop=50, unit_static=50)
 
         self.none_cstr = SchedulingConstraint()
-        self.cstr = SchedulingConstraint(top_bl_t=(None, 1, self.batch_size))
+        self.cstr = SchedulingConstraint(topofm=1, topbat=self.batch_size)
 
         self.resource = Resource(
             proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
@@ -220,7 +220,7 @@ class TestScheduling(unittest.TestCase):
 
         # Make another instance.
         rsrc = Resource(**self.resource._asdict())
-        cstr = SchedulingConstraint(**self.cstr._asdict())
+        cstr = self.cstr
         opts = Option(**self.options._asdict())
         self.assertNotEqual(id(rsrc), id(self.resource))
         self.assertNotEqual(id(opts), id(self.options))

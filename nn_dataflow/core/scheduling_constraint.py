@@ -18,58 +18,123 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from collections import namedtuple
+import numbers
 
 from . import loop_enum as le
 
-class SchedulingConstraint(namedtuple('SchedulingConstraint',
-                                      ['top_bl_t',
-                                       'top_bl_lpe',
-                                      ])):
+class SchedulingConstraint(object):
     '''
-    Layer scheduling constraint.
-
-    NOTE: the top blocking factors must be exactly equal, except for the BAT
-    loop, which needs to be a multiple of the constrained factor because the
-    mapping strategy may increase the effective batch size.
+    Layer scheduling constraint, which constrains top loop blocking factors.
     '''
 
-    def __new__(cls, top_bl_t=None, top_bl_lpe=None):
-        ntp = super(SchedulingConstraint, cls).__new__(
-            cls, top_bl_t=top_bl_t, top_bl_lpe=top_bl_lpe)
+    def __init__(self, topbat=0, topifm=0, topofm=0):
 
-        if ntp.top_bl_t is not None:
-            if not isinstance(ntp.top_bl_t, tuple):
-                raise TypeError('SchedulingConstraint: top_bl_t must be None '
-                                'or a tuple.')
-            if len(ntp.top_bl_t) != le.NUM:
-                raise ValueError('SchedulingConstraint: top_bl_t must have '
-                                 'length {}.'.format(le.NUM))
+        if any(n < 0 or not isinstance(n, numbers.Integral)
+               for n in [topbat, topifm, topofm]):
+            raise ValueError('SchedulingConstraint: '
+                             'constrained factors must be positive integers.')
 
-        if ntp.top_bl_lpe is not None:
-            if ntp.top_bl_lpe not in range(le.NUM):
-                raise ValueError('SchedulingConstraint: top_bl_lpe must be '
-                                 'None or a LoopEnum.')
-
-        return ntp
+        self.topbat = topbat
+        self.topifm = topifm
+        self.topofm = topofm
 
     def is_valid_top_bl(self, top_bl_t, top_bl_ord):
         '''
-        The given `top_bl_t` and `top_bl_lpe` are valid with the constraint.
+        Whether the given `top_bl_t` and `top_bl_lpe` are valid with the
+        constraint.
         '''
-        # Check top_bl_t.
-        if self.top_bl_t is not None:
-            if any(self.top_bl_t[lpe] is not None
-                   and not (self.top_bl_t[lpe] == top_bl_t[lpe] if lpe != le.BAT
-                            else top_bl_t[lpe] % self.top_bl_t[lpe] == 0)
-                   for lpe in range(le.NUM)):
-                return False
+        if self.topbat and self.topbat != top_bl_t[le.BAT]:
+            return False
+        if self.topifm and self.topifm != top_bl_t[le.IFM]:
+            return False
+        if self.topofm and self.topofm != top_bl_t[le.OFM]:
+            return False
 
-        # Check top_bl_ord.
-        if self.top_bl_lpe is not None and any(t > 1 for t in top_bl_t):
-            top_bl_lpe = max(range(le.NUM), key=(lambda lpe: top_bl_ord[lpe]
-                                                 if top_bl_t[lpe] > 1 else -1))
-            if top_bl_lpe != self.top_bl_lpe:
+        del top_bl_ord
+
+        return True
+
+    def is_valid_part(self, part):
+        '''
+        Whether the given `part` is valid with the constraint.
+        '''
+        # pylint: disable=no-self-use, unused-argument
+        return True
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join(['{}={}'.format(k, repr(v))
+                       for k, v in self.__dict__.items()]))
+
+
+class SchedulingConstraintLayerPipeline(SchedulingConstraint):
+    '''
+    Layer scheduling constraint for inter-layer pipelining.
+
+    Constraint includes:
+    - topbat: top BAT loop blocking factor, which decides the number of groups
+      for batch pipelining. It must match between all layers in a pipeline
+      segment.
+    - topifm/topofm: top IFM/OFM blocking factor, which decides the number of
+      groups for fmap data forwarding between adjacent spatial scheduled layers
+      in a pipeline segment. It must match between forwarding
+      source/destination layers.
+    - fbifm/fbofm: whether to fully buffer the fmap data of the layer on-chip.
+      It indicates the baseline double-buffering between pipelined layers.
+
+    For loop orders, the BAT loop must be at the outermost for batch
+    pipelining. Then the loop associated with the forwarded data (IFM or OFM)
+    must follow at the second outermost. If a data category (IFM or OFM) is
+    fully buffered, then the corresponding loop is a trivial loop, which can be
+    at any where.
+    '''
+
+    def __init__(self, topbat=0, topifm=0, topofm=0, fbifm=False, fbofm=False):
+
+        if fbifm:
+            # Fully-buffered IFM <=> topifm = 1.
+            if topifm != 0 and topifm != 1:
+                raise ValueError('SchedulingConstraintLayerPipeline: '
+                                 'fully-buffered IFM implies topifm = 1.')
+            topifm = 1
+
+        if fbofm:
+            # Fully-buffered OFM <=> topofm = 1.
+            if topofm != 0 and topofm != 1:
+                raise ValueError('SchedulingConstraintLayerPipeline: '
+                                 'fully-buffered OFM implies topofm = 1.')
+            topofm = 1
+
+        if topifm > 1 and topofm > 1:
+            raise ValueError('SchedulingConstraintLayerPipeline: '
+                             'impossible to have both topifm and topofm > 1, '
+                             'at least one of IFM and OFM must be a trivial '
+                             'loop (= 1) or not constrained (= 0).')
+
+        super(SchedulingConstraintLayerPipeline, self).__init__(
+            topbat=topbat, topifm=topifm, topofm=topofm)
+
+    def is_valid_top_bl(self, top_bl_t, top_bl_ord):
+
+        if not super(SchedulingConstraintLayerPipeline, self).is_valid_top_bl(
+                top_bl_t, top_bl_ord):
+            return False
+
+        # Loop orders.
+        # Ordered loops from outer to inner.
+        ord_lpe = list(sorted([lpe for lpe in range(le.NUM)
+                               if top_bl_t[lpe] > 1],
+                              key=lambda lpe: top_bl_ord[lpe], reverse=True))
+        if self.topbat > 1:
+            if ord_lpe.pop(0) != le.BAT:
+                return False
+        # topifm and topofm cannot trigger together.
+        if self.topifm > 1:
+            if ord_lpe.pop(0) != le.IFM:
+                return False
+        if self.topofm > 1:
+            if ord_lpe.pop(0) != le.OFM:
                 return False
 
         return True
