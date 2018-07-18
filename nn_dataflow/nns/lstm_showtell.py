@@ -31,7 +31,7 @@ Vinyals et al., Google, CVPR 2015
 
 NN = Network('ShowTell')
 
-NN.set_input(InputLayer(12000, 1))
+NN.set_input_layer(InputLayer(12000, 1))
 
 NN.add('init', FCLayer(12000, 512))
 C = H = 'init'

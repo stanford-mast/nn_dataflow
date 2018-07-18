@@ -41,7 +41,7 @@ class TestPipelineFixture(unittest.TestCase):
 
         net = Network('net1')
         # Linear.
-        net.set_input(InputLayer(10, 1))
+        net.set_input_layer(InputLayer(10, 1))
         net.add('0', FCLayer(10, 20))
         net.add('1', FCLayer(20, 30))
         net.add('1p', PoolingLayer(30, 1, 1))
@@ -51,7 +51,7 @@ class TestPipelineFixture(unittest.TestCase):
 
         net = Network('net2')
         # Long linear.
-        net.set_input(InputLayer(1, 1))
+        net.set_input_layer(InputLayer(1, 1))
         for idx in range(16):
             net.add(str(idx), FCLayer(1, 1))
         self.net[net.net_name] = net
@@ -61,13 +61,13 @@ class TestPipelineFixture(unittest.TestCase):
         # /0-2\   /6- 7- 8\
         #   x  4-5         12
         # \1-3/   \9-10-11/
-        net.set_input(InputLayer(1, 1))
+        net.set_input_layer(InputLayer(1, 1))
         net.add('0', FCLayer(1, 1), prevs=net.INPUT_LAYER_KEY)
         net.add('1', FCLayer(1, 1), prevs=net.INPUT_LAYER_KEY)
         net.add('2', FCLayer(2, 1), prevs=('0', '1'))
         net.add('2p', PoolingLayer(1, 1, 1))
         net.add('3', FCLayer(2, 1), prevs=('0', '1'))
-        net.add('4', FCLayer(1, 1), prevs=('2p', '3'))
+        net.add('4', FCLayer(2, 1), prevs=('2p', '3'))
         net.add('5', FCLayer(1, 1))
         net.add('5p', PoolingLayer(1, 1, 1))
         net.add('6', FCLayer(1, 1), prevs='5p')
@@ -76,7 +76,7 @@ class TestPipelineFixture(unittest.TestCase):
         net.add('9', FCLayer(1, 1), prevs='5p')
         net.add('10', FCLayer(1, 1))
         net.add('11', FCLayer(1, 1))
-        net.add('12', FCLayer(1, 1), prevs=('8', '11'))
+        net.add('12', FCLayer(2, 1), prevs=('8', '11'))
         self.net[net.net_name] = net
 
         net = Network('net4')
@@ -86,7 +86,7 @@ class TestPipelineFixture(unittest.TestCase):
         #              \9/
         #          \11-12   /
         #          \13      /
-        net.set_input(InputLayer(1, 1))
+        net.set_input_layer(InputLayer(1, 1))
         net.add('0', FCLayer(1, 1))
         net.add('1', FCLayer(1, 1))
         net.add('2', FCLayer(1, 1))
@@ -98,11 +98,11 @@ class TestPipelineFixture(unittest.TestCase):
         net.add('8', FCLayer(1, 1), prevs='7')
         net.add('9', FCLayer(1, 1), prevs='7')
         net.add('10', FCLayer(1, 1))
-        net.add('10p', PoolingLayer(1, 1, 1), prevs=('8', '10'))
+        net.add('10p', PoolingLayer(2, 1, 1), prevs=('8', '10'))
         net.add('11', PoolingLayer(1, 1, 1), prevs='4')
         net.add('12', FCLayer(1, 1))
         net.add('13', PoolingLayer(1, 1, 1), prevs='4')
-        net.add('14', FCLayer(1, 1), prevs=('5', '10p', '12', '13'))
+        net.add('14', FCLayer(5, 1), prevs=('5', '10p', '12', '13'))
         self.net[net.net_name] = net
 
         net = Network('net5')
@@ -112,7 +112,7 @@ class TestPipelineFixture(unittest.TestCase):
         # 0-3-4-x   10-11-12
         #  \ \5/ 9 /  \__/
         #   6--/
-        net.set_input(InputLayer(1, 1))
+        net.set_input_layer(InputLayer(1, 1))
         net.add('0', FCLayer(1, 1))
         net.add('1', FCLayer(1, 1), prevs='0')
         net.add('2', FCLayer(1, 1))
@@ -120,17 +120,17 @@ class TestPipelineFixture(unittest.TestCase):
         net.add('4', FCLayer(1, 1), prevs='3')
         net.add('5', FCLayer(1, 1), prevs='3')
         net.add('6', FCLayer(1, 1), prevs='0')
-        net.add('7', FCLayer(1, 1), prevs=('0', '2', '4', '5', '6'))
+        net.add('7', FCLayer(5, 1), prevs=('0', '2', '4', '5', '6'))
         net.add('8', FCLayer(1, 1))
-        net.add('9', FCLayer(1, 1), prevs=('0', '2', '4', '5', '6'))
-        net.add('10', FCLayer(1, 1), prevs=('8', '9'))
+        net.add('9', FCLayer(5, 1), prevs=('0', '2', '4', '5', '6'))
+        net.add('10', FCLayer(2, 1), prevs=('8', '9'))
         net.add('11', FCLayer(1, 1))
-        net.add('12', FCLayer(1, 1), prevs=('10', '11'))
+        net.add('12', FCLayer(2, 1), prevs=('10', '11'))
         self.net[net.net_name] = net
 
         net = Network('net6')
         # Fmap sizes.
-        net.set_input(InputLayer(1, 24))
+        net.set_input_layer(InputLayer(1, 24))
         net.add('0', ConvLayer(1, 1, 24, 3))
         net.add('1', ConvLayer(1, 1, 12, 3, strd=2))
         net.add('1p', PoolingLayer(1, 6, 2))
@@ -143,11 +143,11 @@ class TestPipelineFixture(unittest.TestCase):
         #  /---
         # 0-1-\\
         #  \2--2p
-        net.set_input(InputLayer(1, 1))
+        net.set_input_layer(InputLayer(1, 1))
         net.add('0', FCLayer(1, 1))
         net.add('1', FCLayer(1, 1), prevs='0')
         net.add('2', FCLayer(1, 1), prevs='0')
-        net.add('2p', PoolingLayer(1, 1, 1), prevs=('0', '1', '2'))
+        net.add('2p', PoolingLayer(3, 1, 1), prevs=('0', '1', '2'))
         self.net[net.net_name] = net
 
         # Real networks.
@@ -159,10 +159,10 @@ class TestPipelineFixture(unittest.TestCase):
         self.resource = Resource(
             proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 8),
                                    type=NodeRegion.PROC),
-            data_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 4),
-                                     type=NodeRegion.DATA),
-                          NodeRegion(origin=PhyDim2(0, 4), dim=PhyDim2(8, 4),
-                                     type=NodeRegion.DATA)),
+            src_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 4),
+                                       type=NodeRegion.DRAM),
+            dst_data_region=NodeRegion(origin=PhyDim2(0, 4), dim=PhyDim2(8, 4),
+                                       type=NodeRegion.DRAM),
             dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
 
@@ -216,7 +216,7 @@ class TestPipelineFixture(unittest.TestCase):
         for rtpl in allocation:
             proc_region = rtpl[0].proc_region
             self.assertTrue(all(r.proc_region == proc_region for r in rtpl))
-            for n in proc_region.node_iter():
+            for n in proc_region.iter_node():
                 self.assertTrue(self.resource.proc_region.contains_node(n),
                                 '_validate_allocation: node {} outside of '
                                 'the processing region {}'
@@ -233,42 +233,42 @@ class TestPipelineFixture(unittest.TestCase):
             for l, r in zip(ltpl, rtpl):
 
                 # Check data source.
-                prev_layers, _ = segment.network.prev_layers(l)
+                prev_layers = segment.network.prevs(l)
 
                 for pl in prev_layers:
                     if pl not in data_regions:
                         # Previous layer is not on-chip, from memory.
                         self.assertEqual(
-                            r.src_data_region(),
-                            self.resource.src_data_region(),
+                            r.src_data_region,
+                            self.resource.src_data_region,
                             '_validate_allocation: layer {}\'s prev {} '
                             'is not on-chip, should be from {}, but {}.'
-                            .format(l, pl, self.resource.src_data_region(),
-                                    r.src_data_region()))
+                            .format(l, pl, self.resource.src_data_region,
+                                    r.src_data_region))
                     elif data_regions[pl] != r.proc_region:
                         # Previous layer is on-chip and not local.
                         self.assertEqual(
-                            r.src_data_region(), data_regions[pl],
+                            r.src_data_region, data_regions[pl],
                             '_validate_allocation: layer {}\'s prev {} '
                             'is on-chip, should be from {}, but {}.'
                             .format(l, pl, data_regions[pl],
-                                    r.src_data_region()))
+                                    r.src_data_region))
 
                 # Update data based on destination.
-                if r.dst_data_region() == self.resource.dst_data_region():
+                if r.dst_data_region == self.resource.dst_data_region:
                     # Store back to memory.
                     pass
                 else:
                     # Local.
-                    self.assertEqual(r.dst_data_region(), r.proc_region,
+                    self.assertEqual(r.dst_data_region, r.proc_region,
                                      '_validate_allocation: data can only '
                                      'be local if not storing back to mem.')
                     # Overwrite.
-                    local_node_set = set(r.dst_data_region().node_iter())
+                    local_node_set = set(r.dst_data_region.iter_node())
                     data_regions = {pl: data_regions[pl] for pl in data_regions
                                     if local_node_set.isdisjoint(
-                                        data_regions[pl].node_iter())}
-                    data_regions[l] = r.dst_data_region()
+                                        data_regions[pl].iter_node())}
+                    data_regions[l] = r.dst_data_region
 
     def _validate_constraint(self, segment, constraint):
         ''' Validate segment scheduling constraint. '''
@@ -322,7 +322,7 @@ class TestPipelineFixture(unittest.TestCase):
             for tm_idx, (layer, cstr) in enumerate(zip(ltpl, ctpl)):
 
                 # Source data and their access patterns.
-                prev_layers, _ = segment.network.prev_layers(layer)
+                prev_layers = segment.network.prevs(layer)
                 prev_oaps = []
                 for pl in prev_layers:
                     if pl not in seg_layers:
@@ -339,7 +339,7 @@ class TestPipelineFixture(unittest.TestCase):
                 has_src = not seg_layers.isdisjoint(prev_layers)
 
                 # Destination data.
-                next_layers = segment.network.next_layers(layer)
+                next_layers = segment.network.nexts(layer)
                 # Only buffer output if having destination on-chip.
                 has_dst = not seg_layers.isdisjoint(next_layers)
 

@@ -24,6 +24,9 @@ from nn_dataflow.core import Layer
 from nn_dataflow.core import InputLayer
 from nn_dataflow.core import ConvLayer, FCLayer
 from nn_dataflow.core import LocalRegionLayer, PoolingLayer, EltwiseLayer
+from nn_dataflow.core import DataCategoryEnum as de
+from nn_dataflow.core import LoopEnum as le
+from nn_dataflow.core import DataDimLoops
 
 class TestLayer(unittest.TestCase):
     ''' Tests for Layer. '''
@@ -116,6 +119,14 @@ class TestLayer(unittest.TestCase):
                          ((28 - 1) * 2 + 3) ** 2 * 64 * 2,
                          'LocalRegionLayer: total_ifmap_size')
 
+    def test_data_loops(self):
+        ''' Get data_loops. '''
+        with self.assertRaises(NotImplementedError):
+            _ = Layer.data_loops()
+        layer = Layer(64, 28)
+        with self.assertRaises(NotImplementedError):
+            _ = layer.data_loops()
+
     def test_input_layer(self):
         ''' Get input layer. '''
         layer = Layer(64, 28)
@@ -205,6 +216,15 @@ class TestLayer(unittest.TestCase):
 class TestInputLayer(unittest.TestCase):
     ''' Tests for InputLayer. '''
 
+    def test_data_loops(self):
+        ''' Get data_loops. '''
+        dls = InputLayer.data_loops()
+        ilayer = InputLayer(3, 227)
+        self.assertTupleEqual(ilayer.data_loops(), dls)
+        self.assertEqual(dls[de.FIL], DataDimLoops())
+        self.assertEqual(dls[de.IFM], DataDimLoops())
+        self.assertEqual(dls[de.OFM], DataDimLoops(le.OFM, le.BAT))
+
     def test_input_layer(self):
         ''' Get input layer. '''
         ilayer = InputLayer(3, 227)
@@ -229,6 +249,19 @@ class TestInputLayer(unittest.TestCase):
 
 class TestConvLayer(unittest.TestCase):
     ''' Tests for ConvLayer. '''
+
+    def test_data_loops(self):
+        ''' Get data_loops. '''
+        dls = ConvLayer.data_loops()
+        self.assertEqual(dls[de.FIL], DataDimLoops(le.IFM, le.OFM))
+        self.assertEqual(dls[de.IFM], DataDimLoops(le.IFM, le.BAT))
+        self.assertEqual(dls[de.OFM], DataDimLoops(le.OFM, le.BAT))
+
+        clayer = ConvLayer(3, 64, [28, 14], 3, strd=2)
+        flayer = FCLayer(2048, 4096, sfil=2)
+        self.assertTupleEqual(FCLayer.data_loops(), dls)
+        self.assertTupleEqual(clayer.data_loops(), dls)
+        self.assertTupleEqual(flayer.data_loops(), dls)
 
     def test_input_layer(self):
         ''' Get input layer. '''
@@ -292,6 +325,19 @@ class TestConvLayer(unittest.TestCase):
 class TestLocalRegionLayer(unittest.TestCase):
     ''' Tests for LocalRegionLayer. '''
 
+    def test_data_loops(self):
+        ''' Get data_loops. '''
+        dls = LocalRegionLayer.data_loops()
+        self.assertEqual(dls[de.FIL], DataDimLoops())
+        self.assertEqual(dls[de.IFM], DataDimLoops(le.OFM, le.BAT))
+        self.assertEqual(dls[de.OFM], DataDimLoops(le.OFM, le.BAT))
+
+        llayer = LocalRegionLayer(64, 28, 2, 1)
+        player = PoolingLayer(64, 28, 2)
+        self.assertTupleEqual(PoolingLayer.data_loops(), dls)
+        self.assertTupleEqual(llayer.data_loops(), dls)
+        self.assertTupleEqual(player.data_loops(), dls)
+
     def test_ops(self):
         ''' Get ops. '''
         llayer = LocalRegionLayer(64, 28, 2, 1)
@@ -327,9 +373,10 @@ class TestLocalRegionLayer(unittest.TestCase):
 
     def test_eltwiselayer(self):
         ''' EltwiseLayer init. '''
-        elayer = EltwiseLayer(64, 28)
-        self.assertEqual(elayer.ops_per_neuron(), 1)
-        self.assertEqual(elayer.total_ifmap_size(), elayer.total_ofmap_size())
+        elayer = EltwiseLayer(64, 28, 3)
+        self.assertEqual(elayer.ops_per_neuron(), 3)
+        self.assertEqual(elayer.nifm, 3 * elayer.nofm)
+        self.assertEqual(elayer.ifmap_size(), elayer.ofmap_size())
 
     def test_repr(self):
         ''' __repr__. '''
@@ -347,8 +394,8 @@ class TestLocalRegionLayer(unittest.TestCase):
             self.assertIn('PoolingLayer', repr(l))
             self.assertEqual(eval(repr(l)), l)
 
-        for l in [EltwiseLayer(64, 32),
-                  EltwiseLayer(64, 28)]:
+        for l in [EltwiseLayer(64, 32, 3),
+                  EltwiseLayer(64, 28, 4)]:
             self.assertIn('EltwiseLayer', repr(l))
             self.assertEqual(eval(repr(l)), l)
 

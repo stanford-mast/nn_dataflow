@@ -23,6 +23,7 @@ import itertools
 
 from . import loop_enum as le
 from .. import util
+from .loop_blocking_scheme import LoopBlockingScheme
 from .layer import ConvLayer
 from .network import Network
 
@@ -126,17 +127,9 @@ class PipelineSegmentTiming(object):
         # Ordered loops from outer to inner with LoopEnum and blocking factor.
         # Filter out trivial loops.
         ord_loops = []
-        for ti, to, tb, bl_ord in zip(sched_result.dict_loop['ti'],
-                                      sched_result.dict_loop['to'],
-                                      sched_result.dict_loop['tb'],
-                                      sched_result.dict_loop['orders']):
-            bl_t = [None] * le.NUM
-            bl_t[le.IFM] = ti
-            bl_t[le.OFM] = to
-            bl_t[le.BAT] = tb
-            ord_lpe = sorted(range(le.NUM),
-                             key=lambda lpe, o=bl_ord: o[lpe], reverse=True)
-            ord_loops += [(lpe, bl_t[lpe]) for lpe in ord_lpe if bl_t[lpe] > 1]
+        for bl_t, bl_ord in zip(sched_result.scheme['tvals'],
+                                sched_result.scheme['orders']):
+            ord_loops += LoopBlockingScheme.ordered_loops(bl_t, bl_ord)
 
         # Update the BAT groups.
         bat_ngrp = 1
@@ -249,9 +242,9 @@ class PipelineSegmentTiming(object):
 
             # Start time depends on the ready time of the previous on-chip
             # layers.
-            prev_layers, _ = self.network.prev_layers(layer_name)
-            prev_indices = [self.layer2idx[pl] for pl in prev_layers
-                            if pl in self.layer2idx]
+            prev_indices = [self.layer2idx[p]
+                            for p in self.network.prevs(layer_name)
+                            if p in self.layer2idx]
 
             for prev_sp_idx, prev_tm_idx in prev_indices:
                 if prev_sp_idx == sp_idx:

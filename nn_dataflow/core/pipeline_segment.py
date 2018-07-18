@@ -243,13 +243,13 @@ class PipelineSegment(object):
                 # Sources.
                 src = tuple()
 
-                prev_layers, _ = self.network.prev_layers(layer)
-                assert all(l not in layer2idx or layer2idx[l] < layer2idx[layer]
-                           for l in prev_layers)
-                mem_src = [l for l in prev_layers if l not in layer2idx]
-                lcl_src = [l for l in prev_layers if l not in mem_src
-                           and layer2idx[l].sp_idx == sp_idx]
-                nbr_src = [l for l in prev_layers if l not in mem_src + lcl_src]
+                prevs = self.network.prevs(layer)
+                assert all(p not in layer2idx or layer2idx[p] < layer2idx[layer]
+                           for p in prevs)
+                mem_src = [p for p in prevs if p not in layer2idx]
+                lcl_src = [p for p in prevs if p not in mem_src
+                           and layer2idx[p].sp_idx == sp_idx]
+                nbr_src = [p for p in prevs if p not in mem_src + lcl_src]
 
                 # Ensure single local source to be the immediately previous.
                 # Check at the destination so here are assertions.
@@ -279,13 +279,13 @@ class PipelineSegment(object):
                 # Destinations.
                 dst = tuple()
 
-                next_layers = self.network.next_layers(layer)
-                assert all(l not in layer2idx or layer2idx[l] > layer2idx[layer]
-                           for l in next_layers)
-                mem_dst = [l for l in next_layers if l not in layer2idx]
-                lcl_dst = [l for l in next_layers if l not in mem_dst
-                           and layer2idx[l].sp_idx == sp_idx]
-                nbr_dst = [l for l in next_layers if l not in mem_dst + lcl_dst]
+                nexts = self.network.nexts(layer)
+                assert all(n not in layer2idx or layer2idx[n] > layer2idx[layer]
+                           for n in nexts)
+                mem_dst = [n for n in nexts if n not in layer2idx]
+                lcl_dst = [n for n in nexts if n not in mem_dst
+                           and layer2idx[n].sp_idx == sp_idx]
+                nbr_dst = [n for n in nexts if n not in mem_dst + lcl_dst]
 
                 # Ensure single local destination to be the immediate next.
                 if not lcl_dst:
@@ -345,7 +345,7 @@ class PipelineSegment(object):
                 if None in src:
                     # Data source is memory.
                     assert src == (None,)
-                    src_data_region = self.resource.src_data_region()
+                    src_data_region = self.resource.src_data_region
                 elif src:
                     # Data source is neighbor.
                     assert len(src) == 1
@@ -359,7 +359,7 @@ class PipelineSegment(object):
                 if None in dst:
                     # Data destination is memory.
                     assert dst == (None,)
-                    dst_data_region = self.resource.dst_data_region()
+                    dst_data_region = self.resource.dst_data_region
                 elif dst:
                     # Data destinations are neighbors.
                     # Put data in local. The next layers will fetch.
@@ -374,8 +374,8 @@ class PipelineSegment(object):
                 # different time. We adjust this assumption when calculating
                 # the segment timing.
                 rtpl += (Resource(proc_region=proc_region,
-                                  data_regions=(src_data_region,
-                                                dst_data_region),
+                                  src_data_region=src_data_region,
+                                  dst_data_region=dst_data_region,
                                   dim_array=self.resource.dim_array,
                                   size_gbuf=self.resource.size_gbuf,
                                   size_regf=self.resource.size_regf,

@@ -95,7 +95,7 @@ class TestInterLayerPipeline(TestPipelineFixture):
     def test_vertex_no_merge_lr(self):
         ''' LocalRegionLayer has no previous layer to merge with. '''
         net = Network('tmp_net')
-        net.set_input(InputLayer(30, 1))
+        net.set_input_layer(InputLayer(30, 1))
         net.add('0', PoolingLayer(30, 1, 1))
         net.add('1', FCLayer(30, 40))
         net.add('1p', PoolingLayer(40, 1, 1))
@@ -122,7 +122,7 @@ class TestInterLayerPipeline(TestPipelineFixture):
                 prev_layers = set()
                 v = ilp.dag_vertex_list[vidx]
                 for l in v:
-                    prev_layers.update(net.prev_layers(l)[0])
+                    prev_layers.update(net.prevs(l))
                 prev_layers.difference_update(v)
 
                 for pvidx in prevs:
@@ -148,11 +148,11 @@ class TestInterLayerPipeline(TestPipelineFixture):
                 # Next layers of the current vertex.
                 next_layers = set()
                 if vidx < 0:
-                    next_layers = set(net.first_layers())
+                    next_layers = set(net.firsts())
                 else:
                     v = ilp.dag_vertex_list[vidx]
                     for l in v:
-                        next_layers.update(net.next_layers(l))
+                        next_layers.update(net.nexts(l))
                     next_layers.difference_update(v)
 
                 for nvidx in nexts:
@@ -201,7 +201,7 @@ class TestInterLayerPipeline(TestPipelineFixture):
         self.assertEqual(len(vseg_list), 34)
 
         # Multiple first layers.
-        self.assertGreater(len(self.net['net3'].first_layers()), 1)
+        self.assertGreater(len(self.net['net3'].firsts()), 1)
         ilp = self._make_ilp(self.net['net3'])
         vseg_list = list(ilp._gen_vseg())
         self.assertIn((0,), vseg_list)

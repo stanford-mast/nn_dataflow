@@ -49,7 +49,7 @@ List of major changes and improvements
   conservative type.
 
 
-## [v1.5 -- v1.6] -- 2017-12-05
+## [v1.5 -- v1.6] -- 2018-07-12
 
 ### Added
 
@@ -57,7 +57,12 @@ List of major changes and improvements
 
   - Add `EltwiseLayer`.
 
+  - Allow only concatenation of layers; summation of layers turns into an
+    additional `EltwiseLayer`.
+
   - Add various LSTMs.
+
+  - Add `data_loops` attribute with type `DataDimLoops` to each type of layer.
 
 - Hardware models:
 
@@ -69,20 +74,58 @@ List of major changes and improvements
 
   - Record search time.
 
+  - Add dimensional partitioning option, i.e., each partitioning can only be
+    along one dimension unless it is the only partitioning.
+
+  - Add utility `IntRange` for integer ranges.
+
 
 ### Changed
 
+- Hardware models.
+
+  - 2D memory type is changed to constant four node on the chip corners.
+
+  - `NodeRegion` adds `dist` attribute for inter-node distance.
+
+  - `NodeRegion` renames `DATA` enum to `DRAM`.
+
+  - Limit to single source/destination data regions in `Resource`.
+
 - Software models.
 
-  - `Scheduling` breaks cost tie using time.
+  - `Scheduling` breaks cost tie using time, using a compare key function of
+    `SchedulingResult`.
 
-  - Add dimensional partitioning option, i.e., each partitioning can only be
-    along one dimension unless it is the only partitioning.
+  - Add external occupancy to `MapStrategy` and merge into `NestedLoopDesc`;
+    use it for partitioning occupancy.
+
+  - `FmapRange.beg_end()` returns an `IntRange` instance if with a single
+    attribute argument, or a list of `IntRange` otherwise.
+
+  - Move partitioning scheme sub-`FmapRange` method, which is used to get
+    partitioned fmap ranges, to `PartitionScheme`.
+
+  - Move partitioning scheme projection, which is used to generate ofmap
+    layout, to `PartitionScheme`.
+
+  - `DataLayout` refactored: use `PartitionScheme` to replace `FmapRangeMap`.
+
+  - `partition` module refactored: use new `DataLayout` class and new
+    `PartitionScheme` methods.
+
+  - `SchedulingResult` uses a combined `OrderedDict` to replace `dict_loop` and
+    `dict_part`.
 
 - Software engineering.
 
   - Change `NNDataflowScheme` node-time product interface to explicitly be
     static cost.
+
+  - Improve method names:
+    - Remove `DataDimLoops.data_cnt`.
+    - Change `NodeRegion.node_iter` to `NodeRegion.iter_node`.
+    - Change `Network` method names to distinguish layer and layer name.
 
 
 ### Fixed
@@ -90,6 +133,12 @@ List of major changes and improvements
 - Output dict `PartitionScheme` format fix.
 
 - `idivc` with inf arguments.
+
+- Integer division `//` vs. `/`.
+
+- ITCN access calculation for unit pass in `MapStrategy`.
+
+- `FmapRange` comparison.
 
 
 ## [v1.4 -- v1.5] -- 2017-08-18

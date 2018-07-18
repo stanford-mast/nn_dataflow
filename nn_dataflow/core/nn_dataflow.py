@@ -23,6 +23,8 @@ import sys
 
 from . import partition
 from .cost import Cost
+from .data_layout import DataLayout
+from .fmap_range import FmapPosition, FmapRange
 from .inter_layer_pipeline import InterLayerPipeline
 from .map_strategy import MapStrategy
 from .network import Network
@@ -72,9 +74,6 @@ class NNDataflow(object):
                                       self.resource)
         self.ordered_layer_list = self.ilp.ordered_layer_list()
 
-        # The key function to sort and pick the top NNDataflowScheme instances.
-        self.key_func = lambda nndf: (nndf.total_cost, nndf.total_time)
-
         # Allowed time overhead due to layer pipelining.
         self.layer_base_time = {}
 
@@ -87,7 +86,6 @@ class NNDataflow(object):
         '''
         Search the optimized dataflows.
         '''
-
         # Group the segments by the ending layers.
         segments = defaultdict(list)
         for seg in self.ilp.gen_segment(options):
@@ -122,18 +120,18 @@ class NNDataflow(object):
                 tops += self._segment_schedule_search(seg, options)
 
             # Always pick and keep top n.
-            tops = sorted(tops, key=self.key_func)[:options.ntops]
+            tops = sorted(tops, key=NNDataflowScheme.cmp_key)[:options.ntops]
 
             # Add to the top list.
             assert layer_name not in self.nndf_tops
             self.nndf_tops[layer_name] = tops
 
         # Final top schemes.
-        tops = self.nndf_tops.get(self.ordered_layer_list[-1], [])
-        if not tops:
+        nndf_tops = self.nndf_tops.get(self.ordered_layer_list[-1], [])
+        if not nndf_tops:
             sys.stderr.write('No valid schedule found for {}.\n'
                              .format(self.network.net_name))
-        for nndf in tops:
+        for nndf in nndf_tops:
             assert len(nndf) == len(self.network)
 
         # Cache stats.
@@ -148,7 +146,7 @@ class NNDataflow(object):
             cache_hits += h
             cache_misses += m
 
-        return tops, (cache_hits, cache_misses)
+        return nndf_tops, (cache_hits, cache_misses)
 
     def _segment_schedule_search(self, segment, options):
         '''
@@ -246,7 +244,8 @@ class NNDataflow(object):
                     fast_forward = True
 
         # Always pick and keep top n.
-        nndf_tops = sorted(nndf_tops, key=self.key_func)[:options.ntops]
+        nndf_tops = sorted(nndf_tops,
+                           key=NNDataflowScheme.cmp_key)[:options.ntops]
 
         # Set base time for scheduling layer individually.
         if single_layer and nndf_tops:
@@ -269,10 +268,9 @@ class NNDataflow(object):
         Return new top NNDataflowScheme instances that include this layer. Will
         NOT update the `nndf_tops` attribute.
         '''
+        nndf_tops = []
 
         layer_sched = self.layer_sched_dict[layer_name]
-
-        nndf_tops = []
 
         for ifmap_layout, prev_nndf in self._gen_layer_ifmap_layout(
                 layer_name, prev_nndf_tops):
@@ -290,7 +288,7 @@ class NNDataflow(object):
                                             sched_seq=sched_seq)
 
             try:
-                tops = layer_sched.schedule_search(condition, options)
+                sched_tops = layer_sched.schedule_search(condition, options)
             except Exception:
                 sys.stderr.write('Failed when scheduling layer {}.\n'
                                  .format(layer_name))
@@ -298,13 +296,13 @@ class NNDataflow(object):
 
             # Append all the current layer top schedules to all the previous top
             # schedules with the matching fmap layout.
-            for t in tops:
+            for t in sched_tops:
                 nndf = prev_nndf.copy()
                 nndf[layer_name] = t
                 nndf_tops.append(nndf)
 
         # Always pick and keep top n at each layer.
-        return sorted(nndf_tops, key=self.key_func)[:options.ntops]
+        return sorted(nndf_tops, key=NNDataflowScheme.cmp_key)[:options.ntops]
 
     def _gen_layer_ifmap_layout(self, layer_name, prev_nndf_tops):
         '''
@@ -313,27 +311,17 @@ class NNDataflow(object):
 
         Return the ifmap layout, and the corresponding NNDataflowScheme.
         '''
+        prevs = self.network.prevs(layer_name)
+        assert prevs
 
-        prev_layer_names, merge_symbol = self.network.prev_layers(layer_name)
-        assert prev_layer_names
-
-        def _ofmap_layout(nndf, pl_name):
-            ofmap_layout = nndf[pl_name].ofmap_layout \
-                    if pl_name is not None else nndf.input_layout
-            if ofmap_layout.is_in_region(self.resource.dst_data_region()):
-                # Remap dst memory to src memory.
-                origin_diff = self.resource.src_data_region().origin \
-                        - self.resource.dst_data_region().origin
-                ofmap_layout = ofmap_layout.view(origin_diff=origin_diff)
-            return ofmap_layout
+        def _ofmap_layout(nndf, prev_layer_name):
+            return nndf[prev_layer_name].ofmap_layout if prev_layer_name \
+                    else nndf.input_layout
 
         for nndf in prev_nndf_tops:
             # Merge all previous layer ofmap layouts to get the ifmap layout.
-            it = iter(prev_layer_names)
-            ifmap_layout = _ofmap_layout(nndf, next(it))
-            for pl_name in it:
-                ifmap_layout = ifmap_layout.merge(
-                    merge_symbol, _ofmap_layout(nndf, pl_name))
+            ifmap_layout = DataLayout.concat(*[_ofmap_layout(nndf, p)
+                                               for p in prevs])
 
             # We already checked the ofmap layout dimension in Scheduling, and
             # the prev/next layer dimensions in Network, so ifmap_layout ==
@@ -345,16 +333,22 @@ class NNDataflow(object):
         '''
         Get the input layer layout choices.
         '''
-
         input_layer = self.network.input_layer()
+        input_frng = FmapRange(FmapPosition(b=0, n=0, h=0, w=0),
+                               FmapPosition(b=self.batch_size,
+                                            n=input_layer.nofm,
+                                            h=input_layer.hofm,
+                                            w=input_layer.wofm))
 
-        input_region = self.resource.dst_data_region()
+        input_region = self.resource.src_data_region
 
         for part in partition.gen_partition(input_layer, self.batch_size,
                                             input_region.dim, options,
                                             guaranteed=True):
-            input_layout = partition.get_ofmap_layout(
-                input_layer, self.batch_size, part, input_region)
+            input_layout = DataLayout(
+                frngs=(input_frng,),
+                regions=(input_region,),
+                parts=(part.projection(input_region, appl2frng=True),))
 
             yield input_layout
 

@@ -72,12 +72,12 @@ def add_lstm_cell(network, name, size, xin, cin, hin):
 
     # C_t.
     cout_name = '{}_cout'.format(name)
-    network.add(cout_name, EltwiseLayer(size, 1),
+    network.add(cout_name, EltwiseLayer(size, 1, 4),
                 prevs=(cin, gate_name('f'), cand_name, gate_name('i')))
 
     # h_t.
     hout_name = '{}_hout'.format(name)
-    network.add(hout_name, EltwiseLayer(size, 1),
+    network.add(hout_name, EltwiseLayer(size, 1, 2),
                 prevs=(cout_name, gate_name('o')))
 
     return cout_name, hout_name

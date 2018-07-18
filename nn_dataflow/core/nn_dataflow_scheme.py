@@ -71,14 +71,14 @@ class NNDataflowScheme(MutableMapping):
             raise TypeError('NNDataflowScheme: sched_result must be '
                             'a SchedulingResult instance.')
 
-        prev_layers, _ = self.network.prev_layers(layer_name)
-        for pl in prev_layers:
-            if pl is None:
+        prevs = self.network.prevs(layer_name)
+        for p in prevs:
+            if p is None:
                 continue
-            if pl not in self.res_dict:
+            if p not in self.res_dict:
                 raise KeyError('NNDataflowScheme: layer {} has its previous '
                                'layer {} not scheduled yet.'
-                               .format(layer_name, pl))
+                               .format(layer_name, p))
 
         self.res_dict[layer_name] = sched_result
 
@@ -117,12 +117,11 @@ class NNDataflowScheme(MutableMapping):
         Shallow copy of layer SchedulingResult is sufficient, since they are
         read-only.
         '''
-        df = NNDataflowScheme(self.network, self.input_layout)
-        for layer_name in self.res_dict:
-            df[layer_name] = self.res_dict[layer_name]
-        assert util.isclose(df.total_cost, self.total_cost, rel_tol=1e-5)
-        assert util.isclose(df.total_time, self.total_time, rel_tol=1e-5)
-        return df
+        nndf = NNDataflowScheme(self.network, self.input_layout)
+        nndf.update(self)
+        assert util.isclose(nndf.total_cost, self.total_cost, rel_tol=1e-5)
+        assert util.isclose(nndf.total_time, self.total_time, rel_tol=1e-5)
+        return nndf
 
     @property
     def total_time(self):
@@ -153,7 +152,7 @@ class NNDataflowScheme(MutableMapping):
 
     def total_static_cost(self, unit_static):
         ''' Get the total static cost. '''
-        return unit_static * sum(sr.total_time * sr.dict_part['num_nodes']
+        return unit_static * sum(sr.total_time * sr.num_nodes
                                  for sr in self.values())
 
     def segment_time_list(self):
@@ -194,12 +193,15 @@ class NNDataflowScheme(MutableMapping):
     def active_node_pes(sched_result):
         ''' Layer active node PE counts. '''
         return 1. * sched_result.total_ops \
-                / sched_result.dict_loop['proc_time'] \
-                / sched_result.dict_part['num_nodes']
+                / sched_result.total_proc_time / sched_result.num_nodes
 
     @staticmethod
     def total_dram_bandwidth(sched_result):
         ''' Layer total DRAM bandwidth in elements per cycle. '''
         return 1. * sched_result.total_accesses[me.DRAM] \
                 / sched_result.total_time
+
+    def cmp_key(self):
+        ''' Key function for comparison. '''
+        return self.total_cost, self.total_time
 

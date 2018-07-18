@@ -23,7 +23,7 @@ import math
 from . import data_category_enum as de
 from . import loop_enum as le
 from .. import util
-from .data_dim_loops import DataDimLoops
+from .layer import ConvLayer
 
 '''
 Analytical solvers for loop blocking.
@@ -177,7 +177,7 @@ def _solve_gbuf_reside(nested_loop_desc, resource, reside_dce):
         tz2 = goal_opt2(tx2, ty2)
 
     assert not math.isinf(tz2)
-    tz0 = lnum[2] / tz2
+    tz0 = lnum[2] // tz2
     tx1 = lnum[0] // tx0 // tx2
     ty1 = lnum[1] // ty0 // ty2
 
@@ -219,11 +219,7 @@ def gen_loopblocking_gbuf_reside(nested_loop_desc, resource, options):
     Generator for loop blocking schemes that are solved from gbuf reside
     analytical models.
     '''
-    if (nested_loop_desc.data_loops[de.FIL] != DataDimLoops(le.IFM, le.OFM)
-            or nested_loop_desc.data_loops[de.IFM] \
-                    != DataDimLoops(le.IFM, le.BAT)
-            or nested_loop_desc.data_loops[de.OFM] \
-                    != DataDimLoops(le.OFM, le.BAT)):
+    if nested_loop_desc.data_loops != ConvLayer.data_loops():
         raise ValueError('loop_blocking_solver: solver only applies to '
                          'CONV layer nested loops')
 

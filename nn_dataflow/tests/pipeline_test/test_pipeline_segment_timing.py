@@ -22,10 +22,12 @@ from collections import OrderedDict
 
 from nn_dataflow.core import InputLayer, FCLayer, PoolingLayer
 from nn_dataflow.core import DataLayout
-from nn_dataflow.core import FmapRange, FmapRangeMap
+from nn_dataflow.core import FmapRange
 from nn_dataflow.core import LoopEnum as le
 from nn_dataflow.core import Network
 from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import ParallelEnum as pe
+from nn_dataflow.core import PartitionScheme
 from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import PipelineSegmentTiming
 from nn_dataflow.core import SchedulingResult
@@ -43,18 +45,18 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         self.net4 = self.net['net4']
 
         self.netlr = Network('net1')
-        self.netlr.set_input(InputLayer(10, 1))
+        self.netlr.set_input_layer(InputLayer(10, 1))
         self.netlr.add('0p1', PoolingLayer(10, 1, 1))
         self.netlr.add('0p2', PoolingLayer(10, 1, 1))
         self.netlr.add('0p3', PoolingLayer(10, 1, 1))
         self.netlr.add('1', FCLayer(10, 20))
 
-        self.dict_part = OrderedDict([('cost', 9.876)])
-
-        frmap = FmapRangeMap()
-        frmap.add(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)), (PhyDim2(0, 0),))
-        self.ofmap_layout = DataLayout(origin=PhyDim2(0, 0), frmap=frmap,
-                                       type=NodeRegion.DATA)
+        part = PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM)
+        self.ofmap_layout = DataLayout(
+            frngs=(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)),),
+            regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                type=NodeRegion.DRAM),),
+            parts=(part,))
 
     def test_valid_args(self):
         ''' Valid arguments. '''
@@ -294,18 +296,20 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
 
     def _make_sched_res(self, sched_seq, time, top_ti=1, top_to=1, top_tb=1,
                         top_ord=range(le.NUM), dram_time=0):
-        dict_loop = OrderedDict()
-        dict_loop['cost'] = 1.234
-        dict_loop['time'] = max(time, dram_time)
-        dict_loop['proc_time'] = time
-        dict_loop['bus_time'] = 0
-        dict_loop['dram_time'] = dram_time
-        dict_loop['ti'] = [top_ti, 1, 1]
-        dict_loop['to'] = [top_to, 1, 1]
-        dict_loop['tb'] = [top_tb, 1, 1]
-        dict_loop['orders'] = [top_ord, range(le.NUM), range(le.NUM)]
-        return SchedulingResult(dict_loop=dict_loop,
-                                dict_part=self.dict_part,
+        scheme = OrderedDict()
+        scheme['cost'] = 1.234 + 9.876
+        scheme['time'] = max(time, dram_time)
+        scheme['cost_loop'] = 1.234
+        scheme['cost_part'] = 9.876
+        scheme['proc_time'] = time
+        scheme['bus_time'] = 0
+        scheme['dram_time'] = dram_time
+        scheme['ti'] = [top_ti, 1, 1]
+        scheme['to'] = [top_to, 1, 1]
+        scheme['tb'] = [top_tb, 1, 1]
+        scheme['tvals'] = [[top_ti, top_to, top_tb], [1] * 3, [1] * 3]
+        scheme['orders'] = [top_ord, range(le.NUM), range(le.NUM)]
+        return SchedulingResult(scheme=scheme,
                                 ofmap_layout=self.ofmap_layout,
                                 sched_seq=sched_seq)
 

@@ -21,7 +21,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 from collections import namedtuple, Counter
 import itertools
 
-from .. import util
+from .int_range import IntRange
 
 _FMAP_POSITION_ATTRS = ['b', 'n', 'h', 'w']
 
@@ -31,18 +31,19 @@ A position in a batched fmap.
 FmapPosition = namedtuple('FmapPosition', _FMAP_POSITION_ATTRS)
 
 
-class FmapRange(util.ContentHashClass):
+class FmapRange(namedtuple('FmapRange', ['fp_beg', 'fp_end'])):
     '''
     A range of a batched fmap.
     '''
 
-    def __init__(self, fp_beg, fp_end):
+    def __new__(cls, fp_beg, fp_end):
         for b, e in zip(fp_beg, fp_end):
             if b > e:
                 raise ValueError('FmapRange: begin value > end value? '
                                  'beg: {}, end: {}'.format(fp_beg, fp_end))
-        self.fp_beg = FmapPosition(*fp_beg)
-        self.fp_end = FmapPosition(*fp_end)
+        ntp = super(FmapRange, cls).__new__(
+            cls, FmapPosition(*fp_beg), FmapPosition(*fp_end))
+        return ntp
 
     def _extract_attrs(self, *attrs):
         '''
@@ -60,11 +61,14 @@ class FmapRange(util.ContentHashClass):
     def beg_end(self, *attrs):
         '''
         Get the begin and end values for each of the given attributes. Return
-        in the form of a list with (beg, end) for each attribute. Not
-        specifying means all attributes.
+        in the form of a list of `IntRange` for each attribute, or simply an
+        `IntRange` if with only a single attribute. Not specifying means all
+        attributes.
         '''
         begs, ends = self._extract_attrs(*attrs)
-        return zip(begs, ends)
+        if len(begs) == 1:
+            return IntRange(begs[0], ends[0])
+        return [IntRange(b, e) for b, e in zip(begs, ends)]
 
     def range(self, *attrs):
         '''
@@ -138,22 +142,26 @@ class FmapRange(util.ContentHashClass):
             return self._compare(other) < 0
         return NotImplemented
 
-    def __le__(self, other):
-        return self < other or self == other
-
-    def __gt__(self, other):
+    def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return self._compare(other) > 0
+            try:
+                return self._compare(other) == 0
+            except ValueError:
+                return False
         return NotImplemented
 
-    def __ge__(self, other):
-        return self > other or self == other
-
     def _compare(self, other):
-        # Identical or empty ranges.
-        if (self.fp_beg == other.fp_beg and self.fp_end == other.fp_end) \
-                or (self.size() == 0 and other.size() == 0):
+        # Identical ranges.
+        if self.fp_beg == other.fp_beg and self.fp_end == other.fp_end:
             return 0
+
+        # Empty ranges are smaller than non-empty ranges.
+        if self.size() == 0:
+            if other.size() == 0:
+                return 0
+            return -1
+        elif other.size() == 0:
+            return 1
 
         # Overlap check.
         if self.overlap_size(other) > 0:
@@ -172,6 +180,34 @@ class FmapRange(util.ContentHashClass):
             ', '.join([
                 'fp_beg={}'.format(repr(self.fp_beg)),
                 'fp_end={}'.format(repr(self.fp_end))]))
+
+    # Must explicitly overwrite all rich comparison operators, as they are
+    # already defined in the base class.
+
+    def __ne__(self, other):
+        r = self.__eq__(other)
+        if r is NotImplemented:
+            # "not" NotImplemented will be True.
+            return r
+        return not r
+
+    def __gt__(self, other):
+        r = self.__lt__(other)
+        if r is NotImplemented:
+            # NotImplemented "and" X will be X.
+            return r
+        return not r and self.__ne__(other)
+
+    def __le__(self, other):
+        # NotImplemented "or" X is safe.
+        return self.__lt__(other) or self.__eq__(other)
+
+    def __ge__(self, other):
+        r = self.__lt__(other)
+        if r is NotImplemented:
+            # "not" NotImplemented will be True.
+            return r
+        return not r
 
 
 class FmapRangeMap(object):

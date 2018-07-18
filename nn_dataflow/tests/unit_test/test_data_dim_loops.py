@@ -93,20 +93,6 @@ class TestDataDimLoops(unittest.TestCase):
             self.assertTrue(set(takelst).isdisjoint(set(droplst)))
             self.assertSetEqual(set(takelst) | set(droplst), set(lst))
 
-    def test_data_cnt(self):
-        ''' Get data_cnt. '''
-        lcnt = [3, 5, 7]
-
-        for loops in self._gen_loop_combs():
-            ddls = DataDimLoops(*loops)
-            dcnt = ddls.data_cnt(lcnt)
-
-            dcnt2 = 1
-            for lpe in ddls.loops():
-                dcnt2 *= lcnt[lpe]
-
-            self.assertEqual(dcnt, dcnt2)
-
     def test_repr(self):
         ''' __repr__. '''
         # pylint: disable=eval-used

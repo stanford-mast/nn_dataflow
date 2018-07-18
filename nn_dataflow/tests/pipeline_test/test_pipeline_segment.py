@@ -225,14 +225,14 @@ class TestPipelineSegment(TestPipelineFixture):
                 # The data source of all layers except for the first in the
                 # segment should be previous processing regions.
                 for r in rlist[1:]:
-                    self.assertEqual(r.src_data_region().type, NodeRegion.PROC,
+                    self.assertEqual(r.src_data_region.type, NodeRegion.PROC,
                                      'test_segment_allocation: '
                                      'data source should be PROC region.')
 
                 # The data destination of all layers except for the last in the
                 # segment should be local.
                 for r in rlist[:-1]:
-                    self.assertEqual(r.dst_data_region().type, NodeRegion.PROC,
+                    self.assertEqual(r.dst_data_region.type, NodeRegion.PROC,
                                      'test_segment_allocation: '
                                      'data destination should be PROC region.')
 

@@ -31,7 +31,7 @@ Sutskever, Vinyals, Le, Google, NIPS 2014
 
 NN = Network('GNMT')
 
-NN.set_input(InputLayer(80000, 1))
+NN.set_input_layer(InputLayer(80000, 1))
 
 NN.add('init', FCLayer(80000, 1000))
 

@@ -21,8 +21,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import unittest
 
 from nn_dataflow.core import DataLayout
-from nn_dataflow.core import FmapRange, FmapRangeMap
+from nn_dataflow.core import FmapRange
 from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import ParallelEnum as pe
+from nn_dataflow.core import PartitionScheme
 from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import Resource
 from nn_dataflow.core import SchedulingCondition
@@ -36,17 +38,20 @@ class TestSchedulingCondition(unittest.TestCase):
         self.resource = Resource(
             proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                    type=NodeRegion.PROC),
-            data_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
-                                     type=NodeRegion.DATA),),
+            src_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                       type=NodeRegion.DRAM),
+            dst_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                       type=NodeRegion.DRAM),
             dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
 
         self.none_cstr = SchedulingConstraint()
 
-        frmap = FmapRangeMap()
-        frmap.add(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)), (PhyDim2(0, 0),))
-        self.ifmap_layout = DataLayout(origin=PhyDim2(0, 0), frmap=frmap,
-                                       type=NodeRegion.DATA)
+        part = PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM)
+        self.ifmap_layout = DataLayout(frngs=(FmapRange((0, 0, 0, 0),
+                                                        (2, 4, 16, 16)),),
+                                       regions=(self.resource.src_data_region,),
+                                       parts=(part,))
 
         self.sched_seq = (2, 0, 0)
 

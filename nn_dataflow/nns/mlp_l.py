@@ -29,7 +29,7 @@ PRIME, 2016
 
 NN = Network('MLP-L')
 
-NN.set_input(InputLayer(784, 1))
+NN.set_input_layer(InputLayer(784, 1))
 
 NN.add('fc1', FCLayer(784, 1500))
 NN.add('fc2', FCLayer(1500, 1000))

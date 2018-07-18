@@ -26,6 +26,7 @@ from .phy_dim2 import PhyDim2
 
 NODE_REGION_LIST = ['dim',
                     'origin',
+                    'dist',
                     'type',
                     'wtot',
                     'wbeg',
@@ -36,7 +37,7 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
     A node region defined by the dimension and origin offset.
 
     The `type` attribute specifies the region type, which could be `PROC` for
-    computation processing nodes or 'DATA' for data storage nodes.
+    computation processing nodes or 'DRAM' for off-chip data storage nodes.
 
     The node region can be optionally folded along the w dimension in a zig-zag
     manner. The folding scheme is defined by (wtot, wbeg). `wtot` is always
@@ -64,13 +65,15 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
 
     # Type enums.
     PROC = 0
-    DATA = 1
+    DRAM = 1
     NUM = 2
 
     def __new__(cls, *args, **kwargs):
 
         # Set default values.
         kwargs2 = kwargs.copy()
+        if len(args) <= NODE_REGION_LIST.index('dist'):
+            kwargs2.setdefault('dist', PhyDim2(1, 1))
         if len(args) <= NODE_REGION_LIST.index('wtot'):
             # Default to dim.w but we haven't checked dim yet. Replace later.
             kwargs2.setdefault('wtot', None)
@@ -84,6 +87,8 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
             raise TypeError('NodeRegion: dim must be a PhyDim2 object.')
         if not isinstance(ntp.origin, PhyDim2):
             raise TypeError('NodeRegion: origin must be a PhyDim2 object.')
+        if not isinstance(ntp.dist, PhyDim2):
+            raise TypeError('NodeRegion: dist must be a PhyDim2 object.')
 
         if ntp.type not in range(cls.NUM):
             raise ValueError('NodeRegion: type must be a valid type enum.')
@@ -105,16 +110,15 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
 
     def contains_node(self, coordinate):
         ''' Whether the region contains the given absolute node coordinate. '''
-        return coordinate in self.node_iter()
+        return coordinate in self.iter_node()
 
-    def node_iter(self):
+    def iter_node(self):
         ''' Iterate through all absolute node coordinates in the region. '''
         for rel_coord in itertools.product(*[range(d) for d in self.dim]):
             yield self.rel2abs(PhyDim2(*rel_coord))
 
     def rel2abs(self, rel_coordinate):
         ''' Convert relative node coordinate to absolute node coordinate. '''
-
         if not isinstance(rel_coordinate, PhyDim2):
             raise TypeError('NodeRegion: relative coordinate must be '
                             'a PhyDim2 object.')
@@ -133,7 +137,8 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
         abs_coordinate = self.origin \
                 + PhyDim2(h=h * self.dim.h + rel_coordinate.h,
                           w=w - (self.wtot - self.wbeg if self.wbeg > 0
-                                 else -self.wbeg - 1))
+                                 else -self.wbeg - 1)) \
+                * self.dist
 
         return abs_coordinate
 

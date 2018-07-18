@@ -29,7 +29,7 @@ Zeiler and Fergus, 2013
 
 NN = Network('ZFNet')
 
-NN.set_input(InputLayer(3, 224))
+NN.set_input_layer(InputLayer(3, 224))
 
 NN.add('conv1', ConvLayer(3, 96, 110, 7, 2))
 NN.add('pool1', PoolingLayer(96, 55, 3, strd=2))

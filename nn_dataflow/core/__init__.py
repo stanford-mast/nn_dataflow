@@ -29,6 +29,7 @@ from .cost import Cost
 from .data_dim_loops import DataDimLoops
 from .data_layout import DataLayout
 from .fmap_range import FmapPosition, FmapRange, FmapRangeMap
+from .int_range import IntRange
 from .inter_layer_pipeline import InterLayerPipeline
 from .layer import Layer, InputLayer, ConvLayer, FCLayer, \
         LocalRegionLayer, PoolingLayer, EltwiseLayer

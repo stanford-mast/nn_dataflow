@@ -212,8 +212,6 @@ class InterLayerPipeline(object):
         Also establish two dicts for the previous and next vertices of each DAG
         vertex.
 
-        Also record the number of operations of each DAG vertex.
-
         In summary, the attributes initialized include: `dag_input_vertex`,
         `dag_vertex_list`, `dag_vertex_dict`, `dag_prev_dict`, `dag_next_dict`.
         '''
@@ -232,9 +230,8 @@ class InterLayerPipeline(object):
                 dag_vertex_set.append((layer_name,))
 
             else:
-                prev_layers, _ = self.network.prev_layers(layer_name)
-                prev_layers = set(prev_layers)
-                assert prev_layers
+                prevs = set(self.network.prevs(layer_name))
+                assert prevs
 
                 # Find and merge to a vertex if that vertex only contains one
                 # previous layer at the last, because non-last previous layer
@@ -246,8 +243,8 @@ class InterLayerPipeline(object):
                 for idx in reversed(range(len(dag_vertex_set))):
                     vhead = dag_vertex_set[idx][:-1]
                     vtail = dag_vertex_set[idx][-1]
-                    if prev_layers.isdisjoint(vhead) and vtail in prev_layers \
-                            and len(self.network.next_layers(vtail)) == 1:
+                    if prevs.isdisjoint(vhead) and vtail in prevs \
+                            and len(self.network.nexts(vtail)) == 1:
                         dag_vertex_set[idx] += (layer_name,)
                         break
                 else:
@@ -281,19 +278,16 @@ class InterLayerPipeline(object):
             vidx = self.dag_vertex_dict[layer_name]
 
             # Previous layers.
-            prev_layers, _ = self.network.prev_layers(layer_name)
-            for pl in prev_layers:
-                pvidx = self.dag_vertex_dict[pl] if pl \
-                        else self.dag_input_vertex
+            for p in self.network.prevs(layer_name):
+                pvidx = self.dag_vertex_dict[p] if p else self.dag_input_vertex
                 if pvidx != vidx:
                     self.dag_prev_dict[vidx].add(pvidx)
 
             # Next layers.
-            next_layers = self.network.next_layers(layer_name)
-            for nl in next_layers:
-                if not nl:
+            for n in self.network.nexts(layer_name):
+                if not n:
                     continue
-                nvidx = self.dag_vertex_dict[nl]
+                nvidx = self.dag_vertex_dict[n]
                 if nvidx != vidx:
                     self.dag_next_dict[vidx].add(nvidx)
 
@@ -328,18 +322,18 @@ class InterLayerPipeline(object):
             unseen.discard(vertex)
             seen.add(vertex)
 
-            next_layers = []
+            nexts = []
             for l in vertex:
-                for nl in self.network.next_layers(l):
-                    if nl and nl not in vertex and nl not in next_layers:
-                        next_layers.append(nl)
+                for n in self.network.nexts(l):
+                    if n and n not in vertex and n not in nexts:
+                        nexts.append(n)
 
             # Visit next layers in the reversed order, so the reversed visit
             # order has the original order.
             next_vertices = []
-            for nl in reversed(next_layers):
+            for n in reversed(nexts):
                 for nv in unseen:
-                    if nl in nv:
+                    if n in nv:
                         next_vertices.append(nv)
 
             for nv in next_vertices:
@@ -350,7 +344,7 @@ class InterLayerPipeline(object):
 
         # Start from the first layers.
         start_vertices = []
-        for l in reversed(self.network.first_layers()):
+        for l in reversed(self.network.firsts()):
             for v in unseen:
                 if l in v:
                     start_vertices.append(v)
