@@ -25,7 +25,8 @@ from .node_region import NodeRegion
 from .phy_dim2 import PhyDim2
 
 RESOURCE_LIST = ['proc_region',
-                 'data_regions',
+                 'src_data_region',
+                 'dst_data_region',
                  'dim_array',
                  'size_gbuf',
                  'size_regf',
@@ -49,21 +50,12 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
         if ntp.proc_region.type != NodeRegion.PROC:
             raise ValueError('Resource: proc_region must have type PROC.')
 
-        if not isinstance(ntp.data_regions, tuple):
-            raise TypeError('Resource: data_regions must be a tuple.')
-        for dr in ntp.data_regions:
-            if not isinstance(dr, NodeRegion):
-                raise TypeError('Resource: element in data_regions must be '
-                                'a NodeRegion instance.')
-            if dr.type != NodeRegion.DATA:
-                raise ValueError('Resource: element in data_regions must have '
-                                 'type DATA.')
-        # Data regions can be used as either data source or data destination.
-        # If a single region is provided, it is both the source and
-        # destination; if two regions are provided, the first is the source and
-        # the second is the destination.
-        if len(ntp.data_regions) > 2:
-            raise ValueError('Resource: can have at most 2 data_regions.')
+        if not isinstance(ntp.src_data_region, NodeRegion):
+            raise TypeError('Resource: src_data_region must be '
+                            'a NodeRegion instance.')
+        if not isinstance(ntp.dst_data_region, NodeRegion):
+            raise TypeError('Resource: dst_data_region must be '
+                            'a NodeRegion instance.')
 
         if not isinstance(ntp.dim_array, PhyDim2):
             raise TypeError('Resource: dim_array must be a PhyDim2 object.')
@@ -86,12 +78,4 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
             raise ValueError('Resource: dram_bandwidth must be positive.')
 
         return ntp
-
-    def src_data_region(self):
-        ''' Get the source data region. '''
-        return self.data_regions[0]
-
-    def dst_data_region(self):
-        ''' Get the destination data region. '''
-        return self.data_regions[-1]
 

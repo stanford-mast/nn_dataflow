@@ -19,14 +19,15 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from collections import namedtuple
+import itertools
 
 from .fmap_range import FmapPosition, FmapRange, FmapRangeMap
 from .node_region import NodeRegion
-from .phy_dim2 import PhyDim2
+from .partition_scheme import PartitionScheme
 
-DATA_LAYOUT_LIST = ['frmap',
-                    'origin',
-                    'type',
+DATA_LAYOUT_LIST = ['frngs',
+                    'regions',
+                    'parts',
                    ]
 
 class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
@@ -37,156 +38,193 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
     def __new__(cls, *args, **kwargs):
         ntp = super(DataLayout, cls).__new__(cls, *args, **kwargs)
 
-        if not isinstance(ntp.frmap, FmapRangeMap):
-            raise TypeError('DataLayout: frmap must be a FmapRangeMap object.')
-        if not isinstance(ntp.origin, PhyDim2):
-            raise TypeError('DataLayout: origin must be a PhyDim2 object.')
-        if ntp.type not in range(NodeRegion.NUM):
-            raise ValueError('DataLayout: type must be a valid NodeRegion '
-                             'type enum.')
+        if not isinstance(ntp.frngs, tuple):
+            raise TypeError('DataLayout: frngs must be a tuple.')
+        for fr in ntp.frngs:
+            if not isinstance(fr, FmapRange):
+                raise TypeError('DataLayout: elements in frngs must be a '
+                                'FmapRange object.')
+        if not isinstance(ntp.regions, tuple):
+            raise TypeError('DataLayout: regions must be a tuple.')
+        for nr in ntp.regions:
+            if not isinstance(nr, NodeRegion):
+                raise TypeError('DataLayout: elements in regions must be a '
+                                'NodeRegion object.')
+        if not isinstance(ntp.parts, tuple):
+            raise TypeError('DataLayout: parts must be a tuple.')
+        for p in ntp.parts:
+            if not isinstance(p, PartitionScheme):
+                raise TypeError('DataLayout: elements in parts must be a '
+                                'PartitionScheme object.')
 
-        if not ntp.frmap.is_complete():
-            raise ValueError('DataLayout: frmap must be a complete map.')
+        cls._validate_frngs(ntp.frngs)
+        cls._validate_parts(ntp.parts, ntp.regions)
 
-        coords_list = [val for _, val in ntp.frmap.items()]
-        for coords in coords_list:
-            if not isinstance(coords, tuple) \
-                    or not all(isinstance(c, PhyDim2) for c in coords):
-                raise TypeError('DataLayout: frmap value must be a tuple of '
-                                'PhyDim2 objects.')
+        if not len(ntp.frngs) == len(ntp.regions) == len(ntp.parts):
+            raise ValueError('DataLayout: {} must have the same length.'
+                             .format(', '.join(DATA_LAYOUT_LIST)))
 
         return ntp
 
-    def total_transfer_nhops(self, frng, *dst_coord_list, **kwargs):
+    def complete_fmap_range(self):
         '''
-        Get the total number of hops to transfer the FmapRange `frng` to all
-        the destination coordinates in `dst_coord_list`. If `closest_first` is
-        True, then first transfer to the closest one node, and then forward
-        from there to all other nodes.
+        Get the complete FmapRange, i.e., a perfect hyper cube starting from
+        origin point (0, ..., 0) with no holes.
         '''
-        closest_first = kwargs.get('closest_first', False)
+        return FmapRange(self.frngs[0].fp_beg, self.frngs[-1].fp_end)
 
-        dst_coord_ofs_list = [c - self.origin for c in dst_coord_list]
-
-        coords_cnts = self.frmap.rget_counter(frng)
-        # This assertion is invalid now, because layout is not padded while
-        # frng is padded.
-        # assert sum(coords_cnts.values()) == frng.size()
-
-        nhops = 0
-        for coords, cnt in coords_cnts.items():
-            nhops_list = [cnt * sum(dco.hop_dist(c) for c in coords)
-                          for dco in dst_coord_ofs_list]
-            if closest_first:
-                # First send to the closest node.
-                closest_idx = min(enumerate(nhops_list), key=lambda x: x[1])[0]
-                nhops += nhops_list[closest_idx]
-                # Then forward to others. We do chained forwarding, i.e., 1st
-                # node sends to the 2nd, 2nd node sends to the 3rd, etc..
-                dco_set = set(dst_coord_ofs_list)
-                cur = dst_coord_ofs_list[closest_idx]
-                while True:
-                    dco_set.remove(cur)
-                    if not dco_set:
-                        break
-                    nxt, dist = min([(nxt, cur.hop_dist(nxt))
-                                     for nxt in dco_set], key=lambda x: x[1])
-                    nhops += cnt * dist
-                    cur = nxt
-            else:
-                nhops += sum(nhops_list)
-        return nhops
-
-    def is_in_region(self, node_region):
+    def fmap_range_map(self):
         '''
-        Whether the layout is in the given NodeRegion.
+        Get an `FmapRangeMap` instance, mapping from fmap range to absolute
+        node coordinate.
         '''
-        if self.type != node_region.type:
-            return False
-        all_coords = []
-        for coords in self.frmap.rget_counter(self.frmap.complete_fmap_range()):
-            all_coords += coords
-        return all(node_region.contains_node(c + self.origin)
-                   for c in all_coords)
+        frmap = FmapRangeMap()
 
-    def view(self, origin_diff=PhyDim2(0, 0)):
+        for frng, region, part in zip(self.frngs, self.regions, self.parts):
+
+            for pidx in part.gen_pidx():
+                pcoord = part.coordinate(region, pidx)
+                pfrng = part.fmap_range(frng, pidx)
+
+                frmap.add(pfrng, pcoord)
+
+        return frmap
+
+    def nhops_to(self, fmap_range, *dest_list, **kwargs):
         '''
-        Another view of the layout by shifting the origin by the given
-        `origin_diff`.
+        Get the total number of hops to transfer the FmapRange `fmap_range` to
+        destinations `dest_list` given as a list of absolute coordinates.
+
+        If `forwarding` is True, the data can be forwarded between destinations
+        rather than all from the source.
         '''
-        return DataLayout(frmap=self.frmap, origin=self.origin + origin_diff,
-                          type=self.type)
+        forwarding = kwargs.pop('forwarding', False)
+        if kwargs:
+            raise ValueError('DataLayout: method nhops_to() got an unexpected '
+                             'keyword argument: {}.'
+                             .format(kwargs.popitem()[0]))
 
-    def merge(self, merge_symbol, other):
-        '''
-        Merge self with `other` DataLayout, according to the given
-        `merge_symbol`. Return the merged layout.
+        # The number of hops to transfer data to each destination individually.
+        nhops_list = [0] * len(dest_list)
 
-        Currently support merge symbols:
-        - |: concatenate fmaps along the channel (n) dimension.
-        - +: sum up fmaps along the channel (n) dimension.
-        '''
+        for frng, region, part in zip(self.frngs, self.regions, self.parts):
 
-        if not isinstance(other, DataLayout):
-            raise TypeError('DataLayout: other must be a DataLayout object.')
+            # Skip non-overlapped fmap range.
+            if fmap_range.overlap_size(frng) == 0:
+                continue
 
-        if self.type != other.type:
-            raise ValueError('DataLayout: layouts to be merged must have '
-                             'the same type.')
+            for pidx in part.gen_pidx():
+                psrc = part.coordinate(region, pidx)
+                pfrng = part.fmap_range(frng, pidx)
+                size = fmap_range.overlap_size(pfrng)
 
-        scfrng = self.frmap.complete_fmap_range()
-        ocfrng = other.frmap.complete_fmap_range()
+                nhops_list = [n + size * d.hop_dist(psrc)
+                              for n, d in zip(nhops_list, dest_list)]
 
-        coord_ofs = other.origin - self.origin
+        if forwarding:
+            # The number of hops to the first node and its coordinate.
+            nhops, coord = min(zip(nhops_list, dest_list))
 
-        frmap = None
+            # Size of all data.
+            total_size = self.complete_fmap_range().overlap_size(fmap_range)
 
-        if merge_symbol == '|':
-            # Concatenate fmaps.
+            # Data can be forwarded from all sources to any destination.
+            src_set = {coord}
+            dst_set = set(dest_list) - src_set
 
-            # Check dimension match.
-            if scfrng.beg_end('b', 'h', 'w') != ocfrng.beg_end('b', 'h', 'w'):
-                raise ValueError('DataLayout: |-merging layouts do not match.')
-
-            frmap = self.frmap.copy()
-
-            # Offset for n.
-            nofs = scfrng.fp_end.n
-
-            for ofrng, ocoords in other.frmap.items():
-                fpb = ofrng.fp_beg
-                fpe = ofrng.fp_end
-                o2frng = FmapRange(FmapPosition(b=fpb.b, n=fpb.n + nofs,
-                                                h=fpb.h, w=fpb.w),
-                                   FmapPosition(b=fpe.b, n=fpe.n + nofs,
-                                                h=fpe.h, w=fpe.w))
-                o2coords = tuple(c + coord_ofs for c in ocoords)
-
-                frmap.add(o2frng, o2coords)
-
-        elif merge_symbol == '+':
-            # Sum fmaps.
-
-            # Check dimension match.
-            if scfrng.beg_end() != ocfrng.beg_end():
-                raise ValueError('DataLayout: +-merging layouts do not match.')
-
-            frmap = FmapRangeMap()
-
-            for ofrng, ocoords in other.frmap.items():
-                o2coords = tuple(c + coord_ofs for c in ocoords)
-
-                for sfrng, scoords in self.frmap.items():
-                    frng = sfrng.overlap(ofrng)
-                    if frng.size() > 0:
-                        # Fetch data from both coordinates.
-                        frmap.add(frng, scoords + o2coords)
+            while dst_set:
+                # Each forward step, get the min-distance pair of source and
+                # destination.
+                src, dst = min(itertools.product(src_set, dst_set),
+                               key=lambda (s, d): d.hop_dist(s))
+                dst_set.remove(dst)
+                src_set.add(dst)
+                nhops += total_size * dst.hop_dist(src)
 
         else:
-            raise ValueError('DataLayout: unrecognized merge symbol {}'
-                             .format(merge_symbol))
+            nhops = sum(nhops_list)
 
-        assert frmap.is_complete()
+        return nhops
 
-        return DataLayout(frmap=frmap, origin=self.origin, type=self.type)
+    def is_in(self, *regions):
+        '''
+        Whether the layout is completely in the given NodeRegion's `regions`.
+        Region types must match. Each fmap range can be split into multiple
+        given regions.
+        '''
+        return all(any(region.type == r.type and r.contains_node(coord)
+                       for r in regions)
+                   for region in self.regions for coord in region.iter_node())
+
+    @classmethod
+    def concat(cls, *data_layout_list):
+        '''
+        Concatenate multiple `DataLayout` objects along the channel dimension.
+        '''
+        frngs = []
+        regions = []
+        parts = []
+
+        n_offset = 0
+
+        for dl in data_layout_list:
+
+            # Check type.
+            if not isinstance(dl, DataLayout):
+                raise TypeError('DataLayout: only DataLayout object can be '
+                                'concatenated.')
+
+            # Concatenate frngs along n dimension.
+            for frng in dl.frngs:
+                fpb = frng.fp_beg
+                fpe = frng.fp_end
+                frng2 = FmapRange(FmapPosition(b=fpb.b, n=fpb.n + n_offset,
+                                               h=fpb.h, w=fpb.w),
+                                  FmapPosition(b=fpe.b, n=fpe.n + n_offset,
+                                               h=fpe.h, w=fpe.w))
+                frngs.append(frng2)
+                n_offset += frng.size('n')
+
+            # Regions and partitions are the same.
+            regions += dl.regions
+            parts += dl.parts
+
+        return DataLayout(frngs=tuple(frngs), regions=tuple(regions),
+                          parts=tuple(parts))
+
+    @classmethod
+    def _validate_frngs(cls, frngs):
+        '''
+        Validate the fmap ranges.
+        '''
+        if not frngs:
+            raise ValueError('DataLayout: no frngs.')
+
+        _, n_end = frngs[0].beg_end('n')
+        bhw_beg_end = frngs[0].beg_end('b', 'h', 'w')
+
+        if frngs[0].fp_beg != FmapPosition(0, 0, 0, 0):
+            raise ValueError('DataLayout: frngs must begin at 0.')
+
+        for frng in frngs[1:]:
+            if frng.beg_end('b', 'h', 'w') != bhw_beg_end:
+                raise ValueError('DataLayout: frng dim b, h, w mismatch.')
+            nb, ne = frng.beg_end('n')
+            if nb != n_end:
+                raise ValueError('DataLayout: frng dim n is discontinuous.')
+            n_end = ne
+
+    @classmethod
+    def _validate_parts(cls, parts, regions):
+        '''
+        Validate the partitioning schemes.
+        '''
+        for region, part in zip(regions, parts):
+            if not part.is_applicable_to_fmap_range():
+                raise ValueError('DataLayout: invalid partitioning scheme for '
+                                 'fmap range.')
+
+            if any(pd > rd for pd, rd in zip(part.dim(), region.dim)):
+                raise ValueError('DataLayout: partitioning scheme does not fit '
+                                 'in node region.')
 

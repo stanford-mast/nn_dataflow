@@ -29,7 +29,7 @@ ILSVRC 2014
 
 NN = Network('GoogLeNet')
 
-NN.set_input(InputLayer(3, 224))
+NN.set_input_layer(InputLayer(3, 224))
 
 NN.add('conv1', ConvLayer(3, 64, 112, 7, 2))
 NN.add('pool1', PoolingLayer(64, 56, 3, strd=2))

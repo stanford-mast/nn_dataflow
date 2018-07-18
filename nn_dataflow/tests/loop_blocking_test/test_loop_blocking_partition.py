@@ -41,49 +41,12 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
 
         self.par_proc_region = self.resource['PAR'].proc_region
 
-    def test_scheme_dict(self):
-        ''' get_scheme_dict stats. '''
-
-        for part in self._gen_all_partition():
-
-            p_nld, p_occ = self._part_nld(part)
-
-            filter_size, ifmap_size, ofmap_size = self._total_part_size(part)
-
-            fil_fetch = part.size(pe.BATP, pe.OFMP)
-            ifm_fetch = part.size(pe.OUTP)
-            ofm_fetch = part.size(pe.INPP)
-
-            for lbs in loop_blocking.gen_loopblocking(
-                    p_nld, self.resource['PAR'], part, self.cost, p_occ,
-                    self.options['BASE']):
-                if not lbs.is_valid():
-                    continue
-
-                sch_dict = lbs.get_scheme_dict(self.cost)
-
-                # Ops.
-                self.assertAlmostEqual(sch_dict['ops'], self.total_ops)
-
-                # Top fetch and access.
-                top_fetch = sch_dict['fetch'][0]
-                top_access = sch_dict['access'][0]
-                self.assertAlmostEqual(top_access[de.FIL],
-                                       top_fetch[de.FIL] * filter_size
-                                       * fil_fetch)
-                self.assertAlmostEqual(top_access[de.OFM],
-                                       top_fetch[de.OFM] * ofmap_size
-                                       * ofm_fetch)
-                self.assertGreaterEqual(top_access[de.IFM],
-                                        top_fetch[de.IFM] * ifmap_size
-                                        * ifm_fetch)
-
     def test_accfwd(self):
         ''' Scheme using accfwd. '''
 
         for part in self._gen_all_partition():
 
-            p_nld, p_occ = self._part_nld(part)
+            p_nld = self._part_nld(part)
 
             filter_size, ifmap_size, ofmap_size = self._total_part_size(part)
 
@@ -93,26 +56,24 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
             fil_fetch = part.size(pe.BATP, pe.OFMP) // bufshr.size(de.FIL)
 
             for lbs in loop_blocking.gen_loopblocking(
-                    p_nld, self.resource['PAR'], part, self.cost, p_occ,
+                    p_nld, self.resource['PAR'], part, self.cost,
                     self.options['ACCFWD']):
                 if not lbs.is_valid():
                     continue
 
-                sch_dict = lbs.get_scheme_dict(self.cost)
-
                 # Ops.
-                self.assertAlmostEqual(sch_dict['ops'], self.total_ops)
+                self.assertAlmostEqual(lbs.ops, self.total_ops)
 
                 # Access forwarding reduction.
-                accfwd_red = sch_dict['accfwd_reduction']
+                accfwd_red = lbs.accfwd_reduction
                 self.assertEqual(accfwd_red[de.FIL],
                                  part.size(pe.BATP, pe.OFMP) // fil_fetch)
                 self.assertEqual(accfwd_red[de.OFM], part.size(pe.INPP))
                 self.assertEqual(accfwd_red[de.IFM], part.size(pe.OUTP))
 
                 # Top fetch and access.
-                top_fetch = sch_dict['fetch'][0]
-                top_access = sch_dict['access'][0]
+                top_fetch = lbs.fetch[0]
+                top_access = lbs.access[0]
                 self.assertAlmostEqual(top_access[de.FIL],
                                        top_fetch[de.FIL] * filter_size
                                        * fil_fetch)
@@ -126,7 +87,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
 
         for part in self._gen_all_partition():
 
-            p_nld, p_occ = self._part_nld(part)
+            p_nld = self._part_nld(part)
 
             bufshr = BufShrScheme(self.par_proc_region, part)
 
@@ -136,29 +97,27 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
             for optkey in ['BUFSHR', 'BUFSHR-BYP']:
 
                 for lbs in loop_blocking.gen_loopblocking(
-                        p_nld, self.resource['PAR'], part, self.cost, p_occ,
+                        p_nld, self.resource['PAR'], part, self.cost,
                         self.options[optkey]):
                     if not lbs.is_valid():
                         continue
 
-                    sch_dict = lbs.get_scheme_dict(self.cost)
-
                     # Ops.
-                    self.assertAlmostEqual(sch_dict['ops'], self.total_ops)
+                    self.assertAlmostEqual(lbs.ops, self.total_ops)
 
                     # Buffer sharing uses access forwarding reduction.
-                    accfwd_red = sch_dict['accfwd_reduction']
+                    accfwd_red = lbs.accfwd_reduction
                     self.assertEqual(accfwd_red[de.FIL],
                                      part.size(pe.BATP, pe.OFMP) // fil_fetch)
                     self.assertEqual(accfwd_red[de.OFM], part.size(pe.INPP))
                     self.assertEqual(accfwd_red[de.IFM], part.size(pe.OUTP))
 
                     # Buffer sharing group size.
-                    bufshr_grp_size = sch_dict['bufshr_grp_size']
+                    bufshr_grp_size = lbs.bufshr_grp_size
                     self.assertSequenceEqual(bufshr_grp_size, accfwd_red)
 
                     # Buffer sharing subgroup size.
-                    bufshr_subgrp_size = sch_dict['bufshr_subgrp_size']
+                    bufshr_subgrp_size = lbs.bufshr_subgrp_size
                     self.assertTrue(all(subgrp <= grp for subgrp, grp
                                         in zip(bufshr_subgrp_size,
                                                bufshr_grp_size)))
@@ -168,12 +127,12 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
 
         for part in self._gen_all_partition():
 
-            p_nld, p_occ = self._part_nld(part)
+            p_nld = self._part_nld(part)
 
             bufshr = BufShrScheme(self.par_proc_region, part)
 
             for lbs in loop_blocking.gen_loopblocking(
-                    p_nld, self.resource['PAR'], part, self.cost, p_occ,
+                    p_nld, self.resource['PAR'], part, self.cost,
                     self.options['BUFSHR']):
                 if not lbs.is_valid():
                     continue
@@ -195,12 +154,12 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
 
         for part in self._gen_all_partition():
 
-            p_nld, p_occ = self._part_nld(part)
+            p_nld = self._part_nld(part)
 
             bufshr = BufShrScheme(self.par_proc_region, part)
 
             for lbs in loop_blocking.gen_loopblocking(
-                    p_nld, self.resource['PAR'], part, self.cost, p_occ,
+                    p_nld, self.resource['PAR'], part, self.cost,
                     self.options['BUFSHR-BYP']):
                 if not lbs.is_valid():
                     continue
@@ -235,7 +194,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
                                 [bufshr.size(dce) for dce in range(de.NUM)]))
 
         # Make a LoopBlockingScheme that uses bufshr for all data categories.
-        p_nld, p_occ = self._part_nld(part)
+        p_nld = self._part_nld(part)
         bl_ts = ((util.idivc(p_nld.loopcnt[le.IFM], 6),
                   util.idivc(p_nld.loopcnt[le.OFM], 9),
                   util.idivc(p_nld.loopcnt[le.BAT], 2)),
@@ -243,7 +202,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
                  (2, 3, 1))
         bl_ords = (tuple(range(le.NUM)), tuple(range(le.NUM)))
         lbs = LoopBlockingScheme(p_nld, bl_ts, bl_ords, self.resource['PAR'],
-                                 bufshr, p_occ, self.options['BUFSHR'])
+                                 bufshr, self.options['BUFSHR'])
         self.assertTrue(lbs.is_valid())
         self.assertGreater(sum(lbs.get_noc_access()), 0)
         self.assertTrue(all(sgs > 1 for sgs in lbs.bufshr_subgrp_size)
@@ -275,7 +234,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
                          .format(part, de.IFM, bufshr.size(de.IFM)))
 
         # Make a LoopBlockingScheme that has a single rotation for IFM.
-        p_nld, p_occ = self._part_nld(part)
+        p_nld = self._part_nld(part)
         bl_ts = ((util.idivc(p_nld.loopcnt[le.IFM], 3),
                   util.idivc(p_nld.loopcnt[le.OFM], 3),
                   util.idivc(p_nld.loopcnt[le.BAT], 2)),
@@ -283,7 +242,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
                  (3, 3, 1))
         bl_ords = (tuple(range(le.NUM)), tuple(range(le.NUM)))
         lbs = LoopBlockingScheme(p_nld, bl_ts, bl_ords, self.resource['PAR'],
-                                 bufshr, p_occ, self.options['BUFSHR'])
+                                 bufshr, self.options['BUFSHR'])
         self.assertTrue(lbs.is_valid())
         self.assertGreater(sum(lbs.get_noc_access()), 0)
         self.assertEqual(lbs.bufshr_subgrp_size[de.IFM], 4,
@@ -329,14 +288,14 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
         for t1, t2 in [((3, 3, 1), (1, 1, 2)),
                        ((1, 3, 2), (3, 1, 1))]:
             # Make a LoopBlockingScheme that has wide fetch for IFM.
-            p_nld, p_occ = self._part_nld(part)
+            p_nld = self._part_nld(part)
             bl_ts = (tuple(util.idivc(p_nld.loopcnt[lpe], t1[lpe] * t2[lpe])
                            for lpe in range(le.NUM)),
                      t1, t2)
             # At GBUF level, from inner to outer: le.BAT, le.IFM, le.OFM.
             bl_ords = (tuple(range(le.NUM)), (1, 2, 0))
             lbs = LoopBlockingScheme(p_nld, bl_ts, bl_ords,
-                                     self.resource['PAR'], bufshr, p_occ,
+                                     self.resource['PAR'], bufshr,
                                      self.options['BUFSHR'])
             self.assertTrue(lbs.is_valid())
             self.assertGreater(sum(lbs.get_noc_access()), 0)
@@ -381,7 +340,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
                          .format(part, de.IFM, bufshr.size(de.IFM)))
 
         # Make a LoopBlockingScheme that has multi subgroups per group for IFM.
-        p_nld, p_occ = self._part_nld(part)
+        p_nld = self._part_nld(part)
         bl_ts = ((util.idivc(p_nld.loopcnt[le.IFM], 1),
                   util.idivc(p_nld.loopcnt[le.OFM], 3),
                   util.idivc(p_nld.loopcnt[le.BAT], 2)),
@@ -390,7 +349,7 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
         # At GBUF level, from inner to outer: le.BAT, le.OFM, le.IFM.
         bl_ords = (tuple(range(le.NUM)), (2, 1, 0))
         lbs = LoopBlockingScheme(p_nld, bl_ts, bl_ords, self.resource['PAR'],
-                                 bufshr, p_occ, self.options['BUFSHR'])
+                                 bufshr, self.options['BUFSHR'])
         self.assertTrue(lbs.is_valid())
         self.assertGreater(sum(lbs.get_noc_access()), 0)
         self.assertGreater(lbs.bufshr_grp_size[de.IFM],
@@ -420,10 +379,10 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
 
         for part in self._gen_all_partition():
 
-            p_nld, p_occ = self._part_nld(part)
+            p_nld = self._part_nld(part)
 
             for lbs in loop_blocking.gen_loopblocking(
-                    p_nld, self.resource['PAR'], part, self.cost, p_occ,
+                    p_nld, self.resource['PAR'], part, self.cost,
                     self.options['BUFSHR']):
 
                 noc_access = lbs.get_noc_access()
@@ -443,10 +402,10 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
 
         for part in self._gen_all_partition(layerkey='POOL'):
 
-            p_nld, p_occ = self._part_nld(part, layerkey='POOL')
+            p_nld = self._part_nld(part, layerkey='POOL')
 
             for lbs in loop_blocking.gen_loopblocking(
-                    p_nld, self.resource['PAR'], part, self.cost, p_occ,
+                    p_nld, self.resource['PAR'], part, self.cost,
                     self.options['BUFSHR']):
                 if not lbs.is_valid():
                     continue

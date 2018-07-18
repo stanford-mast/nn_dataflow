@@ -20,9 +20,10 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import unittest
 
-from nn_dataflow.core import partition
 from nn_dataflow.core import ConvLayer, LocalRegionLayer, PoolingLayer
 from nn_dataflow.core import Cost
+from nn_dataflow.core import DataLayout
+from nn_dataflow.core import FmapPosition, FmapRange
 from nn_dataflow.core import MapStrategyEyeriss
 from nn_dataflow.core import NodeRegion
 from nn_dataflow.core import Option
@@ -51,8 +52,10 @@ class TestScheduling(unittest.TestCase):
         self.resource = Resource(
             proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
                                    type=NodeRegion.PROC),
-            data_regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 1),
-                                     type=NodeRegion.DATA),),
+            src_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 1),
+                                       type=NodeRegion.DRAM),
+            dst_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 1),
+                                       type=NodeRegion.DRAM),
             dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
 
@@ -63,9 +66,16 @@ class TestScheduling(unittest.TestCase):
         part = PartitionScheme(order=(pe.INPP, pe.BATP, pe.OUTP, pe.OFMP),
                                pdims=((1, 2), (2, 1), (1, 2), (2, 1)))
         for wlkey in self.layers:
-            self.ifmap_layouts[wlkey] = partition.get_ofmap_layout(
-                self.layers[wlkey].input_layer(), self.batch_size, part,
-                self.resource.src_data_region())
+            input_layer = self.layers[wlkey].input_layer()
+            self.ifmap_layouts[wlkey] = DataLayout(
+                frngs=(FmapRange((0, 0, 0, 0),
+                                 FmapPosition(b=self.batch_size,
+                                              n=input_layer.nofm,
+                                              h=input_layer.hofm,
+                                              w=input_layer.wofm)),),
+                regions=(self.resource.src_data_region,),
+                parts=(part.projection(self.resource.src_data_region,
+                                       appl2frng=True),))
 
     def test_valid_args(self):
         ''' Valid arguments for constructor. '''
@@ -122,27 +132,25 @@ class TestScheduling(unittest.TestCase):
 
             # Combination of loop blocking and partitioning.
             for r in res:
-                self.assertEqual(r.total_cost,
-                                 r.dict_loop['cost'] + r.dict_part['cost'])
-                self.assertEqual(r.dict_loop['ops'],
-                                 layer.total_ops(self.batch_size))
-                self.assertSequenceEqual(r.dict_part['total_nhops'],
+                self.assertAlmostEqual(r.total_cost,
+                                       r.scheme['cost_loop']
+                                       + r.scheme['cost_part'])
+                self.assertEqual(r.total_ops, layer.total_ops(self.batch_size))
+                self.assertSequenceEqual(r.scheme['total_nhops'],
                                          [nh * f for nh, f
-                                          in zip(r.dict_part['unit_nhops'],
-                                                 r.dict_loop['fetch'][0])])
-                self.assertEqual(r.dict_part['num_nodes'],
+                                          in zip(r.scheme['unit_nhops'],
+                                                 r.scheme['fetch'][0])])
+                self.assertEqual(r.num_nodes,
                                  self.resource.proc_region.dim.size())
 
             # Ofmap layout.
             for r in res:
-                self.assertEqual(r.ofmap_layout.frmap.complete_fmap_range()
-                                 .size(),
+                self.assertEqual(r.ofmap_layout.complete_fmap_range().size(),
                                  layer.total_ofmap_size(self.batch_size))
 
     def test_schedule_search_ilayout(self):
         ''' Invalid ifmap_layout. '''
         layer = self.layers['BASE']
-        ifmap_layout = self.ifmap_layouts['BASE']
 
         schd = Scheduling(layer, self.batch_size, self.cost,
                           MapStrategyEyeriss)
@@ -150,7 +158,9 @@ class TestScheduling(unittest.TestCase):
         # Shift ifmap out of memory region.
         condition = SchedulingCondition(
             resource=self.resource,
-            ifmap_layout=ifmap_layout.view(PhyDim2(1, 1)))
+            ifmap_layout=self.ifmap_layouts['BASE']._replace(
+                regions=tuple(r._replace(origin=PhyDim2(-10, -10))
+                              for r in self.ifmap_layouts['BASE'].regions)))
 
         with self.assertRaisesRegexp(ValueError, 'Scheduling: .*ifmap.*'):
             _ = schd.schedule_search(condition, self.options)
@@ -162,6 +172,22 @@ class TestScheduling(unittest.TestCase):
 
         with self.assertRaisesRegexp(ValueError, 'Scheduling: .*ifmap.*'):
             _ = schd.schedule_search(condition, self.options)
+
+    def test_schedule_search_nolbs(self):
+        ''' Schedule search with no lbs. '''
+        layer = self.layers['BASE']
+        ifmap_layout = self.ifmap_layouts['BASE']
+
+        schd = Scheduling(layer, self.batch_size, self.cost,
+                          MapStrategyEyeriss)
+
+        condition = SchedulingCondition(
+            resource=self.resource._replace(size_regf=0),
+            ifmap_layout=ifmap_layout)
+
+        res = schd.schedule_search(condition, self.options)
+
+        self.assertFalse(res)
 
     def test_pernode_sched_cache(self):
         ''' Per-node scheduling cache. '''

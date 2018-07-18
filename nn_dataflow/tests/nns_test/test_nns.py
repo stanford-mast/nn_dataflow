@@ -48,7 +48,7 @@ class TestNNs(unittest.TestCase):
     def test_add_lstm_cell(self):
         ''' Add LSTM cell. '''
         net = Network('LSTM')
-        net.set_input(InputLayer(512, 1))
+        net.set_input_layer(InputLayer(512, 1))
         c, h = nns.add_lstm_cell(net, 'cell0', 512,
                                  net.INPUT_LAYER_KEY, net.INPUT_LAYER_KEY,
                                  net.INPUT_LAYER_KEY)
@@ -73,21 +73,21 @@ class TestNNs(unittest.TestCase):
     def test_add_lstm_cell_not_in(self):
         ''' Add LSTM cell input not in. '''
         net = Network('LSTM')
-        net.set_input(InputLayer(512, 1))
+        net.set_input_layer(InputLayer(512, 1))
         with self.assertRaisesRegexp(ValueError, 'add_lstm_cell: .*in.*'):
             _ = nns.add_lstm_cell(net, 'cell0', 512,
                                   'a', net.INPUT_LAYER_KEY,
                                   net.INPUT_LAYER_KEY)
 
         net = Network('LSTM')
-        net.set_input(InputLayer(512, 1))
+        net.set_input_layer(InputLayer(512, 1))
         with self.assertRaisesRegexp(ValueError, 'add_lstm_cell: .*in.*'):
             _ = nns.add_lstm_cell(net, 'cell0', 512,
                                   net.INPUT_LAYER_KEY, 'a',
                                   net.INPUT_LAYER_KEY)
 
         net = Network('LSTM')
-        net.set_input(InputLayer(512, 1))
+        net.set_input_layer(InputLayer(512, 1))
         with self.assertRaisesRegexp(ValueError, 'add_lstm_cell: .*in.*'):
             _ = nns.add_lstm_cell(net, 'cell0', 512,
                                   net.INPUT_LAYER_KEY, net.INPUT_LAYER_KEY,

@@ -23,12 +23,15 @@ from collections import namedtuple
 
 from . import parallel_enum as pe
 from .. import util
+from .fmap_range import FmapPosition, FmapRange
 from .layer import ConvLayer, LocalRegionLayer
 from .phy_dim2 import PhyDim2
 
 PARTITION_SCHEME_LIST = ['order',
                          'pdims',
                         ]
+
+PARA_ENUM_APPL2FRNG = [pe.BATP, pe.OUTP, pe.OFMP]
 
 class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
     '''
@@ -108,6 +111,71 @@ class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
                      in zip(coord, self.pdims[penum], pidx[penum])]
         return node_region.rel2abs(PhyDim2(*coord))
 
+    def fmap_range(self, frng, pidx):
+        '''
+        Get the partitioned fmap range for the given partition index.
+        '''
+
+        # Batch partition.
+        idx_bat = pidx[pe.BATP].h * self.pdims[pe.BATP].w + pidx[pe.BATP].w
+        b_beg, b_end = util.get_ith_range(frng.beg_end('b'), idx_bat,
+                                          self.pdims[pe.BATP].size())
+
+        # Ofmap channel partition.
+        idx_ofm = pidx[pe.OUTP].h * self.pdims[pe.OUTP].w + pidx[pe.OUTP].w
+        n_beg, n_end = util.get_ith_range(frng.beg_end('n'), idx_ofm,
+                                          self.pdims[pe.OUTP].size())
+
+        # Fmap height tiling.
+        h_beg, h_end = util.get_ith_range(frng.beg_end('h'), pidx[pe.OFMP].h,
+                                          self.pdims[pe.OFMP].h)
+
+        # Fmap width tiling.
+        w_beg, w_end = util.get_ith_range(frng.beg_end('w'), pidx[pe.OFMP].w,
+                                          self.pdims[pe.OFMP].w)
+
+        return FmapRange(FmapPosition(b=b_beg, n=n_beg, h=h_beg, w=w_beg),
+                         FmapPosition(b=b_end, n=n_end, h=h_end, w=w_end))
+
+    def is_applicable_to_fmap_range(self):
+        '''
+        Whether this partitioning scheme is applicable to fmap ranges.
+        '''
+        return self.size() == self.size(*PARA_ENUM_APPL2FRNG)
+
+    def part_layer(self, layer, batch_size):
+        '''
+        Get the partitioned layer structure and batch size. Return partitioned
+        layer, partitioned batch size, and partitioning op occupancy.
+        '''
+
+        p_nifm = util.idivc(layer.nifm, self.pdims[pe.INPP].size())
+        p_nofm = util.idivc(layer.nofm, self.pdims[pe.OUTP].size())
+        p_hofm = util.idivc(layer.hofm, self.pdims[pe.OFMP].h)
+        p_wofm = util.idivc(layer.wofm, self.pdims[pe.OFMP].w)
+
+        if isinstance(layer, ConvLayer):
+            p_layer = ConvLayer(p_nifm, p_nofm, (p_hofm, p_wofm),
+                                (layer.hfil, layer.wfil),
+                                strd=(layer.htrd, layer.wtrd))
+        elif isinstance(layer, LocalRegionLayer):
+            if self.pdims[pe.INPP].size() > 1:
+                raise ValueError('PartitionScheme: input partitioning is '
+                                 'invalid for LocalRegionLayer.')
+            p_layer = LocalRegionLayer(p_nofm, (p_hofm, p_wofm),
+                                       layer.nreg, (layer.hreg, layer.wreg),
+                                       strd=(layer.htrd, layer.wtrd))
+        else:
+            raise TypeError('PartitionScheme: unrecognized layer type.')
+
+        p_batch_size = util.idivc(batch_size, self.pdims[pe.BATP].size())
+
+        p_occ = 1. * layer.total_ops(batch_size) \
+                / (p_layer.total_ops(p_batch_size) * self.size())
+        assert p_occ <= 1 + 1e-6
+
+        return p_layer, p_batch_size, p_occ
+
     def part_neighbor_dist(self, node_region, pae):
         '''
         Get the 2D distance between nearest neighbor nodes with the given
@@ -143,36 +211,63 @@ class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
 
         return PhyDim2(h=hd, w=wd)
 
-    def part_layer(self, layer, batch_size):
+    def projection(self, region, appl2frng=False):
         '''
-        Get the partitioned layer structure and batch size. Return partitioned
-        layer, partitioned batch size, and partitioning op occupation.
+        Get the projection of the partitioning scheme onto a new NodeRegion
+        `region`.
+
+        If `appl2frng` is True, the projection must be applicable to fmap
+        ranges.
         '''
+        if region.dim.size() == 0:
+            raise ValueError('PartitionScheme: '
+                             'cannot project onto an empty node region.')
 
-        p_nifm = util.idivc(layer.nifm, self.pdims[pe.INPP].size())
-        p_nofm = util.idivc(layer.nofm, self.pdims[pe.OUTP].size())
-        p_hofm = util.idivc(layer.hofm, self.pdims[pe.OFMP].h)
-        p_wofm = util.idivc(layer.wofm, self.pdims[pe.OFMP].w)
+        order = self.order
+        pdims = list(self.pdims)
 
-        if isinstance(layer, ConvLayer):
-            p_layer = ConvLayer(p_nifm, p_nofm, (p_hofm, p_wofm),
-                                (layer.hfil, layer.wfil),
-                                strd=(layer.htrd, layer.wtrd))
-        elif isinstance(layer, LocalRegionLayer):
-            if self.pdims[pe.INPP].size() > 1:
-                raise ValueError('PartitionScheme: input partitioning is '
-                                 'invalid for LocalRegionLayer.')
-            p_layer = LocalRegionLayer(p_nofm, (p_hofm, p_wofm),
-                                       layer.nreg, (layer.hreg, layer.wreg),
-                                       strd=(layer.htrd, layer.wtrd))
-        else:
-            raise TypeError('PartitionScheme: unrecognized layer type.')
+        if appl2frng:
+            # Shrink the partitioning not applicable to fmap ranges.
+            for pae in range(pe.NUM):
+                if pae not in PARA_ENUM_APPL2FRNG:
+                    pdims[pae] = PhyDim2(1, 1)
 
-        p_batch_size = util.idivc(batch_size, self.pdims[pe.BATP].size())
+        part_dim = util.prod(pdims)
+        region_dim = region.dim
 
-        p_occ = 1. * layer.total_ops(batch_size) \
-                / (p_layer.total_ops(p_batch_size) * self.size())
-        assert p_occ <= 1 + 1e-6
+        # Keep the same order, and adjust each dimension.
+        pdims = [list(pd) for pd in pdims]
 
-        return p_layer, p_batch_size, p_occ
+        for di in range(2):
+            pd = part_dim[di]
+            rd = region_dim[di]
+
+            if rd > pd:
+                # New region dimension is larger. Extend.
+                ext = rd // pd
+                # Apply the extension to the top level.
+                top_pae = PARA_ENUM_APPL2FRNG[0]
+                pdims[top_pae][di] *= ext
+            else:
+                # Otherwise shrink.
+                # Go from bottom to top. Keep bottom (first) levels unchanged,
+                # and shrink top (latter) levels.
+                for pae in reversed(order):
+                    if rd >= pdims[pae][di]:
+                        # Remaining size in region dimension is enough for
+                        # current level. Use it to keep the current level the
+                        # same size.
+                        rd //= pdims[pae][di]
+                    else:
+                        # Remaining size in region dimension is not enough.
+                        # Shrink current level to be whatever remains.
+                        pdims[pae][di] = rd
+                        rd = 1
+
+        part = PartitionScheme(order=order, pdims=pdims)
+
+        assert all(pd <= rd for pd, rd in zip(part.dim(), region_dim))
+        assert not appl2frng or part.is_applicable_to_fmap_range()
+
+        return part
 

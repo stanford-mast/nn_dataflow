@@ -60,21 +60,24 @@ class TestLoopBlockingFixture(unittest.TestCase):
         dim_array = PhyDim2(16, 16)
         proc_region = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                  type=NodeRegion.PROC)
-        data_regions = (NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
-                                   type=NodeRegion.DATA),)
+        data_region = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                 type=NodeRegion.DRAM)
         # Typical resource.
         self.resource['BASE'] = Resource(
-            proc_region=proc_region, data_regions=data_regions,
+            proc_region=proc_region,
+            src_data_region=data_region, dst_data_region=data_region,
             dim_array=dim_array, size_gbuf=65536, size_regf=64,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
         # Larger resource with sufficient capacity, to make all schemes valid.
         self.resource['LG'] = Resource(
-            proc_region=proc_region, data_regions=data_regions,
+            proc_region=proc_region,
+            src_data_region=data_region, dst_data_region=data_region,
             dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
         # Small resource.
         self.resource['SM'] = Resource(
-            proc_region=proc_region, data_regions=data_regions,
+            proc_region=proc_region,
+            src_data_region=data_region, dst_data_region=data_region,
             dim_array=dim_array, size_gbuf=4096, size_regf=16,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
         # Multi-node parallel resource.
@@ -82,20 +85,23 @@ class TestLoopBlockingFixture(unittest.TestCase):
             proc_region=NodeRegion(origin=PhyDim2(0, 0),
                                    dim=PhyDim2(4, 2),
                                    type=NodeRegion.PROC),
-            data_regions=data_regions,
+            src_data_region=data_region, dst_data_region=data_region,
             dim_array=dim_array, size_gbuf=25000, size_regf=64,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
 
         # Nested loop description after mapping.
         self.nld = {}
         self.nld['BASE'] = next(MapStrategyEyeriss(self.layer['BASE'],
-                                                   self.batch_size, dim_array)
+                                                   self.batch_size, 1,
+                                                   dim_array)
                                 .gen_nested_loop_desc())
         self.nld['LGFIL'] = next(MapStrategyEyeriss(self.layer['LGFIL'],
-                                                    self.batch_size, dim_array)
+                                                    self.batch_size, 1,
+                                                    dim_array)
                                  .gen_nested_loop_desc())
         self.nld['POOL'] = next(MapStrategyEyeriss(self.layer['POOL'],
-                                                   self.batch_size, dim_array)
+                                                   self.batch_size, 1,
+                                                   dim_array)
                                 .gen_nested_loop_desc())
         # Fake nested loop, with zero filter size.
         self.nld['ZERO_FIL'] = NestedLoopDesc(loopcnt=(12, 10, 4),
@@ -163,18 +169,15 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.cost = Cost(mac_op=1, mem_hier=(200, 6, 2, 1),
                          noc_hop=50, unit_static=50)
 
-        # Partition occupation.
-        self.part_occ = 0.91
-
 
     def _lbs(self, bl_ts, bl_ords=None, wlkey='BASE', rsrckey='BASE',
-             optkey='BASE', part_occ=1):
+             optkey='BASE'):
         ''' Make a LoopBlockingScheme instance. '''
         bl_ords = (tuple(range(le.NUM)), tuple(range(le.NUM))) \
                 if not bl_ords else bl_ords
         return LoopBlockingScheme(self.nld[wlkey], bl_ts, bl_ords,
                                   self.resource[rsrckey], self.bufshr,
-                                  part_occ, self.options[optkey])
+                                  self.options[optkey])
 
     def _gen_loopblocking_all(self, wlkey='BASE'):
         ''' Generate all combinations of loop blocking factors and orders. '''
@@ -233,10 +236,10 @@ class TestLoopBlockingFixture(unittest.TestCase):
         ''' Make a partitioned NestedLoopDesc and its partition occupation. '''
         p_layer, p_batch_size, p_occ = part.part_layer(self.layer[layerkey],
                                                        self.batch_size)
-        p_nld = next(MapStrategyEyeriss(p_layer, p_batch_size,
+        p_nld = next(MapStrategyEyeriss(p_layer, p_batch_size, p_occ,
                                         self.resource['PAR'].dim_array)
                      .gen_nested_loop_desc())
-        return p_nld, p_occ
+        return p_nld
 
     def _gen_all_partition(self, layerkey='PAR'):
         '''

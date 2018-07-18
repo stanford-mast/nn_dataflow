@@ -22,12 +22,11 @@ import heapq
 import itertools
 from multiprocessing import Pool
 
-from . import data_category_enum as de
 from . import loop_blocking_solver
 from . import loop_enum as le
 from .. import util
 from .buf_shr_scheme import BufShrScheme
-from .data_dim_loops import DataDimLoops
+from .layer import ConvLayer
 from .loop_blocking_scheme import LoopBlockingScheme
 
 '''
@@ -107,16 +106,8 @@ def skip_conv(bl_ts, bl_ords):
     return False
 
 
-def _is_conv_loops(nested_loop_desc):
-    return (nested_loop_desc.data_loops[de.FIL] == DataDimLoops(le.IFM, le.OFM)
-            and nested_loop_desc.data_loops[de.IFM] \
-                    == DataDimLoops(le.IFM, le.BAT)
-            and nested_loop_desc.data_loops[de.OFM] \
-                    == DataDimLoops(le.OFM, le.BAT))
-
-
 def _gen_loopblocking_perprocess(
-        nested_loop_desc, resource, bufshr, cost, part_occ, options,
+        nested_loop_desc, resource, bufshr, cost, options,
         gen_tifm, gen_tofm, gen_tbat, gen_ords):
 
     def _gen_bl_ts():
@@ -135,12 +126,12 @@ def _gen_loopblocking_perprocess(
 
     def _sweep():
         ''' Sweep all. '''
-        is_conv_loops = _is_conv_loops(nested_loop_desc)
+        is_conv_loops = (nested_loop_desc.data_loops == ConvLayer.data_loops())
         for bl_ts, bl_ords in itertools.product(_gen_bl_ts(), gen_ords):
             if is_conv_loops and skip_conv(bl_ts, bl_ords):
                 continue
             lbs = LoopBlockingScheme(
-                nested_loop_desc, bl_ts, bl_ords, resource, bufshr, part_occ,
+                nested_loop_desc, bl_ts, bl_ords, resource, bufshr,
                 options)
             yield lbs
 
@@ -148,7 +139,7 @@ def _gen_loopblocking_perprocess(
                            key=lambda lbs: (lbs.get_cost(cost), lbs.time))
 
 
-def gen_loopblocking(nested_loop_desc, resource, part, cost, part_occ, options):
+def gen_loopblocking(nested_loop_desc, resource, part, cost, options):
     '''
     Generator for loop blocking.
     '''
@@ -158,12 +149,13 @@ def gen_loopblocking(nested_loop_desc, resource, part, cost, part_occ, options):
                           nested_loop_desc.data_loops)
 
     # Solver only works for CONV layer.
-    if options.sw_solve_loopblocking and _is_conv_loops(nested_loop_desc):
+    if options.sw_solve_loopblocking \
+            and nested_loop_desc.data_loops == ConvLayer.data_loops():
         gen = loop_blocking_solver.gen_loopblocking_gbuf_reside
 
         for bl_ts, bl_ords in gen(nested_loop_desc, resource, options):
             lbs = LoopBlockingScheme(nested_loop_desc, bl_ts, bl_ords,
-                                     resource, bufshr, part_occ, options)
+                                     resource, bufshr, options)
             yield lbs
         return
 
@@ -209,7 +201,7 @@ def gen_loopblocking(nested_loop_desc, resource, part, cost, part_occ, options):
     list_ords = list(gen_ords)
     for tifm, tofm in itertools.product(gen_tifm, gen_tofm):
         r = apply_func(_gen_loopblocking_perprocess,
-                       (nested_loop_desc, resource, bufshr, cost, part_occ,
+                       (nested_loop_desc, resource, bufshr, cost,
                         options, [tifm], [tofm], list_tbat, list_ords))
         results.append(r)
 

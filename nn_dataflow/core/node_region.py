@@ -25,6 +25,7 @@ from .phy_dim2 import PhyDim2
 
 NODE_REGION_LIST = ['dim',
                     'origin',
+                    'dist',
                     'type',
                    ]
 
@@ -33,24 +34,32 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
     A node region defined by the dimension and origin offset.
 
     The `type` attribute specifies the region type, which could be `PROC` for
-    computation processing nodes or 'DATA' for data storage nodes.
+    computation processing nodes or 'DRAM' for off-chip data storage nodes.
 
-    NOTES: we cannot overload __contains__ and __iter__ as a node container,
+    NOTE: we cannot overload __contains__ and __iter__ as a node container,
     because the base namedtuple already defines them.
     '''
 
     # Type enums.
     PROC = 0
-    DATA = 1
+    DRAM = 1
     NUM = 2
 
     def __new__(cls, *args, **kwargs):
-        ntp = super(NodeRegion, cls).__new__(cls, *args, **kwargs)
+
+        # Set default values.
+        kwargs2 = kwargs.copy()
+        if len(args) <= NODE_REGION_LIST.index('dist'):
+            kwargs2.setdefault('dist', PhyDim2(1, 1))
+
+        ntp = super(NodeRegion, cls).__new__(cls, *args, **kwargs2)
 
         if not isinstance(ntp.dim, PhyDim2):
             raise TypeError('NodeRegion: dim must be a PhyDim2 object.')
         if not isinstance(ntp.origin, PhyDim2):
             raise TypeError('NodeRegion: origin must be a PhyDim2 object.')
+        if not isinstance(ntp.dist, PhyDim2):
+            raise TypeError('NodeRegion: dist must be a PhyDim2 object.')
 
         if ntp.type not in range(cls.NUM):
             raise ValueError('NodeRegion: type must be a valid type enum.')
@@ -58,32 +67,23 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
         return ntp
 
     def contains_node(self, coordinate):
-        ''' Whether the region contains the given coordinate. '''
-        min_coord = self.origin
-        max_coord = self.origin + self.dim
-        return all(cmin <= c and c < cmax for c, cmin, cmax
-                   in zip(coordinate, min_coord, max_coord))
+        ''' Whether the region contains the given absolute node coordinate. '''
+        return coordinate in self.iter_node()
 
-    def node_iter(self):
-        ''' Iterate through all nodes in the region. '''
-        gens = []
-        for o, d in zip(self.origin, self.dim):
-            gens.append(xrange(o, o + d))
-        cnt = 0
-        for tp in itertools.product(*gens):
-            coord = PhyDim2(*tp)
-            assert self.contains_node(coord)
-            cnt += 1
-            yield coord
+    def iter_node(self):
+        ''' Iterate through all absolute node coordinates in the region. '''
+        for rel_coord in itertools.product(*[range(d) for d in self.dim]):
+            yield self.rel2abs(PhyDim2(*rel_coord))
 
     def rel2abs(self, rel_coordinate):
         ''' Convert relative node coordinate to absolute node coordinate. '''
         if not isinstance(rel_coordinate, PhyDim2):
             raise TypeError('NodeRegion: relative coordinate must be '
                             'a PhyDim2 object.')
-        abs_coordinate = self.origin + rel_coordinate
-        if not self.contains_node(abs_coordinate):
-            raise ValueError('NodeRegion: relative coordinate {} is not '
-                             'in node region {}'.format(rel_coordinate, self))
+        if not all(0 <= c < d for c, d in zip(rel_coordinate, self.dim)):
+            raise ValueError('NodeRegion: relative coordinate {} is not in '
+                             'node region {}.'.format(rel_coordinate, self))
+
+        abs_coordinate = self.origin + rel_coordinate * self.dist
         return abs_coordinate
 

@@ -29,7 +29,7 @@ Simonyan and Zisserman, 2014
 
 NN = Network('VGG19')
 
-NN.set_input(InputLayer(3, 224))
+NN.set_input_layer(InputLayer(3, 224))
 
 NN.add('conv1', ConvLayer(3, 64, 224, 3))
 NN.add('conv2', ConvLayer(64, 64, 224, 3))

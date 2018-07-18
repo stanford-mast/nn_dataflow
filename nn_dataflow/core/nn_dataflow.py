@@ -22,6 +22,8 @@ import sys
 
 from . import partition
 from .cost import Cost
+from .data_layout import DataLayout
+from .fmap_range import FmapPosition, FmapRange
 from .map_strategy import MapStrategy
 from .network import Network
 from .nn_dataflow_scheme import NNDataflowScheme
@@ -53,14 +55,8 @@ class NNDataflow(object):
 
         # Dict of layer Scheduling instances.
         self.layer_sched_dict = {}
-
-    def schedule_search(self, options):
-        '''
-        Search the optimized dataflows.
-        '''
-        # Scheduling instance dict. Use the same instance for all same layers
-        # in order to exploit its scheduling cache.
-        self.layer_sched_dict = {}
+        # Use the same instance for all same layers in order to exploit its
+        # scheduling cache.
         layer2sched = {}
         for layer_name in self.network:
             layer = self.network[layer_name]
@@ -71,118 +67,120 @@ class NNDataflow(object):
                 layer2sched[layer] = sched
             self.layer_sched_dict[layer_name] = sched
 
+    def schedule_search(self, options):
+        '''
+        Search the optimized dataflows.
+        '''
+        # Clear and reset.
+        nndf_tops = []
+
         # Initial input layout.
-        dfsch_list = []
         for input_layout in self._gen_input_layout(options):
-            dfsch = NNDataflowScheme(self.network, input_layout)
-            dfsch_list.append(dfsch)
+            nndf = NNDataflowScheme(self.network, input_layout)
+            nndf_tops.append(nndf)
 
         # Schedule layers.
         for layer_name in self.network:
             if options.verbose:
                 sys.stderr.write('-> {}\n'.format(layer_name))
                 sys.stderr.flush()
-            dfsch_list = self._layer_schedule_search(
-                layer_name, dfsch_list, options)
+
+            nndf_tops = self._layer_schedule_search(
+                layer_name, nndf_tops, options)
 
         # Cache stats.
         cache_hits = 0
         cache_misses = 0
-        for sched in layer2sched.values():
+        seen_scheds = set()
+        for sched in self.layer_sched_dict.values():
+            if sched in seen_scheds:
+                continue
+            seen_scheds.add(sched)
             h, m = sched.cache_stats()
             cache_hits += h
             cache_misses += m
 
-        return dfsch_list, (cache_hits, cache_misses)
+        return nndf_tops, (cache_hits, cache_misses)
 
-    def _layer_schedule_search(self, layer_name, dfsch_list, options):
+    def _layer_schedule_search(self, layer_name, prev_nndf_tops, options):
         '''
-        Schedule the given layer under the previous layer scheduling results.
-        `dfsch_list` contains up to top n NNDataflowScheme for the previous
-        layers.
+        Schedule the given layer under the given previous top NNDataflowScheme
+        instances in 'prev_nndf_tops`.
+
+        Return new top NNDataflowScheme instances that include this layer.
         '''
+        nndf_tops = []
 
         layer_sched = self.layer_sched_dict[layer_name]
 
-        new_dfsch_list = []
-
-        for ifmap_layout, dfsch_idx in self._gen_layer_ifmap_layout(
-                layer_name, dfsch_list, options):
+        for ifmap_layout, prev_nndf in self._gen_layer_ifmap_layout(
+                layer_name, prev_nndf_tops):
 
             condition = SchedulingCondition(resource=self.resource,
                                             ifmap_layout=ifmap_layout)
 
             try:
-                tops = layer_sched.schedule_search(condition, options)
+                sched_tops = layer_sched.schedule_search(condition, options)
             except Exception:
                 sys.stderr.write('Failed when scheduling layer {}.\n'
                                  .format(layer_name))
                 raise
 
-            if not tops:
-                sys.stderr.write('Layer {} has no valid schedule.\n'
-                                 .format(layer_name))
-
             # Append all the current layer top schedules to all the previous top
             # schedules with the matching fmap layout.
-            for t in tops:
-                dfsch = dfsch_list[dfsch_idx].copy()
-                dfsch[layer_name] = t
-                new_dfsch_list.append(dfsch)
+            for t in sched_tops:
+                nndf = prev_nndf.copy()
+                nndf[layer_name] = t
+                nndf_tops.append(nndf)
 
         # Always pick and keep top n at each layer.
-        return sorted(new_dfsch_list, key=lambda dfsch: dfsch.total_cost
-                     )[:options.ntops]
+        return sorted(nndf_tops, key=NNDataflowScheme.cmp_key)[:options.ntops]
 
-    def _gen_layer_ifmap_layout(self, layer_name, dfsch_list, options):
+    def _gen_layer_ifmap_layout(self, layer_name, prev_nndf_tops):
         '''
-        Generator to get all the choices of ifmap layout for the layer.
+        Generate all choices of ifmap layout for the layer, based on the given
+        previous top NNDataflowScheme instances in `prev_nndf_tops`.
 
-        Return the ifmap layout, and the corresponding NNDataflowScheme index
-        in the list.
+        Return the ifmap layout, and the corresponding NNDataflowScheme.
         '''
+        prevs = self.network.prevs(layer_name)
+        assert prevs
 
-        del options
+        def _ofmap_layout(nndf, prev_layer_name):
+            return nndf[prev_layer_name].ofmap_layout if prev_layer_name \
+                    else nndf.input_layout
 
-        prev_layer_names, merge_symbol = self.network.prev_layers(layer_name)
-        assert prev_layer_names
-
-        def _ofmap_layout(dfsch, pl_name):
-            return dfsch[pl_name].ofmap_layout if pl_name is not None \
-                    else dfsch.input_layout
-
-        for idx, dfsch in enumerate(dfsch_list):
+        for nndf in prev_nndf_tops:
             # Merge all previous layer ofmap layouts to get the ifmap layout.
-            ifmap_layout = _ofmap_layout(dfsch, prev_layer_names[0])
-            for pl_name in prev_layer_names[1:]:
-                ifmap_layout = ifmap_layout.merge(merge_symbol,
-                                                  _ofmap_layout(dfsch, pl_name))
-
-            # Remap dst memory to src memory.
-            origin_diff = self.resource.src_data_region().origin \
-                    - self.resource.dst_data_region().origin
-            ifmap_layout = ifmap_layout.view(origin_diff=origin_diff)
+            ifmap_layout = DataLayout.concat(*[_ofmap_layout(nndf, p)
+                                               for p in prevs])
 
             # We already checked the ofmap layout dimension in Scheduling, and
             # the prev/next layer dimensions in Network, so ifmap_layout ==
             # layer == prev_layers == ofmap_layout.
 
-            yield ifmap_layout, idx
+            yield ifmap_layout, nndf
 
     def _gen_input_layout(self, options):
         '''
         Get the input layer layout choices.
         '''
-
         input_layer = self.network.input_layer()
+        input_frng = FmapRange(FmapPosition(b=0, n=0, h=0, w=0),
+                               FmapPosition(b=self.batch_size,
+                                            n=input_layer.nofm,
+                                            h=input_layer.hofm,
+                                            w=input_layer.wofm))
 
-        input_region = self.resource.dst_data_region()
+        input_region = self.resource.src_data_region
 
         for part in partition.gen_partition(input_layer, self.batch_size,
                                             input_region.dim, options,
                                             guaranteed=True):
-            input_layout = partition.get_ofmap_layout(
-                input_layer, self.batch_size, part, input_region)
+            input_layout = DataLayout(
+                frngs=(input_frng,),
+                regions=(input_region,),
+                parts=(part.projection(input_region, appl2frng=True),))
 
             yield input_layout
 
