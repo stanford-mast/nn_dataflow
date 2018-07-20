@@ -18,7 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from collections import namedtuple
 import unittest
 
 from nn_dataflow.core import InputLayer, ConvLayer, FCLayer, PoolingLayer
@@ -291,22 +290,19 @@ class TestPipelineFixture(unittest.TestCase):
 
         # Data availability.
 
-        # Mapping of available layer data to its output data access pattern and
-        # the spatial scheduling index.
-        avail_data = {}
+        seg_layers = set(l for ltpl in segment for l in ltpl)
 
         class OutAccPat(object):
             ''' Output data access pattern types. '''
             # pylint: disable=too-few-public-methods
-            ANY = 0  # can access in any way
-            DBF = 1  # must double-buffer
-            SEQ = 2  # must consume sequentially
-            RED = 3  # can only be used for reduction in local-region layers
+            ANY = 0   # can access in any way
+            DBF = -1  # must double-buffer
+            # SEQ: use any positive value to represent sequential access with
+            # certain number of groups.
 
-        # pylint: disable=invalid-name
-        AvailDataValType = namedtuple('AvailDataValType', ['oap', 'sp'])
-
-        seg_layers = set(l for ltpl in segment for l in ltpl)
+        # Available data in each spatial subregions. Each is represented by a
+        # tuple of layer name and its output data access pattern.
+        avail_data = [(None, OutAccPat.ANY) for _ in segment]
 
         # Whether to defer fully buffering output.
         fb_out = False
@@ -327,21 +323,55 @@ class TestPipelineFixture(unittest.TestCase):
                 for pl in prev_layers:
                     if pl not in seg_layers:
                         # Off-chip sources.
-                        prev_oaps.append(OutAccPat.ANY)
+                        poap = OutAccPat.ANY
+                    elif pl in ltpl:
+                        # On-chip and local.
+                        self.assertEqual(avail_data[sp_idx][0], pl,
+                                         '_validate_constraint: layer {} ({}) '
+                                         'local source data {} not available, '
+                                         'maybe not the immediate previous.'
+                                         .format(layer, (sp_idx, tm_idx), pl))
+                        poap = avail_data[sp_idx][1]
                     else:
-                        # On-chip, must be available.
-                        self.assertIn(pl, avail_data,
-                                      '_validate_constraint: layer {} ({}) '
-                                      'source data {} not available on-chip.'
-                                      .format(layer, (sp_idx, tm_idx), pl))
-                        prev_oaps.append(avail_data[pl].oap)
+                        # On-chip and neighbor.
+                        poap = next((avail_data[p_sp_idx][1]
+                                     for p_sp_idx in range(sp_idx)
+                                     if avail_data[p_sp_idx][0] == pl),
+                                    None)
+                        self.assertFalse(poap is None,
+                                         '_validate_constraint: layer {} ({}) '
+                                         'neighbor source data {} not '
+                                         'available on-chip.'
+                                         .format(layer, (sp_idx, tm_idx), pl))
+                    prev_oaps.append(poap)
                 # Only buffer input if having source on-chip.
                 has_src = not seg_layers.isdisjoint(prev_layers)
 
+                # The single SEQ source.
+                seq = None
+                seq_prev_oaps = [poap for poap in prev_oaps if poap > 0]
+                if seq_prev_oaps:
+                    self.assertEqual(len(seq_prev_oaps), 1,
+                                     '_validate_constraint: layer {} ({}) '
+                                     'has multiple SEQ input.'
+                                     '\nsrcs: {}, oaps: {}'
+                                     .format(layer, (sp_idx, tm_idx),
+                                             prev_layers, prev_oaps))
+                    seq = seq_prev_oaps[0]
+
                 # Destination data.
-                next_layers = segment.network.nexts(layer)
                 # Only buffer output if having destination on-chip.
+                next_layers = segment.network.nexts(layer)
                 has_dst = not seg_layers.isdisjoint(next_layers)
+
+                # Validation.
+
+                if not has_src:
+                    self.assertEqual(cstr.topifm, 0,
+                                     '_validate_constraint: layer {} ({}) '
+                                     'should not constrain input as it '
+                                     'does not have on-chip sources.'
+                                     .format(layer, (sp_idx, tm_idx)))
 
                 if isinstance(segment.network[layer], ConvLayer):
 
@@ -350,87 +380,103 @@ class TestPipelineFixture(unittest.TestCase):
                                      'buffering from {} has not been realized.'
                                      .format(fb_out_conv))
 
-                    lcl_pl_idx = [idx for idx, pl in enumerate(prev_layers)
-                                  if pl in ltpl]
-                    if lcl_pl_idx:
-                        # Local source must fully buffer its output.
-                        self.assertEqual(len(lcl_pl_idx), 1)
-                        lcl_poap = prev_oaps[lcl_pl_idx[0]]
+                    if any(pl in ltpl for pl in prev_layers):
+                        # Local source.
+                        lcl_poap = avail_data[sp_idx][1]
                         self.assertTrue(lcl_poap == OutAccPat.DBF
                                         or lcl_poap == OutAccPat.ANY,
-                                        '_validate_constraint: local source '
-                                        'of layer {} ({}), {}, must fully '
+                                        '_validate_constraint: layer {} ({}) '
+                                        'local source data {} must fully '
                                         'buffer output.'
                                         .format(layer, (sp_idx, tm_idx),
-                                                prev_layers[lcl_pl_idx[0]]))
+                                                lcl_poap))
 
-                    self.assertNotIn(OutAccPat.RED, prev_oaps,
-                                     '_validate_constraint: layer {} ({}) is '
-                                     'CONV type but has RED source.'
-                                     'src: {}, oap: {}'
-                                     .format(layer, (sp_idx, tm_idx),
-                                             prev_layers, prev_oaps))
-
-                    if OutAccPat.SEQ in prev_oaps and has_dst:
-                        # Some source data require sequential access, must
-                        # fully buffer CONV output (deferred).
-                        fb_out = True
-
+                    # DBF source.
                     if OutAccPat.DBF in prev_oaps:
-                        # Some source data require double-buffering, must
-                        # fully buffer CONV input.
+                        # Must fully buffer CONV input.
                         self.assertEqual(cstr.topifm, 1,
-                                         '_validate_constraint: input of '
-                                         'layer {} ({}) not fully buffered '
-                                         'but with DBF source.\n'
-                                         'src: {}, oap: {}'
+                                         '_validate_constraint: layer {} ({}) '
+                                         'input is not fully buffered but has '
+                                         'DBF source.\nsrcs: {}, oaps: {}'
+                                         '\n{}'
+                                         .format(layer, (sp_idx, tm_idx),
+                                                 prev_layers, prev_oaps,
+                                                 cstr))
+
+                    # SEQ source.
+                    if seq and has_dst:
+                        # Must match SEQ.
+                        self.assertEqual(cstr.topifm, seq,
+                                         '_validate_constraint: layer {} ({}) '
+                                         'input groups ({}) and its SEQ src '
+                                         'output groups ({}) are mismatched.'
+                                         '\nsrcs: {}, oaps: {}'
+                                         .format(layer, (sp_idx, tm_idx),
+                                                 cstr.topifm, seq,
+                                                 prev_layers, prev_oaps))
+                        # Also must fully buffer CONV output.
+                        self.assertEqual(cstr.topofm, 1,
+                                         '_validate_constraint: layer {} ({}) '
+                                         'output is not fully buffered but has '
+                                         'SEQ source.\nsrcs: {}, oaps: {}'
                                          .format(layer, (sp_idx, tm_idx),
                                                  prev_layers, prev_oaps))
+                        # Deferred apply to the last layer in the group.
+                        fb_out = True
+                        fb_out_conv = layer
 
                     oap = None
-                    if cstr.topifm == 1:
-                        if cstr.topofm == 1:
+                    if cstr.topofm == 1:
+                        if cstr.topifm == 1:
                             # Fully buffer both, can access output in any way.
                             # This is fine as we require to buffer either input
                             # or output for CONV (see below).
                             oap = OutAccPat.ANY
                         else:
-                            oap = OutAccPat.SEQ
-                    elif cstr.topofm == 1:
-                        oap = OutAccPat.DBF
-                    elif fb_out:
-                        # Output is only available to local-region layers.
-                        oap = OutAccPat.RED
-                    elif not has_src:
-                        # Input can be viewed as fully buffered in memory.
-                        oap = OutAccPat.SEQ
-                    else:
-                        # Output can be viewed as fully buffered in memory.
-                        self.assertFalse(has_dst,
-                                         '_validate_constraint: layer {} ({}) '
-                                         'fully buffers neither data.'
-                                         .format(layer, (sp_idx, tm_idx)))
+                            oap = OutAccPat.DBF
+                    elif has_dst:
+                        self.assertGreater(cstr.topofm, 0,
+                                           '_validate_constraint: layer {} '
+                                           '({}) output access is '
+                                           'unconstrained.\ncstr: {}.'
+                                           .format(layer, (sp_idx, tm_idx),
+                                                   cstr))
+                        oap = cstr.topofm
+                        if has_src:
+                            self.assertEqual(cstr.topifm, 1,
+                                             '_validate_constraint: layer {} '
+                                             '({}) has on-chip src and dst '
+                                             'but neither input nor output '
+                                             'are fully buffered.\ncstr: {}.'
+                                             .format(layer, (sp_idx, tm_idx),
+                                                     cstr))
 
                 else:
 
-                    # Stream process, no requirement on source.
+                    # SEQ source.
+                    if seq and has_dst:
+                        # Must match SEQ, or fully buffer output.
+                        self.assertTrue(cstr.topofm == seq or cstr.topofm == 1,
+                                        '_validate_constraint: layer {} ({}) '
+                                        'output is not fully buffered, and '
+                                        'groups ({}) and its SEQ src output '
+                                        'groups ({}) are mismatched.'
+                                        '\nsrcs: {}, oaps: {}'
+                                        .format(layer, (sp_idx, tm_idx),
+                                                cstr.topofm, seq,
+                                                prev_layers, prev_oaps))
 
-                    oap = OutAccPat.ANY
                     if cstr.topofm == 1:
                         # Fully buffer output.
                         oap = OutAccPat.DBF
-                    elif OutAccPat.SEQ in prev_oaps:
-                        # If there is SEQ input, output must also SEQ.
-                        oap = OutAccPat.SEQ
+                    else:
+                        # SEQ output.
+                        oap = cstr.topofm
 
                 # Realize deferred fully buffering output.
                 if cstr.topofm == 1:
                     fb_out = False  # reset
 
                 # Overwrite the previous temporal scheduling.
-                avail_data = {l: avail_data[l] for l in avail_data
-                              if avail_data[l].sp != sp_idx}
-                # Add this layer.
-                if oap is not None:
-                    avail_data[layer] = AvailDataValType(oap=oap, sp=sp_idx)
+                avail_data[sp_idx] = (layer, oap)
 

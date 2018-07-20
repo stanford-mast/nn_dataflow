@@ -18,9 +18,14 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from collections import namedtuple
+from collections import namedtuple, OrderedDict, Counter
+import itertools
 
-from . import loop_enum as le
+from sympy import symbols
+from sympy import Eq as symeq
+from sympy.core.containers import Tuple as symtuple
+from sympy.functions.elementary.piecewise import Piecewise as sympiecewise
+
 from .. import util
 from .layer import ConvLayer
 from .network import Network
@@ -69,6 +74,9 @@ class PipelineSegment(object):
         if not self.valid:
             return
 
+        # Scheduling constraints.
+        self._init_sym_cstrs()
+
     def allocation(self):
         '''
         Get resource allocation, as a tuple of sub-tuples corresponding to the
@@ -84,82 +92,34 @@ class PipelineSegment(object):
         sub-tuples of SchedulingConstraint instances, corresponding to the
         layers in the segment.
 
-        Yield the segment constraint tuple, and information for pruning and
-        early termination. The information includes:
-
-        - ff_end: if True, starting from (including) the current constraint,
-          the constraints will have NO strictness relation with the previous
-          ones. Between two ff_end points, the constraints are guaranteed to be
-          increasingly strict. If previously we have encountered an infeasible
-          constraint, we can fast forward until a ff_end point.
-
-        Rules for constraints.
-
-        1. Top BAT loop factor.
-
-        With a single spatial scheduling, there is no constraint on top BAT
-        loop factor. Otherwise all layers must share the same factor.
-
-        2. Fully buffered data category (ifmaps or ofmaps).
-
-        Only CONV layers require fully buffered data. Local-region layers
-        process data in a streaming manner. We group each CONV layer, and all
-        local-region layers immediately following it within the same spatial
-        scheduling, into a group. The fully buffering requirements only apply
-        to the first layer (ifmaps) or the last layer (ofmaps) in the group.
-        Layers in between do not need to fully buffer.
-
-        For a group G in the segment,
-
-        - (initial) if G is both first spatial and temporal scheduled, it can
-          choose whether to fully buffer ofmaps or not. This is a configuration
-          to explore.
-
-        - (between spatial) if G has a source from G' in another spatial
-          scheduling, the source, as a neighbor source dependency, must be the
-          last temporal scheduled in both G' and that spatial scheduling,
-          - If G' fully buffers only ofmaps, G fully buffers ifmaps.
-          - Otherwise, make G' fully buffer ifmaps, and G fully buffer ofmaps
-            (we bias this case as it can reduce the pipeline filling delay).
-
-        - (between temporal) if G has a source from G' in the same spatial
-          scheduling, the source, as a local source dependency, must be
-          immediately before G. G' must fully buffer ofmaps, and G must fully
-          buffer ifmaps.
+        Yield the segment constraint tuple, and hints for pruning.
         '''
+        syms = self.cstr_symvals.keys()
+        vals = self.cstr_symvals.values()
+        assert syms and vals
 
-        # Top BAT factors, sorted from smallest to largest.
-        def _top_tb_cands():
-            cands = [None] if len(self.seg) == 1 else \
-                (t for t, _ in util.factorize(self.batch_size, 2))
-            return sorted(cands)
+        for valp in itertools.product(*vals):
 
-        # Start with fully buffer ofmaps or not.
-        sfbo_cands = [False] if len(self.seg) == 1 else [True, False]
+            constraint = tuple()
 
-        # Pruning info.
-        ff_end = False
-        constraint_set = set()
+            for atpl in self._subs_symargs(self.cstr_symargs, zip(syms, valp)):
+                ctpl = tuple()
+                for a in atpl:
+                    # Construct kwargs, adjust the types of the values.
+                    kwargs = {}
+                    kwargs['topbat'] = int(a.get('topbat', 0))
+                    kwargs['fbifm'] = bool(a.get('fbifm', False))
+                    if not kwargs['fbifm']:
+                        kwargs['topifm'] = int(a.get('topifm', 0))
+                    kwargs['fbofm'] = bool(a.get('fbofm', False))
+                    if not kwargs['fbofm']:
+                        kwargs['topofm'] = int(a.get('topofm', 0))
 
-        for sfbo in sfbo_cands:
+                    c = Cstr(**kwargs)
+                    ctpl += (c,)
+                constraint += (ctpl,)
 
-            for top_tb in _top_tb_cands():
-
-                conditions = (top_tb, sfbo)
-
-                constraint = self._make_constraint(*conditions)
-
-                if constraint and constraint not in constraint_set:
-
-                    yield constraint, ff_end
-
-                    # Reset info until next set.
-                    ff_end = False
-
-                    constraint_set.add(constraint)
-
-            # Smaller top tb factors are more strict than larger ones.
-            ff_end = True
+            yield constraint, None
 
     def __getitem__(self, index):
         return self.seg[index]
@@ -228,23 +188,23 @@ class PipelineSegment(object):
         self.dst_dict = [[None for _ in ltpl] for ltpl in self.seg]
 
         # Mapping from layer to spatial/temporal indices in the segment.
-        layer2idx = {layer: PipelineSegment.SchedIndex(sp_idx, tm_idx)
+        layer2idx = {l: PipelineSegment.SchedIndex(sp_idx, tm_idx)
                      for sp_idx, ltpl in enumerate(self.seg)
-                     for tm_idx, layer in enumerate(ltpl)}
+                     for tm_idx, l in enumerate(ltpl)}
 
         for sp_idx, ltpl in enumerate(self.seg):
 
             cnt_nbr_src = 0
 
-            for tm_idx, layer in enumerate(ltpl):
+            for tm_idx, l in enumerate(ltpl):
 
-                assert layer2idx[layer] == (sp_idx, tm_idx)
+                assert layer2idx[l] == (sp_idx, tm_idx)
 
                 # Sources.
                 src = tuple()
 
-                prevs = self.network.prevs(layer)
-                assert all(p not in layer2idx or layer2idx[p] < layer2idx[layer]
+                prevs = self.network.prevs(l)
+                assert all(p not in layer2idx or layer2idx[p] < layer2idx[l]
                            for p in prevs)
                 mem_src = [p for p in prevs if p not in layer2idx]
                 lcl_src = [p for p in prevs if p not in mem_src
@@ -279,8 +239,8 @@ class PipelineSegment(object):
                 # Destinations.
                 dst = tuple()
 
-                nexts = self.network.nexts(layer)
-                assert all(n not in layer2idx or layer2idx[n] > layer2idx[layer]
+                nexts = self.network.nexts(l)
+                assert all(n not in layer2idx or layer2idx[n] > layer2idx[l]
                            for n in nexts)
                 mem_dst = [n for n in nexts if n not in layer2idx]
                 lcl_dst = [n for n in nexts if n not in mem_dst
@@ -464,113 +424,268 @@ class PipelineSegment(object):
 
         return subregions
 
-    def _make_constraint(self, *conditions):
+    def _init_sym_cstrs(self):
         '''
-        Make scheduling constraint for the segment under the given conditions.
+        Initialize the symbolic scheduling constraints for the layers in the
+        segment, by constructing a nested lists of dicts `cstr_symargs` whose
+        values can be symbolic expressions for the keyword arguments of layers
+        in the segment, and a dict `cstr_symvals` mapping each symbol to its
+        possible numerical values.
 
-        See gen_constraint() for the rules.
+        Rules for constraints.
+
+        - Top BAT loop factor.
+
+        With a single spatial scheduling, there is no constraint on the top BAT
+        loop factor. Otherwise all layers must share the same factor, namely
+        `topbat_shr`.
+
+        - Fmap forwarding and fully buffering.
+
+        Only CONV layers require to fully buffer fmaps. Local-region layers
+        process data in a streaming manner.
+
+        Each CONV layer, and all local-region layers immediately following it
+        within the same spatial scheduling, are made into a group G.
+
+        (initial) if G is both the first spatial and the first temporal
+        scheduling with a CONV layer, it can choose whether to fully buffer
+        ofmaps or not. This is a configuration to explore, namely `fbofm_init`.
+
+        (within-group) within G, the CONV layer, and all local-region layers,
+        should use the same top OFM factors (IFM factors are automatically
+        determined by OFM factors in local-region layers), unless CONV ofmaps
+        need to be fully buffered, in which case, the CONV layer and the last
+        layer in G fully buffer ofmaps (top OFM factor is 1), and other layers
+        still use the same top OFM factors but can be different than 1.
+
+        (inter-temporal) if G has a source from G' in the same spatial
+        scheduling (which must be immediately before G), G should fully buffer
+        ifmaps, and G' should fully buffer ofmaps.
+
+        (inter-spatial) if G has a source from G' in another spatial scheduling
+        (where the source must be the last temporal scheduling in G' and that
+        spatial scheduling),
+        (a) if G' already fully buffers ofmaps, make G fully buffer ifmaps.
+        (b) otherwise, make G fully buffer ofmaps (do not require G' to fully
+            buffer ifmaps; leave it to other rules, e.g. inter-temporal, to
+            decide); forward data between G' and G, by matching their top O/IFM
+            factors (biasing this case for smaller pipeline filling delay).
+        Notice the destination can be: (1) the leading CONV layer, whose top
+        IFM factor is constrained; (2) a local-region layer, where we constrain
+        the top OFM factors of this group (except otherwise constrained by
+        fully buffering ofmaps).
         '''
+        # pylint: disable=too-many-branches
 
-        top_tb, sfbo = conditions
+        # Symbolic variables mapping to numerical values.
+        symvals = dict()
 
-        # Single spatial scheduling does not have requirements for top tb and
-        # starting fully buffering.
-        assert len(self.seg) > 1 or top_tb is None
-        assert len(self.seg) > 1 or not sfbo
+        if len(self.seg) > 1:
+            # Top BAT loop factor.
+            topbat = symbols('topbat_shr', integer=True)
+            symvals[topbat] = \
+                [t for t, _ in util.factorize(self.batch_size, 2)]
+            # Whether the initial CONV layer fully buffers ofmaps.
+            fbofm_init = symbols('fbofm_init')
+            symvals[fbofm_init] = [False, True]
+        else:
+            topbat = 0
+            fbofm_init = False
 
-        if top_tb is None:
-            top_tb = 0
+        def _layer_topofm_vals(layer_name):
+            layer = self.network[layer_name]
+            vals = [t for t, _ in util.factorize(layer.nofm, 2)]
+            return vals
 
-        # Scheduling indices for the last CONV layer.
-        last_idx = PipelineSegment.SchedIndex(-1, 0)
-        # Whether to fully buffer ofmaps for the last group (defer applying to
-        # the last layer of the group).
-        last_fbo = False
+        # Layer constraint kwargs.
+        symargs = [[{'topbat': topbat} for _ in ltpl] for ltpl in self.seg]
 
-        # Top loop factor for each layer.
-        top_bl_t_list = [[[0] * le.NUM for _ in ltpl] for ltpl in self.seg]
+        # The last CONV layer index.
+        last_conv = PipelineSegment.SchedIndex(-1, 0)
+
+        # Whether the current group needs to fully buffer ofmap. Delayed apply
+        # to the last layer in the group.
+        curr_fbofm = False
 
         for sp_idx, ltpl in enumerate(self.seg):
 
-            for tm_idx, layer in enumerate(ltpl):
+            # Initial topofm, in case of a non-CONV starting layer.
+            curr_topofm = symbols('topofm_{}_s'.format(sp_idx), integer=True)
+            symvals[curr_topofm] = _layer_topofm_vals(ltpl[0])
 
-                top_bl_t_list[sp_idx][tm_idx][le.BAT] = top_tb
+            for tm_idx, l in enumerate(ltpl):
 
-                if isinstance(self.network[layer], ConvLayer):
+                layer = self.network[l]
+                curr_sa = symargs[sp_idx][tm_idx]
 
-                    # Defer applying fully buffer ofmaps to the last group.
-                    if last_fbo:
-                        if last_idx.sp_idx == sp_idx:
-                            # Last group is in the same spatial scheduling.
-                            # Apply to immediate previous layer.
-                            assert tm_idx >= 1
-                            top_bl_t_list[sp_idx][tm_idx - 1][le.OFM] = 1
+                # Neighbor source dependency.
+                nsrc_sa = None
+                src_deps = self.src_dict[sp_idx][tm_idx]
+                if any(s is not None for s in src_deps):
+                    assert len(src_deps) == 1
+                    nbr_src = src_deps[0]
+                    assert nbr_src.sp_idx < sp_idx
+                    nsrc_sa = symargs[nbr_src.sp_idx][nbr_src.tm_idx]
+                    assert nsrc_sa  # not empty, used to test nbr src exists.
+
+                if isinstance(layer, ConvLayer):
+                    # Conv layer.
+
+                    # The last group may require to fully buffer ofmaps.
+                    # Delayed apply to the immediate previous layer.
+                    if curr_fbofm is not False:
+                        assert last_conv >= (0, 0)
+                        if last_conv.sp_idx == sp_idx:
+                            assert tm_idx > 0
+                            lsrc_sa = symargs[sp_idx][tm_idx - 1]
                         else:
-                            # Last group is in a previous spatial scheduling.
-                            # Apply to its last temporal scheduled layer.
-                            top_bl_t_list[last_idx.sp_idx][-1][le.OFM] = 1
-                    # Reset
-                    last_fbo = False
+                            lsrc_sa = symargs[last_conv.sp_idx][-1]
+                        lsrc_sa['fbofm'] = curr_fbofm
+                    # Reset.
+                    curr_fbofm = False
 
-                    if last_idx.sp_idx < 0:
-                        # Initial rule.
-                        last_fbo = sfbo
+                    # New topofm for a new group.
+                    curr_topofm = symbols('topofm_{}_{}'.format(sp_idx, tm_idx),
+                                          integer=True)
+                    symvals[curr_topofm] = _layer_topofm_vals(l)
 
-                    src_deps = self.src_dict[sp_idx][tm_idx]
+                    # Set topofm.
+                    curr_sa['topofm'] = curr_topofm
 
-                    if any(s is not None for s in src_deps):
-                        # Between-spatial rule.
-                        assert len(src_deps) == 1
-                        src_sp_idx, src_tm_idx = src_deps[0]
-                        assert src_sp_idx < sp_idx
-                        src_top_bl_t = top_bl_t_list[src_sp_idx][src_tm_idx]
-                        if src_top_bl_t[le.OFM] == 1 \
-                                and src_top_bl_t[le.IFM] != 1:
-                            # When neighbor source only fully buffers ofmaps.
-                            # Make this group fully buffers ifmaps.
-                            top_bl_t_list[sp_idx][tm_idx][le.IFM] = 1
-                        else:
-                            # Make neighbor source fully buffer ifmaps.
-                            src_top_bl_t[le.IFM] = 1
-                            # Make this group fully buffer ofmaps.
-                            last_fbo = True
-
-                    if last_idx.sp_idx == sp_idx:
-                        # Between-temporal rule.
-                        # Make last group fully buffer ofmaps.
-                        assert tm_idx >= 1
-                        top_bl_t_list[sp_idx][tm_idx - 1][le.OFM] = 1
+                    if sp_idx == last_conv.sp_idx:
+                        # Rule inter-temporal.
+                        assert tm_idx > 0
                         # Make this group fully buffer ifmaps.
-                        top_bl_t_list[sp_idx][tm_idx][le.IFM] = 1
+                        curr_sa['fbifm'] = True
+                        # Make the last group fully buffer ofmaps.
+                        last_sa = symargs[sp_idx][last_conv.tm_idx]
+                        lsrc_sa = symargs[sp_idx][tm_idx - 1]
+                        last_sa['fbofm'] = True
+                        lsrc_sa['fbofm'] = True
 
-                    last_idx = PipelineSegment.SchedIndex(sp_idx, tm_idx)
+                    elif nsrc_sa:
+                        # Rule inter-spatial.
+                        # We only look at this rule when inter-temporal rule
+                        # does not apply and the ifmaps of this group are not
+                        # yet required to fully buffer.
+                        nsrc_fbofm = nsrc_sa.get('fbofm', False)
+                        # (a): if the source already fully buffers ofmaps.
+                        # Make this group fully buffer ifmaps.
+                        curr_sa['fbifm'] = symeq(nsrc_fbofm, True)
+                        # (b)-(1): otherwise.
+                        # Make this group fully buffer ofmaps.
+                        curr_sa['fbofm'] = symeq(nsrc_fbofm, False)
+                        curr_fbofm = symeq(nsrc_fbofm, False)  # delayed apply.
+                        # Match top OFM/IFM factors.
+                        curr_sa['topifm'] = sympiecewise(
+                            (nsrc_sa['topofm'], symeq(nsrc_fbofm, False)),
+                            (curr_sa.get('topifm', 0), True))
 
-        # The last group ofmaps go to memory, do not need to fully buffer.
-        # Ignore final last_fbo value.
+                    elif last_conv < (0, 0):
+                        # The first CONV layer.
+                        # Rule initial.
+                        curr_sa['fbofm'] = fbofm_init
+                        curr_fbofm = fbofm_init
 
-        # Make SchedulingConstraint instances.
-        constraint = tuple(tuple(Cstr(topbat=top_bl_t[le.BAT],
-                                      topifm=top_bl_t[le.IFM],
-                                      topofm=top_bl_t[le.OFM])
-                                 for top_bl_t in tlst)
-                           for tlst in top_bl_t_list)
+                    last_conv = PipelineSegment.SchedIndex(sp_idx, tm_idx)
 
-        # Check whether the constraint is possible to realize.
-        for ltpl, rtpl, ctpl in zip(self.seg, self.alloc, constraint):
-            for layer, resource, cstr in zip(ltpl, rtpl, ctpl):
+                else:
+                    # Non-Conv layer.
 
-                # Required GBUF size.
-                req_size_gbuf = 0
-                if cstr.topifm == 1:
-                    # Fully buffer ifmaps.
-                    req_size_gbuf += self.network[layer].total_ifmap_size()
-                if cstr.topifm == 1:
-                    # Fully buffer ofmaps.
-                    req_size_gbuf += self.network[layer].total_ofmap_size()
+                    if nsrc_sa:
+                        # Rule inter-spatial, (b)-(2).
+                        nsrc_fbofm = nsrc_sa.get('fbofm', False)
+                        curr_topofm = sympiecewise(
+                            (nsrc_sa['topofm'], symeq(nsrc_fbofm, False)),
+                            (curr_topofm, True))
+                        # Also backtrace this group.
+                        for bt_idx in range(last_conv.tm_idx, tm_idx):
+                            symargs[sp_idx][bt_idx]['topofm'] = curr_topofm
 
-                if req_size_gbuf > \
-                        resource.size_gbuf * resource.proc_region.dim.size():
-                    return None
+                    # Rule within-group.
+                    curr_sa['topofm'] = curr_topofm
 
-        return constraint
+                # If this layer has no on-chip destinations, cancel the
+                # requirement to fully buffer ofmaps.
+                if all(d is None for d in self.dst_dict[sp_idx][tm_idx]) \
+                        and tm_idx == len(ltpl) - 1:
+                    curr_sa.pop('fbofm', False)
+
+        # Sort symbol dict.
+        symvals = OrderedDict(sorted(((s, symvals[s]) for s in symvals),
+                                     key=lambda item: str(item[0])))
+
+        # Simplify.
+        self._simplify_symargs(symargs, symvals)
+
+        if not symvals:
+            # Must add a dummy symbol so iterative substitution can happen.
+            symvals[symbols('_dummy')] = [None]
+
+        self.cstr_symargs = symargs
+        self.cstr_symvals = symvals
+
+    @staticmethod
+    def _simplify_symargs(symargs, symvals):
+        '''
+        Simplify symargs and symvals in-place:
+        - If fbi/ofm is False, then remove it.
+        - If fbi/ofm is True, then remove topi/ofm.
+        - If a symbol can take only one value, then substitute it.
+        - If a symbol only occurs once, then remove its constraint.
+        '''
+        for a in itertools.chain.from_iterable(symargs):
+            is_fbifm = a.get('fbifm')
+            is_fbofm = a.get('fbofm')
+            # pylint: disable=singleton-comparison
+            # lhs may be symbolic, see
+            # docs.sympy.org/latest/modules/logic.html#sympy.logic.boolalg.BooleanTrue
+            if is_fbifm == True:
+                a.pop('topifm', 0)
+            if is_fbifm == False:
+                a.pop('fbifm', False)
+            if is_fbofm == True:
+                a.pop('topofm', 0)
+            if is_fbofm == False:
+                a.pop('fbofm', False)
+
+        subs_dict = {}
+
+        # Possible values for symbols.
+        subs_dict.update(
+            (s, symvals[s][0]) for s in symvals if len(symvals[s]) == 1)
+
+        # Count the occurrence of symbols in all args (values).
+        symcnts = Counter(
+            s for a in itertools.chain.from_iterable(symargs)
+            for val in a.values() for s in symtuple(val).free_symbols)
+        assert set(symcnts.keys()).issubset(symvals.keys())
+        subs_dict.update((s, None)
+                         for s in set(symvals.keys()) - set(symcnts.keys()))
+        subs_dict.update((s, 0 if str(s).startswith('top') else False)
+                         for s in symcnts if symcnts[s] <= 1)
+
+        # Substitute symbols and remove from symbol dict.
+        for a in itertools.chain.from_iterable(symargs):
+            for k in a:
+                a[k] = symtuple(a[k]).subs(subs_dict)[0]
+        for s in subs_dict:
+            del symvals[s]
+
+        used_syms = symtuple(
+            *[symtuple(*a.values())
+              for a in itertools.chain.from_iterable(symargs)]).free_symbols
+        assert set(used_syms) == set(symvals.keys())
+        assert all(val for val in symvals.values())
+
+    @staticmethod
+    def _subs_symargs(symargs, *subs_args):
+        '''
+        Substitute symbols. The additional arguments are passed to subs().
+
+        Return a new substituted copy without modifying the original one.
+        '''
+        return [[dict((k, symtuple(a[k]).subs(*subs_args)[0])
+                      for k in a) for a in atpl] for atpl in symargs]
 

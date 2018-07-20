@@ -302,15 +302,18 @@ class TestPipelineSegment(TestPipelineFixture):
                 for constraint, _ in segment.gen_constraint():
                     self._validate_constraint(segment, constraint)
 
-                    # No top loop constraint for single-vertex segment.
-                    for ctpl in constraint:
-                        for c in ctpl:
+                    # No top loop constraint for single-layer segment.
+                    if len(constraint) == 1 and len(constraint[0]) == 1:
+                        for c in itertools.chain.from_iterable(constraint):
                             self.assertTrue(c.topifm == 0 and c.topofm == 0
                                             and c.topbat == 0)
 
         # Spatial pipelining.
 
         for net_name in self.net:
+
+            if not net_name.startswith('net') and net_name != 'zfnet':
+                continue
 
             net = self.net[net_name]
 
@@ -350,55 +353,4 @@ class TestPipelineSegment(TestPipelineFixture):
                     for ctpl in constraint:
                         for c in ctpl:
                             self.assertEqual(c.topbat, 0)
-
-    def test_gen_constraint_ff_end(self):
-        ''' gen_constraint() pruning info ff_end. '''
-
-        for net_name in self.net:
-
-            if not net_name.startswith('net') and net_name != 'zfnet':
-                # Use ZFNet to give the real fmap dimensions.
-                continue
-            net = self.net[net_name]
-
-            for segment in self._gen_all_segment(net):
-                if not segment.valid:
-                    continue
-
-                last_top_tb = None
-                last_cstr = None
-
-                for constraint, ff_end in segment.gen_constraint():
-
-                    top_tb = constraint[0][0].topbat
-
-                    if last_top_tb == 0:
-                        self.assertTrue(ff_end,
-                                        'test_gen_constraint_ff_end: '
-                                        'ff_end must be True when previous '
-                                        'top tb is 0.')
-
-                    # Convert to dict, and replace top tb.
-                    cstr = []
-                    for ctpl in constraint:
-                        cstr.append([])
-                        for c in ctpl:
-                            cstr[-1].append(c.__dict__)
-                            cstr[-1][-1]['topbat'] = 0
-
-                    if last_cstr and not ff_end:
-                        self.assertEqual(cstr, last_cstr,
-                                         'test_gen_constraint_ff_end: '
-                                         'with False ff_end, constraints must '
-                                         'be the same except for top tb. '
-                                         'current {}; last {}.'
-                                         .format(cstr, last_cstr))
-                        self.assertGreater(top_tb, last_top_tb,
-                                           'test_gen_constraint_ff_end: '
-                                           'with False ff_end, top tb must '
-                                           'increase. current {}; last {}.'
-                                           .format(top_tb, last_top_tb))
-
-                    last_cstr = cstr
-                    last_top_tb = top_tb
 

@@ -58,6 +58,7 @@ setuptools.setup(
         'pytest>=3',
         'pytest-cov>=2',
         'pytest-xdist>=1',
+        'sympy>=1',
     ],
 
     entry_points={
