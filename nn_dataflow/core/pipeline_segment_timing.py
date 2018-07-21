@@ -19,10 +19,8 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from collections import namedtuple, OrderedDict
-import itertools
 
 from . import loop_enum as le
-from .. import util
 from .loop_blocking_scheme import LoopBlockingScheme
 from .layer import ConvLayer
 from .network import Network
@@ -30,15 +28,15 @@ from .network import Network
 class PipelineSegmentTiming(object):
     ''' Timing information of a pipeline segment. '''
 
-    # Timing info of a layer in the segment, including
-    # - the total time of the layer.
-    # - the total node time of the layer.
-    # - the total DRAM time of the layer.
-    # - whether the layer is fused with its previous layer.
-    # - the number of groups of which IFM are sequentially processed.
-    # - the number of groups of which OFM are sequentially processed.
-    LayerTiming = namedtuple('LayerTiming', ['time', 'node_time', 'dram_time',
-                                             'fused', 'ifm_ngrp', 'ofm_ngrp'])
+    # Each layer timing info is a tuple:
+    # - time: the total time.
+    # - ngrp: the OFM group number.
+    # - ts_xb: when to start.
+    # - td_xb: when the first BAT group of this and all prev layers is done.
+    # Time is stored by multiplying the lazily updated BAT group number (_xb).
+    # Notice (td - ts) may be greater than (time), because fused layers can
+    # have an earlier start time, but done time is sequentially accumulated.
+    LayerTiming = namedtuple('LayerTiming', ['time', 'ngrp', 'ts_xb', 'td_xb'])
 
     def __init__(self, network, seg_idx):
 
@@ -51,48 +49,29 @@ class PipelineSegmentTiming(object):
         self.seg_idx = seg_idx
         self.last_sched_seq = None
 
+        # Time properties.
+        # The time on DRAM accesses.
+        self.dram_time = 0
+        # The time on node processing.
+        self.node_time = 0
+        # The critical (longest) spatial scheduling time.
+        self.critical_time = 0
+
         # Mapping from layer name to spatial and temporal indices.
         self.layer2idx = OrderedDict()
 
-        # Nested list for layer timing info, indexed by spatial and temporal
-        # indices.
-        self.timing_list = []
-
-        # The number of groups of which BAT are sequentially processed, shared
-        # by all layers in the segment. An individual layer may have a larger
-        # top BAT loop factor, but must be divided by this shared factor.
+        # The number of groups of which BAT are sequentially processed, i.e.,
+        # the degree of batch pipelining, shared by all layers in the segment.
+        # Lazily updated.
         self.bat_ngrp = None
 
-        # Cached time and critical time. Lazily calculated since the number of
-        # BAT group may change.
-        self.cached_time = None
-        self.cached_crit_time = None
-        self.cached_node_time = None
-        self.cached_dram_time = None
+        # Timing of each layer, indexed by spatial and temporal indices.
+        self.timing_list = []
 
+    @property
     def time(self):
-        ''' The total time of the end-to-end segment schedule. '''
-        self._calc_time()
-        assert self.cached_time is not None
-        return self.cached_time
-
-    def critical_time(self):
-        ''' The critical spatial scheduling pipeline stage time. '''
-        self._calc_time()
-        assert self.cached_crit_time is not None
-        return self.cached_crit_time
-
-    def node_time(self):
-        ''' The total time on processing nodes of the segment. '''
-        self._calc_time()
-        assert self.cached_node_time is not None
-        return self.cached_node_time
-
-    def dram_time(self):
-        ''' The total time on DRAM access of the segment. '''
-        self._calc_time()
-        assert self.cached_dram_time is not None
-        return self.cached_dram_time
+        ''' The total time of the end-to-end segment processing. '''
+        return max(self.node_time, self.dram_time)
 
     def add(self, layer_name, sched_result):
         ''' Add the SchedulingResult of a new layer. '''
@@ -123,56 +102,35 @@ class PipelineSegmentTiming(object):
                                      sched_seq[1:]))
         self.layer2idx[layer_name] = sched_seq[1:]
 
-        # Loop blocking scheme.
-        # Ordered loops from outer to inner with LoopEnum and blocking factor.
-        # Filter out trivial loops.
-        ord_loops = []
-        for bl_t, bl_ord in zip(sched_result.scheme['tvals'],
-                                sched_result.scheme['orders']):
-            ord_loops += LoopBlockingScheme.ordered_loops(bl_t, bl_ord)
-
-        # Update the BAT groups.
-        bat_ngrp = 1
-        while ord_loops:
-            if ord_loops[0][0] == le.BAT:
-                bat_ngrp = ord_loops[0][1]
-                ord_loops.pop(0)
-            else:
-                break
-        if not self.bat_ngrp:
-            self.bat_ngrp = bat_ngrp
-        else:
-            self.bat_ngrp = util.gcd(self.bat_ngrp, bat_ngrp)
-
-        # Get the IFM/OFM groups.
-        ifm_ngrp = util.prod(
-            lp[1] for lp in itertools.takewhile(lambda lp: lp[0] == le.IFM,
-                                                ord_loops))
-        ofm_ngrp = util.prod(
-            lp[1] for lp in itertools.takewhile(lambda lp: lp[0] == le.OFM,
-                                                ord_loops))
-
-        # Fused. Only fuse non-CONV layers and not-the-first-temporal layers.
-        fused = not isinstance(self.network[layer_name], ConvLayer) \
-                and sched_seq[-1] > 0
-
-        # Construct layer timing info.
-        timing = PipelineSegmentTiming.LayerTiming(
-            time=sched_result.total_time,
-            node_time=sched_result.total_node_time,
-            dram_time=sched_result.total_dram_time,
-            fused=fused, ifm_ngrp=ifm_ngrp, ofm_ngrp=ofm_ngrp)
-
-        # Append.
-        self.timing_list[-1].append(timing)
+        # Add layer timing.
+        self.timing_list[-1].append(
+            self._make_layer_timing(layer_name, sched_result))
         assert self.last_sched_seq[1] + 1 == len(self.timing_list)
         assert self.last_sched_seq[2] + 1 == len(self.timing_list[-1])
 
-        # Invalidate cached results.
-        self.cached_time = None
-        self.cached_crit_time = None
-        self.cached_node_time = None
-        self.cached_dram_time = None
+        # Update time.
+
+        # Critical time, as the longest of all spatial scheduling.
+        assert all(sum(timing.time for timing in tlist)
+                   <= tlist[-1].td_xb - tlist[0].ts_xb
+                   for tlist in self.timing_list)
+        self.critical_time = max(tlist[-1].td_xb - tlist[0].ts_xb
+                                 for tlist in self.timing_list)
+
+        # DRAM time.
+        # Each layer DRAM time is calculated using the layer accesses and the
+        # maximum bandwidth. Accumulating the accesses is accumulating the
+        # time.
+        self.dram_time += sched_result.total_dram_time
+
+        # Node time, as the max of end time of the last BAT group.
+        # The interval between BAT groups is determined by the critical time of
+        # one BAT group.
+        self.node_time = max((tlist[-1].td_xb
+                              + self.critical_time * (self.bat_ngrp - 1))
+                             // self.bat_ngrp
+                             for tlist in self.timing_list)
+        assert self.node_time >= self.critical_time
 
     def _sched_seq_incr(self, pos):
         ''' Get the next sched seq incremented at the given position. '''
@@ -182,105 +140,68 @@ class PipelineSegmentTiming(object):
         return self.last_sched_seq[:pos] + (self.last_sched_seq[pos] + 1,) \
                 + (0,) * (2 - pos)
 
-    def _calc_time(self):
-        ''' Calculate the time and critical time. '''
+    def _make_layer_timing(self, layer_name, sched_result):
+        ''' Construct and return the layer timing. '''
+        # Top-level ordered loops, from outermost to innermost.
+        ord_loops = LoopBlockingScheme.ordered_loops(
+            sched_result.scheme['tvals'][0], sched_result.scheme['orders'][0])
 
-        if self.cached_time is not None and self.cached_crit_time is not None \
-                and self.cached_node_time is not None \
-                and self.cached_dram_time is not None:
-            return
+        # Top loop blocking factors.
+        top_ts = [1] * le.NUM
+        if ord_loops and ord_loops[0][0] == le.BAT:
+            top_ts[le.BAT] = ord_loops.pop(0)[1]
+        if ord_loops:
+            lpe, t = ord_loops.pop(0)
+            assert lpe == le.IFM or lpe == le.OFM
+            top_ts[lpe] = t
 
-        # Start time of each layer in the segment. Only for added layers.
-        start_list = self._calc_start_time()
+        # Lazily update BAT group number.
+        if not self.bat_ngrp:
+            self.bat_ngrp = top_ts[le.BAT]
+        elif self.bat_ngrp != top_ts[le.BAT]:
+            # Unmatched.
+            self.bat_ngrp = 1
 
-        # Critical stage time, as the max of all spatial scheduling.
-        self.cached_crit_time = max(sum(timing.time for timing in tlist)
-                                    for tlist in self.timing_list)
+        # IFM/OFM group number.
+        ifm_ngrp, ofm_ngrp = top_ts[le.IFM], top_ts[le.OFM]
 
-        # Total node time, as the max of end time of the last BAT group.
-        # The interval between BAT groups is determined by the critical stage
-        # time of one BAT group.
-        self.cached_node_time = max(start + timing.time // self.bat_ngrp
-                                    + self.cached_crit_time // self.bat_ngrp
-                                    * (self.bat_ngrp - 1)
-                                    for slist, tlist
-                                    in zip(start_list, self.timing_list)
-                                    for start, timing in zip(slist, tlist))
-        assert self.cached_node_time >= self.cached_crit_time
-
-        # Time limit of the DRAM bandwidth.
-        # Each layer DRAM time is calculated using the layer accesses and the
-        # maximum bandwidth. Accumulating the accesses is accumulating the
-        # time.
-        self.cached_dram_time = sum(timing.dram_time for timing
-                                    in itertools.chain.from_iterable(
-                                        self.timing_list))
-
-        self.cached_time = max(self.cached_node_time, self.cached_dram_time)
-
-    def _calc_start_time(self):
-        '''
-        Calculate the start time of each layer as a nested list indexed by
-        spatial and temporal indices.
-
-        For temporal scheduling, each fused group will execute each batch group
-        to completion, and then switch to the next batch group. So the start
-        time only waits for one batch group.
-        '''
-
-        start_list = []
-
-        for layer_name, layer_idx in self.layer2idx.items():
-            sp_idx, tm_idx = layer_idx
-
-            # Append.
-            if tm_idx == 0:
-                start_list.append([])
-            start_list[-1].append(0)
-            assert sp_idx == len(start_list) - 1
-            assert tm_idx == len(start_list[sp_idx]) - 1
-
-            # Start time depends on the ready time of the previous on-chip
-            # layers.
-            prev_indices = [self.layer2idx[p]
-                            for p in self.network.prevs(layer_name)
-                            if p in self.layer2idx]
-
-            for prev_sp_idx, prev_tm_idx in prev_indices:
-                if prev_sp_idx == sp_idx:
-                    # Same spatial scheduling, wait for full time.
-                    assert prev_tm_idx == tm_idx - 1, \
-                            ('PipelineSegmentTiming: same-spatial dependency '
-                             '{} of {} must be immediate previous.'
-                             .format((prev_sp_idx, prev_tm_idx), layer_idx))
-                    prev_timing = self.timing_list[prev_sp_idx][prev_tm_idx]
-                    ready = start_list[prev_sp_idx][prev_tm_idx] \
-                            + prev_timing.time // self.bat_ngrp
+        # Calculate timing.
+        sp_idx, tm_idx = self.layer2idx[layer_name]
+        is_conv = isinstance(self.network[layer_name], ConvLayer)
+        time = sched_result.total_time
+        ts_xb = 0
+        td_xb = 0
+        for p in self.network.prevs(layer_name):
+            if p not in self.layer2idx:
+                # Off-chip source.
+                continue
+            # On-chip source.
+            p_sp_idx, p_tm_idx = self.layer2idx[p]
+            p_timing = self.timing_list[p_sp_idx][p_tm_idx]
+            if p_sp_idx == sp_idx:
+                assert p_tm_idx == tm_idx - 1
+                # Same spatial scheduling.
+                if not is_conv and ofm_ngrp == p_timing.ngrp:
+                    # Fused.
+                    start = p_timing.ts_xb + p_timing.time // p_timing.ngrp
                 else:
-                    assert prev_sp_idx < sp_idx
-                    # Previous spatial scheduling, wait for one group.
-                    prev_sp_timing_list = self.timing_list[prev_sp_idx]
-                    assert prev_tm_idx == len(prev_sp_timing_list) - 1, \
-                            ('PipelineSegmentTiming: prev-spatial dependency '
-                             '{} must be the last temporal scheduling in {}.'
-                             .format((prev_sp_idx, prev_tm_idx),
-                                     len(prev_sp_timing_list)))
-                    # Backtrace all fused layers.
-                    unfused_tm_idx = max(i for i, t
-                                         in enumerate(prev_sp_timing_list)
-                                         if not t.fused)
-                    fused_timing_list = prev_sp_timing_list[unfused_tm_idx:]
-                    tgrp = sum(t.time for t in fused_timing_list)
-                    # The number of groups should be min of input and previous
-                    # outputs.
-                    ngrp = min(self.timing_list[sp_idx][tm_idx].ifm_ngrp,
-                               min(t.ofm_ngrp for t in fused_timing_list))
-                    ready = start_list[prev_sp_idx][unfused_tm_idx] \
-                            + tgrp // self.bat_ngrp // ngrp
+                    # Not fused.
+                    start = p_timing.td_xb
+                # Also constrain the done time.
+                td_xb = p_timing.td_xb + time
+            else:
+                assert p_sp_idx < sp_idx
+                assert p_tm_idx == len(self.timing_list[p_sp_idx]) - 1
+                # Previous spatial scheduling.
+                if (ifm_ngrp if is_conv else ofm_ngrp) == p_timing.ngrp:
+                    # I/OFM group forwarding.
+                    start = p_timing.ts_xb + p_timing.time // p_timing.ngrp
+                else:
+                    # All I/OFM double buffering.
+                    start = p_timing.td_xb
+            ts_xb = max(ts_xb, start)
+        td_xb = max(td_xb, ts_xb + time)
 
-                # Max of dependency ready time.
-                start_list[sp_idx][tm_idx] = max(start_list[sp_idx][tm_idx],
-                                                 ready)
-
-        return start_list
+        return PipelineSegmentTiming.LayerTiming(time=time, ngrp=ofm_ngrp,
+                                                 ts_xb=ts_xb, td_xb=td_xb)
 

@@ -72,40 +72,67 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
 
     def test_add(self):
         ''' add(). '''
+        # No fused.
+
         timing = PipelineSegmentTiming(self.net1, 3)
 
         timing.add('0', self._make_sched_res((3, 0, 0), 123,
-                                             top_to=3, top_tb=4))
+                                             top_to=3, top_tb=2))
         self.assertTupleEqual(timing.last_sched_seq, (3, 0, 0))
-        self.assertFalse(timing.timing_list[-1][-1].fused)
+        self.assertEqual(timing.timing_list[-1][-1].ngrp, 3)
 
         timing.add('1', self._make_sched_res((3, 1, 0), 141,
                                              top_ti=3, top_tb=2))
         self.assertTupleEqual(timing.last_sched_seq, (3, 1, 0))
-        self.assertFalse(timing.timing_list[-1][-1].fused)
+        self.assertEqual(timing.timing_list[-1][-1].ngrp, 1)
 
         timing.add('1p', self._make_sched_res((3, 1, 1), 12,
-                                              top_ti=3, top_tb=8))
+                                              top_ti=3, top_tb=2))
         self.assertTupleEqual(timing.last_sched_seq, (3, 1, 1))
-        self.assertTrue(timing.timing_list[-1][-1].fused)
+        self.assertEqual(timing.timing_list[-1][-1].ngrp, 1)
 
         self.assertEqual(timing.bat_ngrp, 2)
         self.assertEqual(len(timing.timing_list), 2)
         self.assertEqual(len(timing.timing_list[0]), 1)
         self.assertEqual(len(timing.timing_list[1]), 2)
 
+        # Fused.
+
+        timing = PipelineSegmentTiming(self.net1, 3)
+
+        timing.add('0', self._make_sched_res((3, 0, 0), 123,
+                                             top_tb=2))
+        self.assertTupleEqual(timing.last_sched_seq, (3, 0, 0))
+        self.assertEqual(timing.timing_list[-1][-1].ngrp, 1)
+
+        timing.add('1', self._make_sched_res((3, 1, 0), 141,
+                                             top_to=3, top_tb=2))
+        self.assertTupleEqual(timing.last_sched_seq, (3, 1, 0))
+        self.assertEqual(timing.timing_list[-1][-1].ngrp, 3)
+
+        timing.add('1p', self._make_sched_res((3, 1, 1), 12,
+                                              top_to=3, top_tb=2))
+        self.assertTupleEqual(timing.last_sched_seq, (3, 1, 1))
+        self.assertEqual(timing.timing_list[-1][-1].ngrp, 3)
+
+        # Unmatched BAT group number.
+
+        self.assertEqual(timing.bat_ngrp, 2)
+        timing.add('2', self._make_sched_res((3, 2, 0), 123, top_tb=4))
+        self.assertEqual(timing.bat_ngrp, 1)
+
     def test_add_all_lr(self):
         ''' add() all LocalRegionLayer. '''
         timing = PipelineSegmentTiming(self.netlr, 2)
 
-        timing.add('0p1', self._make_sched_res((2, 0, 0), 40, top_tb=4))
-        self.assertFalse(timing.timing_list[-1][-1].fused)
-        timing.add('0p2', self._make_sched_res((2, 0, 1), 80, top_tb=4))
-        self.assertTrue(timing.timing_list[-1][-1].fused)
-        timing.add('0p3', self._make_sched_res((2, 0, 2), 60, top_tb=2))
-        self.assertTrue(timing.timing_list[-1][-1].fused)
-        timing.add('1', self._make_sched_res((2, 1, 0), 800, top_tb=2))
-        self.assertFalse(timing.timing_list[-1][-1].fused)
+        timing.add('0p1', self._make_sched_res((2, 0, 0), 40, top_to=4))
+        self.assertEqual(timing.timing_list[-1][-1].ngrp, 4)
+        timing.add('0p2', self._make_sched_res((2, 0, 1), 80, top_to=4))
+        self.assertEqual(timing.timing_list[-1][-1].ngrp, 4)
+        timing.add('0p3', self._make_sched_res((2, 0, 2), 60, top_to=4))
+        self.assertEqual(timing.timing_list[-1][-1].ngrp, 4)
+        timing.add('1', self._make_sched_res((2, 1, 0), 800, top_to=4))
+        self.assertEqual(timing.timing_list[-1][-1].ngrp, 4)
 
     def test_add_invalid_sched_seq(self):
         ''' add(), invalid sched seq. '''
@@ -129,17 +156,21 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
             timing.add('0', self._make_sched_res((3, 1, 0), 123))
 
     def test_time_bat_ngrp(self):
-        ''' time() and critical_time() bat_ngrp. '''
+        ''' time and critical_time bat_ngrp. '''
         timing = PipelineSegmentTiming(self.net1, 3)
         timing.add('0', self._make_sched_res((3, 0, 0), 120, top_tb=4))
-        timing.add('1', self._make_sched_res((3, 1, 0), 130, top_tb=8))
-        timing.add('1p', self._make_sched_res((3, 1, 1), 20, top_tb=2))
-        timing.add('2', self._make_sched_res((3, 2, 0), 138, top_tb=2))
-        self.assertEqual(timing.critical_time(), 150)
-        self.assertEqual(timing.time(), 120 // 2 + 130 + 20 + 138 // 2)
+        timing.add('1', self._make_sched_res((3, 1, 0), 130, top_tb=4))
+        timing.add('1p', self._make_sched_res((3, 1, 1), 20, top_tb=4))
+        timing.add('2', self._make_sched_res((3, 2, 0), 136, top_tb=4))
+        self.assertEqual(timing.critical_time, 150)
+        self.assertEqual(timing.time, 120 // 4 + 130 + 20 + 136 // 4)
+
+        # Unmatched BAT group number.
+        timing.add('3', self._make_sched_res((3, 3, 0), 100, top_tb=2))
+        self.assertEqual(timing.time, 120 + 130 + 20 + 136 + 100)
 
     def test_time_ifm_ofm_ngrp(self):
-        ''' time() and critical_time() ifm_ngrp and ofm_ngrp. '''
+        ''' time and critical_time ifm_ngrp and ofm_ngrp. '''
 
         # Single-group wait, first critical.
 
@@ -148,11 +179,11 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
                                              top_to=3, top_tb=2))
         timing.add('1', self._make_sched_res((3, 1, 0), 90,
                                              top_ti=3, top_tb=2))
-        self.assertEqual(timing.critical_time(), 120)
+        self.assertEqual(timing.critical_time, 120)
         # Layer 0 is critical. Layer 0 last BAT group starts at 120 - 120 // 2.
         # Layer 1 last BAT group starts 120 // 2 // 3 later, which takes 90 //
         # 2.
-        self.assertEqual(timing.time(),
+        self.assertEqual(timing.time,
                          120 - 120 // 2 + 120 // 2 // 3 + 90 // 2)
 
         # Single-group wait, second critical.
@@ -162,10 +193,10 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
                                              top_to=3, top_tb=2))
         timing.add('1', self._make_sched_res((3, 1, 0), 150,
                                              top_ti=3, top_tb=2))
-        self.assertEqual(timing.critical_time(), 150)
+        self.assertEqual(timing.critical_time, 150)
         # Layer 1 is critical. Layer 1 first BAT group starts at 120 // 2 // 3,
         # and takes 150 for all its BAT groups.
-        self.assertEqual(timing.time(), 120 // 2 // 3 + 150)
+        self.assertEqual(timing.time, 120 // 2 // 3 + 150)
 
         # All-group wait, first critical.
 
@@ -174,8 +205,8 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
                                              top_to=3, top_tb=2))
         timing.add('1', self._make_sched_res((3, 1, 0), 90,
                                              top_to=3, top_tb=2))
-        self.assertEqual(timing.critical_time(), 120)
-        self.assertEqual(timing.time(), 120 + 90 // 2)
+        self.assertEqual(timing.critical_time, 120)
+        self.assertEqual(timing.time, 120 + 90 // 2)
 
         # All-group wait, second critical.
 
@@ -184,79 +215,79 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
                                              top_ti=3, top_tb=2))
         timing.add('1', self._make_sched_res((3, 1, 0), 150,
                                              top_ti=3, top_tb=2))
-        self.assertEqual(timing.critical_time(), 150)
-        self.assertEqual(timing.time(), 120 // 2 + 150)
+        self.assertEqual(timing.critical_time, 150)
+        self.assertEqual(timing.time, 120 // 2 + 150)
 
     def test_time_linear(self):
-        ''' time() and critical_time() linear. '''
+        ''' time and critical_time linear. '''
         timing = PipelineSegmentTiming(self.net1, 3)
         timing.add('0', self._make_sched_res((3, 0, 0), 120,
-                                             top_ti=3, top_tb=4))
-        timing.add('1', self._make_sched_res((3, 1, 0), 130,
-                                             top_to=3, top_tb=8))
-        timing.add('1p', self._make_sched_res((3, 1, 1), 20,
+                                             top_ti=3, top_tb=2))
+        timing.add('1', self._make_sched_res((3, 1, 0), 129,
+                                             top_to=3, top_tb=2))
+        timing.add('1p', self._make_sched_res((3, 1, 1), 21,
                                               top_to=3, top_tb=2))
         timing.add('2', self._make_sched_res((3, 2, 0), 138,
                                              top_ti=3, top_tb=2))
-        self.assertEqual(timing.critical_time(), 150)
+        self.assertEqual(timing.critical_time, 150)
         # Layer 1 is critical. Layer 1+1p first BAT group starts at 120 // 2,
         # and last BAT group starts at 150 // 2 later. Layer 2 last BAT group
         # starts 150 // 2 // 3 later, and takes 138 // 2.
-        self.assertEqual(timing.time(),
+        self.assertEqual(timing.time,
                          120 // 2 + 150 // 2 + 150 // 2 // 3 + 138 // 2)
 
     def test_time_branch(self):
-        ''' time() and critical_time() branch. '''
+        ''' time and critical_time branch. '''
 
         # Single-group wait.
 
         timing = PipelineSegmentTiming(self.net4, 3)
         timing.add('6', self._make_sched_res((3, 0, 0), 120,
-                                             top_ti=3, top_tb=4))
+                                             top_ti=3, top_tb=2))
         timing.add('7', self._make_sched_res((3, 1, 0), 150,
-                                             top_to=3, top_tb=8))
+                                             top_to=3, top_tb=2))
         timing.add('8', self._make_sched_res((3, 2, 0), 144,
                                              top_ti=3, top_tb=2))
         timing.add('9', self._make_sched_res((3, 3, 0), 168,
-                                             top_ti=3, top_tb=4))
-        self.assertEqual(timing.critical_time(), 168)
+                                             top_ti=3, top_tb=2))
+        self.assertEqual(timing.critical_time, 168)
         # Layer 9 is critical. Layer 7 first BAT group starts at 120 // 2.
         # Layer 8 and 9 first BAT group starts at 150 // 2 // 3 later, and all
         # groups of layer 9 take 168.
-        self.assertEqual(timing.time(),
+        self.assertEqual(timing.time,
                          120 // 2 + 150 // 2 // 3 + 168)
 
         # All-group wait.
 
         timing = PipelineSegmentTiming(self.net4, 3)
-        timing.add('6', self._make_sched_res((3, 0, 0), 120, top_tb=4))
-        timing.add('7', self._make_sched_res((3, 1, 0), 150, top_tb=8))
+        timing.add('6', self._make_sched_res((3, 0, 0), 120, top_tb=2))
+        timing.add('7', self._make_sched_res((3, 1, 0), 150, top_tb=2))
         timing.add('8', self._make_sched_res((3, 2, 0), 144, top_tb=2))
-        timing.add('9', self._make_sched_res((3, 3, 0), 132, top_tb=4))
-        self.assertEqual(timing.critical_time(), 150)
+        timing.add('9', self._make_sched_res((3, 3, 0), 132, top_tb=2))
+        self.assertEqual(timing.critical_time, 150)
         # Layer 7 is critical. Layer 7 first BAT group starts at 120 // 2, and
         # layer 7 last BAT group ends at 150 later, at which time layer 8 and 9
         # last BAT group starts, and takes 144 // 2.
-        self.assertEqual(timing.time(), 120 // 2 + 150 + 144 // 2)
+        self.assertEqual(timing.time, 120 // 2 + 150 + 144 // 2)
 
     def test_time_all_lr(self):
-        ''' time() and critical_time() all LocalRegionLayer. '''
+        ''' time and critical_time all LocalRegionLayer. '''
         timing = PipelineSegmentTiming(self.netlr, 2)
         timing.add('0p1', self._make_sched_res((2, 0, 0), 40,
-                                               top_to=10, top_tb=4))
+                                               top_to=5, top_tb=2))
         timing.add('0p2', self._make_sched_res((2, 0, 1), 80,
-                                               top_to=10, top_tb=4))
+                                               top_to=5, top_tb=2))
         timing.add('0p3', self._make_sched_res((2, 0, 2), 60,
-                                               top_to=10, top_tb=2))
+                                               top_to=5, top_tb=2))
         timing.add('1', self._make_sched_res((2, 1, 0), 800,
                                              top_ti=5, top_tb=2))
-        self.assertEqual(timing.critical_time(), 800)
+        self.assertEqual(timing.critical_time, 800)
         # Layer 1 is critical. Layer 1 first BAT group starts at (40 + 80 + 60)
         # // 2 // 5, and takes 800.
-        self.assertEqual(timing.time(), (40 + 80 + 60) // 2 // 5 + 800)
+        self.assertEqual(timing.time, (40 + 80 + 60) // 2 // 5 + 800)
 
     def test_time_single_spatial(self):
-        ''' time() and critical_time() for single-spatial segment. '''
+        ''' time and critical_time for single-spatial segment. '''
 
         for net_name in self.net:
             if not net_name.startswith('net'):
@@ -276,23 +307,23 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
                                                     top_to=4, top_ti=4,
                                                     top_tb=4))
 
-                self.assertEqual(timing.critical_time(), timing.time())
+                self.assertEqual(timing.critical_time, timing.time)
 
     def test_time_dram_time(self):
-        ''' time() and critical_time() dominated by DRAM time. '''
+        ''' time and critical_time dominated by DRAM time. '''
         timing = PipelineSegmentTiming(self.net1, 3)
         timing.add('0', self._make_sched_res((3, 0, 0), 120, dram_time=100,
                                              top_ti=3, top_tb=4))
         timing.add('1', self._make_sched_res((3, 1, 0), 130, dram_time=140,
-                                             top_to=3, top_tb=8))
+                                             top_to=3, top_tb=4))
         timing.add('1p', self._make_sched_res((3, 1, 1), 20, dram_time=10,
-                                              top_to=3, top_tb=2))
+                                              top_to=3, top_tb=4))
         timing.add('2', self._make_sched_res((3, 2, 0), 138, dram_time=100,
-                                             top_ti=3, top_tb=2))
-        self.assertEqual(timing.critical_time(), 160)
-        self.assertEqual(timing.time(), 100 + 140 + 10 + 100)
-        self.assertEqual(timing.dram_time(), timing.time())
-        self.assertLess(timing.node_time(), timing.time())
+                                             top_ti=3, top_tb=4))
+        self.assertEqual(timing.critical_time, 160)
+        self.assertEqual(timing.time, 100 + 140 + 10 + 100)
+        self.assertEqual(timing.dram_time, timing.time)
+        self.assertLess(timing.node_time, timing.time)
 
     def _make_sched_res(self, sched_seq, time, top_ti=1, top_to=1, top_tb=1,
                         top_ord=range(le.NUM), dram_time=0):

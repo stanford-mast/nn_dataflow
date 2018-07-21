@@ -129,8 +129,8 @@ class NNDataflowScheme(MutableMapping):
         # Special case, when the entire network fits in one segment. No
         # pipeline filling/draining delay.
         if len(self.seg_tlist) == 1 and self.__len__() == len(self.network):
-            return self.seg_tlist[0].critical_time()
-        return sum(t.time() for t in self.seg_tlist)
+            return self.seg_tlist[0].critical_time
+        return sum(t.time for t in self.seg_tlist)
 
     @property
     def total_ops(self):
@@ -157,21 +157,21 @@ class NNDataflowScheme(MutableMapping):
 
     def segment_time_list(self):
         ''' Get the time for each segment. '''
-        return [t.time() for t in self.seg_tlist]
+        return [t.time for t in self.seg_tlist]
 
     def segment_dram_time_list(self):
         '''
         Get the time for each segment on DRAM access.
         '''
-        return [t.dram_time() for t in self.seg_tlist]
+        return [t.dram_time for t in self.seg_tlist]
 
     def last_segment_time(self):
         ''' Get the time for the last segment. '''
-        return self.seg_tlist[-1].time()
+        return self.seg_tlist[-1].time
 
     def last_segment_critical_time(self):
         ''' Get the critical time for the last segment. '''
-        return self.seg_tlist[-1].critical_time()
+        return self.seg_tlist[-1].critical_time
 
     def perlayer_stats(self, stats_name):
         '''
