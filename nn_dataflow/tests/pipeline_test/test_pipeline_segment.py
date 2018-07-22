@@ -334,6 +334,69 @@ class TestPipelineSegment(TestPipelineFixture):
         for constraint, _ in segment.gen_constraint():
             self._validate_constraint(segment, constraint)
 
+    def test_gen_constraint_fbofm_init(self):
+        ''' gen_constraint() deciding fbofm_init. '''
+
+        net = self.net['zfnet']
+
+        # Two spatial, fbofm_init == False.
+        segment = PipelineSegment((('fc2',), ('fc3',)),
+                                  net, self.batch_size, self.resource)
+        self.assertTrue(segment.valid)
+        self.assertFalse(segment.cstr_symargs[0][0].get('fbofm', False))
+        self.assertFalse(segment.cstr_symargs[1][0].get('fbifm', False))
+
+        # Two spatial, fbofm_init == False.
+        segment = PipelineSegment((('conv5', 'pool3'), ('fc1',)),
+                                  net, self.batch_size, self.resource)
+        self.assertTrue(segment.valid)
+        self.assertFalse(segment.cstr_symargs[0][0].get('fbofm', False))
+        self.assertFalse(segment.cstr_symargs[0][1].get('fbofm', False))
+        self.assertFalse(segment.cstr_symargs[1][0].get('fbifm', False))
+
+        # Four spatial, fbofm_init == False.
+        segment = PipelineSegment((('conv1', 'pool1'), ('conv2', 'pool2'),
+                                   ('conv3',), ('conv4',)),
+                                  net, self.batch_size, self.resource)
+        self.assertTrue(segment.valid)
+        self.assertFalse(segment.cstr_symargs[0][0].get('fbofm', False))
+        self.assertFalse(segment.cstr_symargs[0][1].get('fbofm', False))
+        self.assertFalse(segment.cstr_symargs[1][0].get('fbifm', False))
+        self.assertTrue(segment.cstr_symargs[1][0]['fbofm'])
+        self.assertTrue(segment.cstr_symargs[1][1]['fbofm'])
+        self.assertTrue(segment.cstr_symargs[2][0]['fbifm'])
+        self.assertFalse(segment.cstr_symargs[2][0].get('fbofm', False))
+        self.assertFalse(segment.cstr_symargs[3][0].get('fbifm', False))
+
+        # Three spatial, fbofm_init == False.
+        segment = PipelineSegment((('conv4',), ('conv5', 'pool3'), ('fc1',)),
+                                  net, self.batch_size, self.resource)
+        self.assertTrue(segment.valid)
+        self.assertFalse(segment.cstr_symargs[0][0].get('fbofm', False))
+        self.assertFalse(segment.cstr_symargs[1][0].get('fbifm', False))
+        self.assertTrue(segment.cstr_symargs[1][0]['fbofm'])
+        self.assertTrue(segment.cstr_symargs[1][1]['fbofm'])
+        self.assertTrue(segment.cstr_symargs[2][0]['fbifm'])
+
+        # Three spatial, fbofm_init == False.
+        segment = PipelineSegment((('conv2', 'pool2'), ('conv3',), ('conv4',)),
+                                  net, self.batch_size, self.resource)
+        self.assertTrue(segment.valid)
+        self.assertFalse(segment.cstr_symargs[0][0].get('fbofm', False))
+        self.assertFalse(segment.cstr_symargs[0][1].get('fbofm', False))
+        self.assertFalse(segment.cstr_symargs[1][0].get('fbifm', False))
+        self.assertTrue(segment.cstr_symargs[1][0]['fbofm'])
+        self.assertTrue(segment.cstr_symargs[2][0]['fbifm'])
+
+        # Three spatial, fbofm_init == True.
+        segment = PipelineSegment((('conv3',), ('conv4',), ('conv5', 'pool3')),
+                                  net, self.batch_size, self.resource)
+        self.assertTrue(segment.valid)
+        self.assertTrue(segment.cstr_symargs[0][0]['fbofm'])
+        self.assertTrue(segment.cstr_symargs[1][0]['fbifm'])
+        self.assertFalse(segment.cstr_symargs[1][0].get('fbofm', False))
+        self.assertFalse(segment.cstr_symargs[2][0].get('fbifm', False))
+
     def test_gen_constraint_temporal(self):
         ''' gen_constraint() temporal. '''
 

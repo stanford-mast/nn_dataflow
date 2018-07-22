@@ -192,7 +192,10 @@ class TestPipelineFixture(unittest.TestCase):
             yield PipelineSegment(((layer,),), ilp.network, ilp.batch_size,
                                   ilp.resource)
         for vseg in ilp._gen_vseg():
-            yield self._make_segment(vseg, network, **kwargs)
+            segment = self._make_segment(vseg, network, **kwargs)
+            if len(segment) == 1 and len(segment[0]) == 1:
+                continue
+            yield segment
 
     def _validate_allocation(self, segment, allocation):
         ''' Validate segment resource allocation. '''

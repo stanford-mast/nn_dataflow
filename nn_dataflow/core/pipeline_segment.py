@@ -75,7 +75,9 @@ class PipelineSegment(object):
             return
 
         # Scheduling constraints.
-        self._init_sym_cstrs()
+        self.valid = self._init_sym_cstrs()
+        if not self.valid:
+            return
 
     def allocation(self):
         '''
@@ -451,6 +453,9 @@ class PipelineSegment(object):
         (initial) if G is both the first spatial and the first temporal
         scheduling with a CONV layer, it can choose whether to fully buffer
         ofmaps or not. This is a configuration to explore, namely `fbofm_init`.
+        We decide its value by choosing the one that gives the fewer fully
+        buffered inter-spatial pairs on the critical forwarding path, and the
+        smaller maximum fully buffered data size.
 
         (within-group) within G, the CONV layer, and all local-region layers,
         should use the same top OFM factors (IFM factors are automatically
@@ -495,11 +500,21 @@ class PipelineSegment(object):
 
         def _layer_topofm_vals(layer_name):
             layer = self.network[layer_name]
-            vals = [t for t, _ in util.factorize(layer.nofm, 2)]
+            # We require that the total ofmap size takes at least 5% of the
+            # gbuf capacity of a single node, to avoid too fine blocking.
+            tmax = layer.total_ofmap_size(self.batch_size) \
+                    / (0.05 * self.resource.size_gbuf)
+            vals = [t for t, _ in util.factorize(layer.nofm, 2)
+                    if t <= tmax or t == 1]
+            assert vals
             return vals
 
         # Layer constraint kwargs.
         symargs = [[{'topbat': topbat} for _ in ltpl] for ltpl in self.seg]
+
+        # Candidates for critical forwarding path between spatial scheduling.
+        sp_crit_path_cands = set()
+        sp_crit_path_cands.add((0,))  # init with the first spatial.
 
         # The last CONV layer index.
         last_conv = PipelineSegment.SchedIndex(-1, 0)
@@ -528,6 +543,12 @@ class PipelineSegment(object):
                     assert nbr_src.sp_idx < sp_idx
                     nsrc_sa = symargs[nbr_src.sp_idx][nbr_src.tm_idx]
                     assert nsrc_sa  # not empty, used to test nbr src exists.
+                    # Set critical path candidates.
+                    new_cands = set()
+                    for cand in sp_crit_path_cands:
+                        if cand[-1] == nbr_src.sp_idx:
+                            new_cands.add(cand + (sp_idx,))
+                    sp_crit_path_cands |= new_cands
 
                 if isinstance(layer, ConvLayer):
                     # Conv layer.
@@ -619,12 +640,59 @@ class PipelineSegment(object):
         # Simplify.
         self._simplify_symargs(symargs, symvals)
 
+        # Get critical forwarding path between spatial scheduling.
+        # The critical path has the longest forwarding chain.
+        sp_crit_path = max(sp_crit_path_cands, key=len)
+
+        # Check maximum fully-buffering size, and decide fbofm_init.
+        fbofm_init_vals = symvals.get(fbofm_init, [])
+        if fbofm_init_vals:
+            assert len(fbofm_init_vals) > 1
+        else:
+            # A single value, or simplified out.
+            fbofm_init_vals = [fbofm_init]
+            fbofm_init = symbols('_dummy_fbofm_init')
+        opt_val = None
+        opt_key = (float('inf'),) * 2  # (num of fb pairs, max fb size)
+        for val in fbofm_init_vals:
+            subs_symargs = self._subs_symargs(symargs, fbofm_init, val)
+            maxsz = 0
+            numfb = 0
+            for sp_idx, (ltpl, atpl) in enumerate(zip(self.seg, subs_symargs)):
+                ms = max(itertools.chain(
+                    ((self.network[l].total_ofmap_size() if a.get('fbofm')
+                      else 0)
+                     + (self.network[l].total_ifmap_size() if a.get('fbifm')
+                        else 0)
+                     for l, a in zip(ltpl, atpl)),
+                    [0]))  # safe max with default.
+                if ms > self.alloc[sp_idx][0].proc_region.dim.size() \
+                        * self.alloc[sp_idx][0].size_gbuf:
+                    break
+                maxsz = max(maxsz, ms)
+                if sp_idx in sp_crit_path and atpl[-1].get('fbofm', False):
+                    numfb += 1
+            else:
+                key = (numfb, maxsz)
+                if key < opt_key:
+                    opt_val, opt_key = val, key
+        if opt_val is None:
+            return False
+        # Use the optimal value.
+        symvals[fbofm_init] = [opt_val]
+
+        # Simplify twice. First substitute fbofm_init, then simplify.
+        self._simplify_symargs(symargs, symvals)
+        self._simplify_symargs(symargs, symvals)
+
         if not symvals:
             # Must add a dummy symbol so iterative substitution can happen.
             symvals[symbols('_dummy')] = [None]
 
         self.cstr_symargs = symargs
         self.cstr_symvals = symvals
+
+        return True
 
     @staticmethod
     def _simplify_symargs(symargs, symvals):
