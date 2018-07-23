@@ -46,16 +46,32 @@ class TestSchedulingConstraint(TestSchedulingConstraintFixture):
         self.assertEqual(cstr.topbat, 2)
         self.assertEqual(cstr.topifm, 1)
         self.assertEqual(cstr.topofm, 4)
+        self.assertDictEqual(cstr.update_dict, {})
 
         cstr = SchedulingConstraint(topbat=2, topofm=4)
         self.assertEqual(cstr.topbat, 2)
         self.assertEqual(cstr.topifm, 0)
         self.assertEqual(cstr.topofm, 4)
+        self.assertDictEqual(cstr.update_dict, {})
+
+        cstr = SchedulingConstraint(
+            topofm=4,
+            update_dict={
+                'l1': lambda s, _: setattr(s, 'topbat', 1),
+                'l2': lambda s, r: setattr(s, 'topifm', r.topifm),
+            })
+        self.assertEqual(cstr.topbat, 0)
+        self.assertEqual(cstr.topifm, 0)
+        self.assertEqual(cstr.topofm, 4)
+        self.assertEqual(len(cstr.update_dict), 2)
+        self.assertIn('l1', cstr.update_dict)
+        self.assertIn('l2', cstr.update_dict)
 
         cstr = SchedulingConstraint()
         self.assertEqual(cstr.topbat, 0)
         self.assertEqual(cstr.topifm, 0)
         self.assertEqual(cstr.topofm, 0)
+        self.assertDictEqual(cstr.update_dict, {})
 
     def test_invalid_args(self):
         ''' Invalid arguments. '''
@@ -63,6 +79,18 @@ class TestSchedulingConstraint(TestSchedulingConstraintFixture):
                                      'SchedulingConstraint: '
                                      '.*positive integers.*'):
             _ = SchedulingConstraint(topbat=-1, topofm=2.)
+
+    def test_invalid_update_dict(self):
+        ''' Invalid argument update_dict. '''
+        with self.assertRaisesRegexp(TypeError,
+                                     'SchedulingConstraint: '
+                                     '.*update_dict.*'):
+            _ = SchedulingConstraint(update_dict=['l1'])
+
+        with self.assertRaisesRegexp(TypeError,
+                                     'SchedulingConstraint: '
+                                     '.*update_dict.*'):
+            _ = SchedulingConstraint(update_dict={'l1': 1})
 
     def test_null_constraint(self):
         ''' Null constraint. '''
@@ -91,6 +119,63 @@ class TestSchedulingConstraint(TestSchedulingConstraintFixture):
         for bl_t, bl_ord in self._gen_bl():
             self.assertTrue(cstr.is_valid_top_bl(bl_t, bl_ord))
 
+    def test_is_valid_part(self):
+        ''' Whether is_valid_part. '''
+        cstr = SchedulingConstraintLayerPipeline(
+            topbat=2, topifm=1, topofm=4, fbifm=True, fbofm=False)
+        self.assertTrue(cstr.is_valid_part(PartitionScheme(
+            order=range(pe.NUM), pdims=[(2, 2)] * pe.NUM)))
+
+        cstr = SchedulingConstraintLayerPipeline(topbat=2, topofm=4, fbifm=True)
+        self.assertTrue(cstr.is_valid_part(PartitionScheme(
+            order=range(pe.NUM), pdims=[(2, 2)] * pe.NUM)))
+
+        cstr = SchedulingConstraintLayerPipeline()
+        self.assertTrue(cstr.is_valid_part(PartitionScheme(
+            order=range(pe.NUM), pdims=[(2, 2)] * pe.NUM)))
+
+    def test_is_valid_before_update(self):
+        ''' is_valid_top_bl and is_valid_part called before update. '''
+        cstr = SchedulingConstraint(
+            topofm=4,
+            update_dict={
+                'l1': lambda s, _: setattr(s, 'topbat', 1),
+                'l2': lambda s, r: setattr(s, 'topifm', r.topifm),
+            })
+
+        with self.assertRaisesRegexp(ValueError,
+                                     'SchedulingConstraint: '
+                                     '.*update_dict.*'):
+            cstr.is_valid_top_bl([1] * le.NUM, range(le.NUM))
+
+        with self.assertRaisesRegexp(ValueError,
+                                     'SchedulingConstraint: '
+                                     '.*update_dict.*'):
+            cstr.is_valid_part(PartitionScheme(order=range(pe.NUM),
+                                               pdims=[(2, 2)] * pe.NUM))
+
+    def test_update_by_prev(self):
+        ''' Modifier update_by_prev. '''
+        cstr = SchedulingConstraint(
+            topofm=4,
+            update_dict={
+                'l1': lambda s, _: setattr(s, 'topbat', 1),
+                'l2': lambda s, r: setattr(s, 'topifm', r.topifm),
+            })
+        self.assertEqual(cstr.topbat, 0)
+        self.assertEqual(cstr.topifm, 0)
+        self.assertEqual(cstr.topofm, 4)
+
+        r = SchedulingConstraint(topifm=2)
+        cstr.update_by_prev({'l1': None, 'l2': r})
+
+        self.assertEqual(cstr.topbat, 1)
+        self.assertEqual(cstr.topifm, 2)
+        self.assertEqual(cstr.topofm, 4)
+
+        self.assertFalse(cstr.is_valid_top_bl([1, 4, 1], range(le.NUM)))
+        self.assertTrue(cstr.is_valid_top_bl([2, 4, 1], range(le.NUM)))
+
     def test_repr(self):
         ''' __repr__. '''
         cstr = SchedulingConstraint(topbat=2)
@@ -98,6 +183,14 @@ class TestSchedulingConstraint(TestSchedulingConstraintFixture):
         self.assertIn('topbat=2', repr(cstr))
         self.assertIn('topifm=0', repr(cstr))
         self.assertIn('topofm=0', repr(cstr))
+
+        cstr = SchedulingConstraint(update_dict={
+            'l1': lambda s, _: setattr(s, 'topbat', 1),
+            'l2': lambda s, r: setattr(s, 'topifm', r.topifm),
+        })
+        self.assertIn('update_dict=', repr(cstr))
+        self.assertIn('l1', repr(cstr))
+        self.assertIn('l2', repr(cstr))
 
 
 class TestSchedulingConstraintLayerPipeline(TestSchedulingConstraintFixture):
@@ -184,21 +277,6 @@ class TestSchedulingConstraintLayerPipeline(TestSchedulingConstraintFixture):
         cstr = SchedulingConstraintLayerPipeline()
         for bl_t, bl_ord in self._gen_bl():
             self.assertTrue(cstr.is_valid_top_bl(bl_t, bl_ord))
-
-    def test_is_valid_part(self):
-        ''' Whether is_valid_part. '''
-        cstr = SchedulingConstraintLayerPipeline(
-            topbat=2, topifm=1, topofm=4, fbifm=True, fbofm=False)
-        self.assertTrue(cstr.is_valid_part(PartitionScheme(
-            order=range(pe.NUM), pdims=[(2, 2)] * pe.NUM)))
-
-        cstr = SchedulingConstraintLayerPipeline(topbat=2, topofm=4, fbifm=True)
-        self.assertTrue(cstr.is_valid_part(PartitionScheme(
-            order=range(pe.NUM), pdims=[(2, 2)] * pe.NUM)))
-
-        cstr = SchedulingConstraintLayerPipeline()
-        self.assertTrue(cstr.is_valid_part(PartitionScheme(
-            order=range(pe.NUM), pdims=[(2, 2)] * pe.NUM)))
 
     def test_repr(self):
         ''' __repr__. '''

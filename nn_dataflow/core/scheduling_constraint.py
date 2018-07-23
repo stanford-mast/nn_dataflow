@@ -27,22 +27,45 @@ class SchedulingConstraint(object):
     Layer scheduling constraint, which constrains top loop blocking factors.
     '''
 
-    def __init__(self, topbat=0, topifm=0, topofm=0):
+    def __init__(self, topbat=0, topifm=0, topofm=0, update_dict=None):
+        '''
+        `topbat`, `topifm`, `topofm` specify the top-level loop blocking
+        factors.
 
+        `update_dict` specifies lazily updated rules to refine the constraint
+        with previous scheduling results. It should be a mapping, from previous
+        layer name to a function which takes two arguments: self, and the
+        SchedulingResult instance of that layer.
+        '''
         if any(n < 0 or not isinstance(n, numbers.Integral)
                for n in [topbat, topifm, topofm]):
             raise ValueError('SchedulingConstraint: '
                              'constrained factors must be positive integers.')
 
+        if not update_dict:
+            update_dict = {}
+        if not isinstance(update_dict, dict):
+            raise TypeError('SchedulingConstraint: '
+                            'update_dict must be a dict instance.')
+        for val in update_dict.values():
+            if not callable(val):
+                raise TypeError('SchedulingConstraint: '
+                                'values in update_dict must be callable.')
+
         self.topbat = topbat
         self.topifm = topifm
         self.topofm = topofm
+        self.update_dict = update_dict
 
     def is_valid_top_bl(self, top_bl_t, top_bl_ord):
         '''
         Whether the given `top_bl_t` and `top_bl_lpe` are valid with the
         constraint.
         '''
+        if self.update_dict:
+            raise ValueError('SchedulingConstraint: update_dict is not empty, '
+                             'rules have not been updated.')
+
         if self.topbat and self.topbat != top_bl_t[le.BAT]:
             return False
         if self.topifm and self.topifm != top_bl_t[le.IFM]:
@@ -58,8 +81,22 @@ class SchedulingConstraint(object):
         '''
         Whether the given `part` is valid with the constraint.
         '''
-        # pylint: disable=no-self-use, unused-argument
+        # pylint: disable=unused-argument
+        if self.update_dict:
+            raise ValueError('SchedulingConstraint: update_dict is not empty, '
+                             'rules have not been updated.')
+
         return True
+
+    def update_by_prev(self, prev_results):
+        '''
+        Based on the previous layer scheduling results `prev_results` as a
+        mapping from previous layer name to SchedulingResult instance, use the
+        rules specified by `update_dict` to update the constraint.
+        '''
+        for layer_name in self.update_dict:
+            self.update_dict[layer_name](self, prev_results[layer_name])
+        self.update_dict = {}  # clear updated rules.
 
     def __repr__(self):
         return '{}({})'.format(
@@ -90,7 +127,8 @@ class SchedulingConstraintLayerPipeline(SchedulingConstraint):
     at any where.
     '''
 
-    def __init__(self, topbat=0, topifm=0, topofm=0, fbifm=False, fbofm=False):
+    def __init__(self, topbat=0, topifm=0, topofm=0, fbifm=False, fbofm=False,
+                 update_dict=None):
 
         if fbifm:
             # Fully-buffered IFM <=> topifm = 1.
@@ -113,7 +151,8 @@ class SchedulingConstraintLayerPipeline(SchedulingConstraint):
                              'loop (= 1) or not constrained (= 0).')
 
         super(SchedulingConstraintLayerPipeline, self).__init__(
-            topbat=topbat, topifm=topifm, topofm=topofm)
+            topbat=topbat, topifm=topifm, topofm=topofm,
+            update_dict=update_dict)
 
     def is_valid_top_bl(self, top_bl_t, top_bl_ord):
 

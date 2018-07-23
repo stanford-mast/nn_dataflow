@@ -9,6 +9,8 @@ List of major changes and improvements
 
   - Add `SchedulingConstraint` class to specify loop blocking and partitioning
     constraints.
+    - Add lazily updated rules to allow refine constraint with previous
+      scheduling results at runtime.
     - Add subclass `SchedulingConstraintLayerPipeline` for layer pipelining
       constraints.
 
