@@ -282,6 +282,8 @@ class NNDataflow(object):
 
             sched_seq = (segment_idx, spatial_idx, temporal_idx)
 
+            constraint.update_by_prev(prev_nndf)
+
             condition = SchedulingCondition(resource=resource,
                                             constraint=constraint,
                                             ifmap_layout=ifmap_layout,

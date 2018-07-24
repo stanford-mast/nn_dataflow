@@ -274,6 +274,7 @@ class TestPipelineFixture(unittest.TestCase):
 
     def _validate_constraint(self, segment, constraint):
         ''' Validate segment scheduling constraint. '''
+        # pylint: disable=too-many-branches
 
         # Match segment.
         self.assertEqual(len(constraint), len(segment))
@@ -352,6 +353,8 @@ class TestPipelineFixture(unittest.TestCase):
 
                 # The single SEQ source.
                 seq = None
+                # str is greater than all numbers, see
+                # https://docs.python.org/2/library/stdtypes.html#comparisons
                 seq_prev_oaps = [poap for poap in prev_oaps if poap > 0]
                 if seq_prev_oaps:
                     self.assertEqual(len(seq_prev_oaps), 1,
@@ -408,6 +411,12 @@ class TestPipelineFixture(unittest.TestCase):
 
                     # SEQ source.
                     if seq and has_dst:
+                        # Cannot be lazily updated.
+                        self.assertNotIsInstance(
+                            seq, str,
+                            '_validate_constraint: CONV layer {} ({}) cannot '
+                            'use lazy update (from {})'
+                            .format(layer, (sp_idx, tm_idx), seq))
                         # Must match SEQ.
                         self.assertEqual(cstr.topifm, seq,
                                          '_validate_constraint: layer {} ({}) '
@@ -437,13 +446,7 @@ class TestPipelineFixture(unittest.TestCase):
                             oap = OutAccPat.ANY
                         else:
                             oap = OutAccPat.DBF
-                    elif has_dst:
-                        self.assertGreater(cstr.topofm, 0,
-                                           '_validate_constraint: layer {} '
-                                           '({}) output access is '
-                                           'unconstrained.\ncstr: {}.'
-                                           .format(layer, (sp_idx, tm_idx),
-                                                   cstr))
+                    elif has_dst and cstr.topofm > 0:
                         oap = cstr.topofm
                         if has_src:
                             self.assertEqual(cstr.topifm, 1,
@@ -453,17 +456,22 @@ class TestPipelineFixture(unittest.TestCase):
                                              'are fully buffered.\ncstr: {}.'
                                              .format(layer, (sp_idx, tm_idx),
                                                      cstr))
+                    elif has_dst:
+                        # Lazy update, record layer name as seq.
+                        oap = layer
 
                 else:
 
                     # SEQ source.
                     if seq and has_dst:
                         # Must match SEQ, or fully buffer output.
-                        self.assertTrue(cstr.topofm == seq or cstr.topofm == 1,
+                        self.assertTrue(cstr.topofm == seq or cstr.topofm == 1
+                                        or seq in cstr.update_dict,
                                         '_validate_constraint: layer {} ({}) '
                                         'output is not fully buffered, and '
                                         'groups ({}) and its SEQ src output '
-                                        'groups ({}) are mismatched.'
+                                        'groups ({}) are mismatched, and '
+                                        'lazy update is not used.'
                                         '\nsrcs: {}, oaps: {}'
                                         .format(layer, (sp_idx, tm_idx),
                                                 cstr.topofm, seq,
@@ -472,6 +480,9 @@ class TestPipelineFixture(unittest.TestCase):
                     if cstr.topofm == 1:
                         # Fully buffer output.
                         oap = OutAccPat.DBF
+                    elif isinstance(seq, str):
+                        # Lazy update.
+                        oap = seq
                     else:
                         # SEQ output.
                         oap = cstr.topofm

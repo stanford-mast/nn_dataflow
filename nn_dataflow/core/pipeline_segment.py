@@ -22,6 +22,7 @@ from collections import namedtuple, OrderedDict, Counter
 import itertools
 
 from sympy import symbols
+from sympy import Basic as symbasic
 from sympy import Eq as symeq
 from sympy.core.containers import Tuple as symtuple
 from sympy.functions.elementary.piecewise import Piecewise as sympiecewise
@@ -116,6 +117,7 @@ class PipelineSegment(object):
                     kwargs['fbofm'] = bool(a.get('fbofm', False))
                     if not kwargs['fbofm']:
                         kwargs['topofm'] = int(a.get('topofm', 0))
+                    kwargs['update_dict'] = a.get('update_dict')
 
                     c = Cstr(**kwargs)
                     ctpl += (c,)
@@ -685,6 +687,10 @@ class PipelineSegment(object):
         self._simplify_symargs(symargs, symvals)
         self._simplify_symargs(symargs, symvals)
 
+        # Turn constraints into lazily updated rules.
+        self._lazify_topofm_symargs(symargs, symvals)
+        # Cannot simplify any more as update_dict is not sympifi-able.
+
         if not symvals:
             # Must add a dummy symbol so iterative substitution can happen.
             symvals[symbols('_dummy')] = [None]
@@ -754,6 +760,72 @@ class PipelineSegment(object):
 
         Return a new substituted copy without modifying the original one.
         '''
-        return [[dict((k, symtuple(a[k]).subs(*subs_args)[0])
+        # sympify=False is necessary because there may be str in the values.
+        return [[dict((k, symtuple(a[k], sympify=False).subs(*subs_args)[0])
                       for k in a) for a in atpl] for atpl in symargs]
+
+    class TopOfmUpdateLambda(symbasic):
+        ''' A sympifi-able lambda function to lazily update topofm. '''
+        def __new__(cls, *args):
+            return super(PipelineSegment.TopOfmUpdateLambda, cls).__new__(cls)
+        def __call__(self, arg_s, arg_r):
+            setattr(arg_s, 'topofm', arg_r.scheme['to'][0])
+
+    def _lazify_topofm_symargs(self, symargs, symvals):
+        '''
+        Turn qualified topofm constraints into lazily updated rules.
+
+        If a symbol is only used as the topofm constraint by a single CONV
+        layer and some local-region layers, we can turn it into a lazily update
+        rule.
+        '''
+        sym2conv = {}  # symbol --> the only CONV layer using it.
+        sym2lrs = {}   # symbol --> list of local-region layer using it.
+        unqual_syms = set()  # symbols used by two or more CONV layers.
+        for l, a in zip(itertools.chain.from_iterable(self.seg),
+                        itertools.chain.from_iterable(symargs)):
+            layer = self.network[l]
+            if isinstance(layer, ConvLayer):
+                topofm = a.get('topofm', 0)
+                topifm = a.get('topifm', 0)
+                for s in symtuple(topofm, topifm).free_symbols:
+                    if s not in unqual_syms:
+                        if s in sym2conv:
+                            # If a symbol is used in two CONV layers, it cannot
+                            # be lazily updated.
+                            del sym2conv[s]
+                            sym2lrs.pop(s, [])
+                            unqual_syms.add(s)
+                        elif topofm == s:
+                            assert s not in sym2lrs
+                            sym2conv[s] = l
+            else:
+                topofm = a.get('topofm', 0)
+                if topofm in sym2conv:
+                    sym2lrs.setdefault(topofm, []).append(l)
+        assert 0 not in sym2conv and 0 not in sym2lrs
+
+        syms = sym2conv.keys()  # symbols to be lazily updated.
+        lr2conv = {}  # local-region layer to the CONV layer constraining it.
+        for s in syms:
+            for lr in sym2lrs.get(s, []):
+                lr2conv[lr] = sym2conv[s]
+        lconvs = set(lr2conv.values())  # CONV layer whose topofm to be removed.
+
+        for l, a in zip(itertools.chain.from_iterable(self.seg),
+                        itertools.chain.from_iterable(symargs)):
+            if l in lconvs:
+                # Remove CONV topofm.
+                assert sym2conv[a['topofm']] == l
+                del a['topofm']
+            elif l in lr2conv:
+                # Link local-region layer to the CONV layer.
+                lconv = lr2conv[l]
+                assert sym2conv[a['topofm']] == lconv
+                del a['topofm']
+                a['update_dict'] = {
+                    lconv: PipelineSegment.TopOfmUpdateLambda()}
+
+        for s in syms:
+            del symvals[s]
 
