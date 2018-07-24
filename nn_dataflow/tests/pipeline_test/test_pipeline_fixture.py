@@ -149,6 +149,17 @@ class TestPipelineFixture(unittest.TestCase):
         net.add('2p', PoolingLayer(3, 1, 1), prevs=('0', '1', '2'))
         self.net[net.net_name] = net
 
+        net = Network('net8')
+        # Forward to the middle.
+        #    /-\
+        # 0-1-2-2p
+        net.set_input_layer(InputLayer(1, 1))
+        net.add('0', FCLayer(1, 1))
+        net.add('1', FCLayer(1, 1), prevs='0')
+        net.add('2', FCLayer(1, 1), prevs='1')
+        net.add('2p', PoolingLayer(2, 1, 1), prevs=('1', '2'))
+        self.net[net.net_name] = net
+
         # Real networks.
         for net_name in all_networks():
             self.net[net_name] = import_network(net_name)

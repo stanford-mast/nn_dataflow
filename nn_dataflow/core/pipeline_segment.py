@@ -198,7 +198,7 @@ class PipelineSegment(object):
 
         for sp_idx, ltpl in enumerate(self.seg):
 
-            cnt_nbr_src = 0
+            single_nbr_src = None
 
             for tm_idx, l in enumerate(ltpl):
 
@@ -236,8 +236,8 @@ class PipelineSegment(object):
                     prev_idx = layer2idx[nbr_src[0]]
                     assert prev_idx.tm_idx == len(self.seg[prev_idx.sp_idx]) - 1
                     # Single neighbor source across this spatial scheduling.
-                    cnt_nbr_src += 1
-                    assert cnt_nbr_src <= 1
+                    assert single_nbr_src is None or single_nbr_src == prev_idx
+                    single_nbr_src = prev_idx
                     src += (prev_idx,)
 
                 # Destinations.
