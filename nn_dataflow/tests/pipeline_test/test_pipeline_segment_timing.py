@@ -164,10 +164,15 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         timing.add('2', self._make_sched_res((3, 2, 0), 136, top_tb=4))
         self.assertEqual(timing.critical_time, 150)
         self.assertEqual(timing.time, 120 // 4 + 130 + 20 + 136 // 4)
+        self.assertAlmostEqual(timing.time_overhead,
+                               timing.time / ((120 + 130 + 20 + 136) / 3.) - 1)
 
         # Unmatched BAT group number.
         timing.add('3', self._make_sched_res((3, 3, 0), 100, top_tb=2))
         self.assertEqual(timing.time, 120 + 130 + 20 + 136 + 100)
+        self.assertAlmostEqual(timing.time_overhead,
+                               timing.time
+                               / ((120 + 130 + 20 + 136 + 100) / 4.) - 1)
 
     def test_time_ifm_ofm_ngrp(self):
         ''' time and critical_time ifm_ngrp and ofm_ngrp. '''
@@ -185,6 +190,8 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         # 2.
         self.assertEqual(timing.time,
                          120 - 120 // 2 + 120 // 2 // 3 + 90 // 2)
+        self.assertAlmostEqual(timing.time_overhead,
+                               timing.time / ((120 + 90) / 2.) - 1)
 
         # Single-group wait, second critical.
 
@@ -197,6 +204,8 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         # Layer 1 is critical. Layer 1 first BAT group starts at 120 // 2 // 3,
         # and takes 150 for all its BAT groups.
         self.assertEqual(timing.time, 120 // 2 // 3 + 150)
+        self.assertAlmostEqual(timing.time_overhead,
+                               timing.time / ((120 + 150) / 2.) - 1)
 
         # All-group wait, first critical.
 
@@ -207,6 +216,8 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
                                              top_to=3, top_tb=2))
         self.assertEqual(timing.critical_time, 120)
         self.assertEqual(timing.time, 120 + 90 // 2)
+        self.assertAlmostEqual(timing.time_overhead,
+                               timing.time / ((120 + 90) / 2.) - 1)
 
         # All-group wait, second critical.
 
@@ -217,6 +228,8 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
                                              top_ti=3, top_tb=2))
         self.assertEqual(timing.critical_time, 150)
         self.assertEqual(timing.time, 120 // 2 + 150)
+        self.assertAlmostEqual(timing.time_overhead,
+                               timing.time / ((120 + 150) / 2.) - 1)
 
     def test_time_linear(self):
         ''' time and critical_time linear. '''
@@ -235,6 +248,8 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         # starts 150 // 2 // 3 later, and takes 138 // 2.
         self.assertEqual(timing.time,
                          120 // 2 + 150 // 2 + 150 // 2 // 3 + 138 // 2)
+        self.assertAlmostEqual(timing.time_overhead,
+                               timing.time / ((120 + 129 + 21 + 138) / 3.) - 1)
 
     def test_time_branch(self):
         ''' time and critical_time branch. '''
@@ -256,6 +271,8 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         # groups of layer 9 take 168.
         self.assertEqual(timing.time,
                          120 // 2 + 150 // 2 // 3 + 168)
+        self.assertAlmostEqual(timing.time_overhead,
+                               timing.time / ((120 + 150 + 144 + 168) / 4.) - 1)
 
         # All-group wait.
 
@@ -269,6 +286,8 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         # layer 7 last BAT group ends at 150 later, at which time layer 8 and 9
         # last BAT group starts, and takes 144 // 2.
         self.assertEqual(timing.time, 120 // 2 + 150 + 144 // 2)
+        self.assertAlmostEqual(timing.time_overhead,
+                               timing.time / ((120 + 150 + 144 + 132) / 4.) - 1)
 
     def test_time_all_lr(self):
         ''' time and critical_time all LocalRegionLayer. '''
@@ -285,6 +304,8 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         # Layer 1 is critical. Layer 1 first BAT group starts at (40 + 80 + 60)
         # // 2 // 5, and takes 800.
         self.assertEqual(timing.time, (40 + 80 + 60) // 2 // 5 + 800)
+        self.assertAlmostEqual(timing.time_overhead,
+                               timing.time / ((40 + 80 + 60 + 800) / 2.) - 1)
 
     def test_time_single_spatial(self):
         ''' time and critical_time for single-spatial segment. '''
@@ -308,6 +329,7 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
                                                     top_tb=4))
 
                 self.assertEqual(timing.critical_time, timing.time)
+                self.assertAlmostEqual(timing.time_overhead, 0.)
 
     def test_time_dram_time(self):
         ''' time and critical_time dominated by DRAM time. '''
@@ -325,11 +347,28 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         self.assertEqual(timing.dram_time, timing.time)
         self.assertLess(timing.node_time, timing.time)
 
+    def test_time_overhead(self):
+        ''' time_overhead. '''
+        timing = PipelineSegmentTiming(self.net1, 3)
+        timing.add('0', self._make_sched_res((3, 0, 0), 120, num_nodes=4,
+                                             top_ti=3, top_tb=4))
+        timing.add('1', self._make_sched_res((3, 1, 0), 130, num_nodes=6,
+                                             top_to=3, top_tb=4))
+        timing.add('1p', self._make_sched_res((3, 1, 1), 20, num_nodes=6,
+                                              top_to=3, top_tb=4))
+        timing.add('2', self._make_sched_res((3, 2, 0), 138, num_nodes=3,
+                                             top_ti=3, top_tb=4))
+
+        time_indv = 120 * 4 / 13. + (130 + 20) * 6 / 13. + 138 * 3 / 13.
+        self.assertAlmostEqual(timing.time_overhead,
+                               timing.time / time_indv - 1)
+
     def _make_sched_res(self, sched_seq, time, top_ti=1, top_to=1, top_tb=1,
-                        top_ord=range(le.NUM), dram_time=0):
+                        top_ord=range(le.NUM), dram_time=0, num_nodes=4):
         scheme = OrderedDict()
         scheme['cost'] = 1.234 + 9.876
         scheme['time'] = max(time, dram_time)
+        scheme['num_nodes'] = num_nodes
         scheme['cost_loop'] = 1.234
         scheme['cost_part'] = 9.876
         scheme['proc_time'] = time

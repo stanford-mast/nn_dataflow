@@ -30,13 +30,18 @@ class PipelineSegmentTiming(object):
 
     # Each layer timing info is a tuple:
     # - time: the total time.
+    # - node_time: the total time on node processing.
+    # - dram_time: the total time on DRAM access.
+    # - num_nodes: the number of processing nodes.
     # - ngrp: the OFM group number.
     # - ts_xb: when to start.
     # - td_xb: when the first BAT group of this and all prev layers is done.
     # Time is stored by multiplying the lazily updated BAT group number (_xb).
     # Notice (td - ts) may be greater than (time), because fused layers can
     # have an earlier start time, but done time is sequentially accumulated.
-    LayerTiming = namedtuple('LayerTiming', ['time', 'ngrp', 'ts_xb', 'td_xb'])
+    LayerTiming = namedtuple('LayerTiming', ['time', 'node_time', 'dram_time',
+                                             'num_nodes', 'ngrp',
+                                             'ts_xb', 'td_xb'])
 
     def __init__(self, network, seg_idx):
 
@@ -73,6 +78,26 @@ class PipelineSegmentTiming(object):
         ''' The total time of the end-to-end segment processing. '''
         return max(self.node_time, self.dram_time)
 
+    @property
+    def time_overhead(self):
+        '''
+        The time overhead as a percentage, to process layers in segment
+        compared to processing layers individually.
+        '''
+        num_nodes_list = [tlist[0].num_nodes
+                          for tlist in self.timing_list]
+        total_num_nodes = sum(num_nodes_list)
+        node_time_list = [sum(timing.node_time for timing in tlist)
+                          for tlist in self.timing_list]
+        dram_time_list = [sum(timing.dram_time for timing in tlist)
+                          for tlist in self.timing_list]
+        # Sum up the max of scaled node time and DRAM time.
+        time_indv = sum(max(1. * nt * n / total_num_nodes, dt)
+                        for nt, dt, n in zip(node_time_list, dram_time_list,
+                                             num_nodes_list))
+        assert self.time >= time_indv
+        return (self.time - time_indv) / time_indv
+
     def add(self, layer_name, sched_result):
         ''' Add the SchedulingResult of a new layer. '''
 
@@ -103,8 +128,11 @@ class PipelineSegmentTiming(object):
         self.layer2idx[layer_name] = sched_seq[1:]
 
         # Add layer timing.
-        self.timing_list[-1].append(
-            self._make_layer_timing(layer_name, sched_result))
+
+        timing = self._make_layer_timing(layer_name, sched_result)
+        assert not self.timing_list[-1] \
+                or timing.num_nodes == self.timing_list[-1][-1].num_nodes
+        self.timing_list[-1].append(timing)
         assert self.last_sched_seq[1] + 1 == len(self.timing_list)
         assert self.last_sched_seq[2] + 1 == len(self.timing_list[-1])
 
@@ -165,6 +193,12 @@ class PipelineSegmentTiming(object):
         # IFM/OFM group number.
         ifm_ngrp, ofm_ngrp = top_ts[le.IFM], top_ts[le.OFM]
 
+        # Time on node processing and DRAM access.
+        node_time = sched_result.total_node_time
+        dram_time = sched_result.total_dram_time
+        # Number of nodes.
+        num_nodes = sched_result.num_nodes
+
         # Calculate timing.
         sp_idx, tm_idx = self.layer2idx[layer_name]
         is_conv = isinstance(self.network[layer_name], ConvLayer)
@@ -202,6 +236,7 @@ class PipelineSegmentTiming(object):
             ts_xb = max(ts_xb, start)
         td_xb = max(td_xb, ts_xb + time)
 
-        return PipelineSegmentTiming.LayerTiming(time=time, ngrp=ofm_ngrp,
-                                                 ts_xb=ts_xb, td_xb=td_xb)
+        return PipelineSegmentTiming.LayerTiming(
+            time=time, node_time=node_time, dram_time=dram_time,
+            num_nodes=num_nodes, ngrp=ofm_ngrp, ts_xb=ts_xb, td_xb=td_xb)
 
