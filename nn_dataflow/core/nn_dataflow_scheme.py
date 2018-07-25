@@ -50,7 +50,7 @@ class NNDataflowScheme(MutableMapping):
         self.total_cost = 0
 
         # A list of segment schedule timing information.
-        self.seg_tlist = []
+        self.segment_timing_list = []
 
         self.last_seg_idx = -1
 
@@ -86,7 +86,8 @@ class NNDataflowScheme(MutableMapping):
 
         seg_idx = sched_result.sched_seq[0]
         if seg_idx == self.last_seg_idx + 1:
-            self.seg_tlist.append(PipelineSegmentTiming(self.network, seg_idx))
+            self.segment_timing_list.append(
+                PipelineSegmentTiming(self.network, seg_idx))
             self.last_seg_idx += 1
         elif seg_idx == self.last_seg_idx:
             pass
@@ -94,8 +95,8 @@ class NNDataflowScheme(MutableMapping):
             raise ValueError('NNDataflowScheme: segment index is invalid. '
                              'segment {} follows {}.'
                              .format(seg_idx, self.last_seg_idx))
-        assert len(self.seg_tlist) - 1 == self.last_seg_idx
-        self.seg_tlist[-1].add(layer_name, sched_result)
+        assert len(self.segment_timing_list) - 1 == self.last_seg_idx
+        self.segment_timing_list[-1].add(layer_name, sched_result)
 
     def __delitem__(self, layer_name):
         ''' Not legal to call. '''
@@ -128,9 +129,10 @@ class NNDataflowScheme(MutableMapping):
         ''' Get the total time. '''
         # Special case, when the entire network fits in one segment. No
         # pipeline filling/draining delay.
-        if len(self.seg_tlist) == 1 and self.__len__() == len(self.network):
-            return self.seg_tlist[0].critical_time
-        return sum(t.time for t in self.seg_tlist)
+        if len(self.segment_timing_list) == 1 \
+                and self.__len__() == len(self.network):
+            return self.segment_timing_list[0].critical_time
+        return sum(t.time for t in self.segment_timing_list)
 
     @property
     def total_ops(self):
@@ -157,21 +159,13 @@ class NNDataflowScheme(MutableMapping):
 
     def segment_time_list(self):
         ''' Get the time for each segment. '''
-        return [t.time for t in self.seg_tlist]
+        return [t.time for t in self.segment_timing_list]
 
     def segment_dram_time_list(self):
         '''
         Get the time for each segment on DRAM access.
         '''
-        return [t.dram_time for t in self.seg_tlist]
-
-    def last_segment_time(self):
-        ''' Get the time for the last segment. '''
-        return self.seg_tlist[-1].time
-
-    def last_segment_critical_time(self):
-        ''' Get the critical time for the last segment. '''
-        return self.seg_tlist[-1].critical_time
+        return [t.dram_time for t in self.segment_timing_list]
 
     def perlayer_stats(self, stats_name):
         '''

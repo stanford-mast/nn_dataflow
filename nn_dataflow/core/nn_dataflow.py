@@ -74,9 +74,6 @@ class NNDataflow(object):
                                       self.resource)
         self.ordered_layer_list = self.ilp.ordered_layer_list()
 
-        # Allowed time overhead due to layer pipelining.
-        self.layer_base_time = {}
-
         # NNDataflowScheme tops.
         # The top schemes are organized by the ending layers, and keeping
         # extended to the end of the network.
@@ -94,7 +91,6 @@ class NNDataflow(object):
 
         # Clear and reset.
         self.nndf_tops = {}
-        self.layer_base_time = {}
 
         # Initial input layout.
         self.nndf_tops[None] = []
@@ -113,7 +109,7 @@ class NNDataflow(object):
 
             # The segments ended with the current layer. Use them to extend the
             # current top schemes.
-            for seg in segments.get(layer_name, []):
+            for seg in segments[layer_name]:
                 if options.verbose:
                     sys.stderr.write('  - {}\n'.format(seg.seg))
                     sys.stderr.flush()
@@ -152,29 +148,9 @@ class NNDataflow(object):
         '''
         Schedule the given PipelineSegment `segment`.
 
-        Return a list of top NNDataflowScheme instances that include this
-        segment. Will NOT update the `nndf_tops` attribute.
+        Return new top NNDataflowScheme instances that include this segment.
+        Will NOT update the `nndf_tops` attribute.
         '''
-
-        # Single-layer or multi-layer segment.
-        single_layer = len(segment) == 1 and len(segment[0]) == 1
-        if single_layer:
-            layer = segment[0][0]
-            assert layer not in self.layer_base_time
-            self.layer_base_time[layer] = float('inf')
-            time_limit = float('inf')
-        else:
-            # Get time limit.
-            time_limit = 0
-            for ltpl in segment:
-                for layer in ltpl:
-                    assert layer in self.layer_base_time, \
-                            'NNDataflow: single-layer segment must be ' \
-                            'yielded before multi-layer segments. ' \
-                            'Got {} before {}.'.format(segment, layer)
-                    time_limit += self.layer_base_time[layer]
-            time_limit *= (1 + options.layer_pipeline_time_ovhd)
-
         # We take the top schemes that end with the latest previous layer as
         # the initial state.
         first_layer_idx = self.ordered_layer_list.index(segment[0][0])
@@ -192,17 +168,18 @@ class NNDataflow(object):
         # Allocation.
         allocation = segment.allocation()
 
-        fast_forward = False
+        # Max allowed time overhead for segment timing.
+        max_time_ovhd = options.layer_pipeline_time_ovhd
+
+        # Cost hint Pareto-optimal frontier.
+        frontier = set()
 
         # Explore constraints.
-        for constraint, ff_end in segment.gen_constraint():
+        for constraint, hints in segment.gen_constraint():
 
-            # Prune.
-            if ff_end:
-                # Exit fast forwarding.
-                fast_forward = False
-
-            if fast_forward:
+            # Filter out off-frontier constraints.
+            if any(all(h >= fh for h, fh in zip(hints, fhints))
+                   for fhints in frontier):
                 continue
 
             # Start from the previous top schemes.
@@ -221,38 +198,18 @@ class NNDataflow(object):
                         curr_nndf_tops, options)
 
             # Filter by time limit.
-            filtered_nndf_tops = [nndf for nndf in curr_nndf_tops
-                                  if nndf.last_segment_time() <= time_limit]
+            seg_nndf_tops = [nndf for nndf in curr_nndf_tops
+                             if all(timing.time_overhead <= max_time_ovhd
+                                    for timing in nndf.segment_timing_list)]
 
-            nndf_tops += filtered_nndf_tops
+            # Add to frontier.
+            if seg_nndf_tops:
+                frontier.add(hints)
 
-            if not curr_nndf_tops or filtered_nndf_tops:
-                # Enter fast forwarding if 1) constraint is infeasible; or 2)
-                # already found with less strict constraint.
-                fast_forward = True
-            else:
-                assert curr_nndf_tops and not filtered_nndf_tops
-                # This is the case where all schemes are filtered out by the
-                # time limit.
-                assert all(nndf.last_segment_time() > time_limit
-                           for nndf in curr_nndf_tops)
-                if all(nndf.last_segment_critical_time() > time_limit
-                       for nndf in curr_nndf_tops):
-                    # Enter fast forwarding if the critical time does not meet
-                    # the time limit, in which case the more strict constraints
-                    # will not help.
-                    fast_forward = True
+            nndf_tops += seg_nndf_tops
 
         # Always pick and keep top n.
-        nndf_tops = sorted(nndf_tops,
-                           key=NNDataflowScheme.cmp_key)[:options.ntops]
-
-        # Set base time for scheduling layer individually.
-        if single_layer and nndf_tops:
-            layer = segment[0][0]
-            self.layer_base_time[layer] = nndf_tops[0][layer].total_time
-
-        return nndf_tops
+        return sorted(nndf_tops, key=NNDataflowScheme.cmp_key)[:options.ntops]
 
     def _layer_schedule_search(self, layer_name, resource, constraint,
                                spatial_idx, temporal_idx, prev_nndf_tops,

@@ -96,10 +96,23 @@ class PipelineSegment(object):
         layers in the segment.
 
         Yield the segment constraint tuple, and hints for pruning.
+
+        Pruning hints are the top-level loop blocking factors. Smaller hints
+        indicate better (lower) cost, and larger hints indicate better segment
+        timing (with lower time overhead). Constraints with smaller hints are
+        generated before those with larger hints. So if a constraint results in
+        a valid scheduling, the later ones with all hints larger than its can
+        be pruned.
         '''
         syms = self.cstr_symvals.keys()
         vals = self.cstr_symvals.values()
         assert syms and vals
+
+        # Sort from small to large.
+        # This is not a strict ordering, but we guarantee that if all values in
+        # hint A are larger than the corresponding values in hint B, A will be
+        # generated after B.
+        vals = [sorted(v) for v in vals]
 
         for valp in itertools.product(*vals):
 
@@ -123,7 +136,13 @@ class PipelineSegment(object):
                     ctpl += (c,)
                 constraint += (ctpl,)
 
-            yield constraint, None
+            if None in valp:
+                assert len(valp) == 1
+                hints = (1,)
+            else:
+                hints = tuple(valp)
+
+            yield constraint, hints
 
     def __getitem__(self, index):
         return self.seg[index]

@@ -215,6 +215,29 @@ class TestNNDataflow(unittest.TestCase):
         tops, _ = nnd.schedule_search(options)
         self.assertTrue(tops)
 
+    def test_fast_forward_frontier(self):
+        ''' Enter fast forward due to off-frontier. '''
+        network = self.simple_net
+        batch_size = 16
+
+        # Multiple nodes for spatial pipelining.
+        resource = self.resource._replace(
+            proc_region=NodeRegion(origin=PhyDim2(0, 0),
+                                   dim=PhyDim2(8, 8),
+                                   type=NodeRegion.PROC),
+            dim_array=PhyDim2(2, 2),
+        )
+
+        # No time overhead limit.
+        options = Option(hw_gbuf_save_writeback=True,
+                         partition_interlayer=True,
+                         layer_pipeline_time_ovhd=float('inf'))
+        nnd = NNDataflow(network, batch_size, resource, self.cost,
+                         self.map_strategy)
+
+        tops, _ = nnd.schedule_search(options)
+        self.assertTrue(tops)
+
     def test_sched_instance_sharing(self):
         ''' Scheduling instance sharing between layers. '''
         network = self.alex_net

@@ -417,3 +417,39 @@ class TestPipelineSegment(TestPipelineFixture):
                         for c in ctpl:
                             self.assertEqual(c.topbat, 0)
 
+    def test_gen_constraint_hints(self):
+        ''' gen_constraint() pruning hints. '''
+
+        # Use ZFNet to give the real fmap dimensions.
+        net_name = 'zfnet'
+
+        net = self.net[net_name]
+
+        for segment in self._gen_all_segment(net):
+            if not segment.valid:
+                continue
+
+            hints_set = set()
+            last_hints = None
+
+            for _, hints in segment.gen_constraint():
+
+                self.assertTrue(all(isinstance(h, int) and h > 0
+                                    for h in hints),
+                                'test_gen_constraint_hints: '
+                                'all hints should be positive integers only. '
+                                '{}'.format(hints))
+
+                self.assertTrue(all(
+                    not all(h < ph for h, ph in zip(hints, phints))
+                    for phints in hints_set),
+                                'test_gen_constraint_hints: '
+                                'smaller hints are generated too late.')
+
+                if last_hints:
+                    self.assertGreater(hints, last_hints,
+                                       'test_gen_constraint_hints: '
+                                       'hints should be generated from small '
+                                       'to large.')
+                last_hints = hints
+

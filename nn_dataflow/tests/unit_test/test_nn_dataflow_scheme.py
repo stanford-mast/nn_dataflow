@@ -289,26 +289,6 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.assertListEqual(dtfl.segment_dram_time_list(), [185, 10])
         self.assertListEqual(dtfl.segment_time_list(), [205, 10])
 
-    def test_last_segment_time(self):
-        ''' last_segment_time(). '''
-        dtfl = NNDataflowScheme(self.network, self.input_layout)
-        dtfl['c1'] = self.c1res
-        self.assertEqual(dtfl.last_segment_time(), 200)
-        dtfl['p1'] = self.p1res
-        self.assertEqual(dtfl.last_segment_time(), 205)
-        dtfl['p2'] = self.p2res._replace(sched_seq=(1, 0, 0))
-        self.assertEqual(dtfl.last_segment_time(), 5)
-
-    def test_last_segment_critical_time(self):
-        ''' last_segment_critical_time(). '''
-        dtfl = NNDataflowScheme(self.network, self.input_layout)
-        dtfl['c1'] = self.c1res
-        self.assertEqual(dtfl.last_segment_critical_time(), 200)
-        dtfl['p1'] = self.p1res
-        self.assertEqual(dtfl.last_segment_critical_time(), 200)
-        dtfl['p2'] = self.p2res._replace(sched_seq=(1, 0, 0))
-        self.assertEqual(dtfl.last_segment_critical_time(), 5)
-
     def test_total_static_cost(self):
         ''' Static cost. '''
         self.assertAlmostEqual(self.dtfl.total_static_cost(1),
