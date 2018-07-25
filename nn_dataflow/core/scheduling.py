@@ -20,6 +20,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import itertools
 from collections import OrderedDict, namedtuple
+import fastcache
 
 from . import data_category_enum as de
 from . import loop_blocking
@@ -128,7 +129,6 @@ class Scheduling(object):
     '''
     Layer scheduling.
     '''
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, layer, batch_size, cost, map_strategy_class):
 
@@ -146,11 +146,7 @@ class Scheduling(object):
         self.cost = cost
         self.map_strategy_class = map_strategy_class
 
-        # Per-node schedule cache.
-        self.pernode_sched_cache = {}
-        self.pernode_sched_cache_hits = 0
-        self.pernode_sched_cache_misses = 0
-
+    @fastcache.clru_cache(maxsize=1024)
     def schedule_search(self, condition, options):
         '''
         Search the best scheduling results.
@@ -230,31 +226,17 @@ class Scheduling(object):
         '''
         Get the cache hits/misses stats. Return a tuple of (hits, misses).
         '''
-        return (self.pernode_sched_cache_hits, self.pernode_sched_cache_misses)
+        # pylint: disable=no-member
+        info = self.schedule_search_per_node.cache_info()
+        return (info.hits, info.misses)
 
-    def schedule_search_per_node(self, *args):
+    @fastcache.clru_cache(maxsize=1024)
+    def schedule_search_per_node(self, part, resource, options):
         '''
         Search the best mapping strategies and loop blocking schemes for a
         single node after partitioning. Return the top LoopBlockingScheme
         instances.
         '''
-
-        # NOTE: need to ensure the key's __eq__ and __hash__ have been
-        # redefined.
-        cache_key = tuple(args)
-
-        cache_val = self.pernode_sched_cache.get(cache_key, None)
-
-        if cache_val is not None:
-            # Cache hit.
-            self.pernode_sched_cache_hits += 1
-            return cache_val
-
-        # Cache miss.
-        self.pernode_sched_cache_misses += 1
-
-        part, resource, options = args
-
         lbs_tops = []
 
         # Partitioned layer.
@@ -274,8 +256,6 @@ class Scheduling(object):
 
                 if lbs.is_valid():
                     lbs_tops.append(lbs)
-
-        self.pernode_sched_cache[cache_key] = lbs_tops
 
         return lbs_tops
 
