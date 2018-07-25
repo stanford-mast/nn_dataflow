@@ -34,6 +34,8 @@ List of major changes and improvements
 
   - Add utility `IntRange` for integer ranges.
 
+  - Add `HashableDict` class.
+
 
 ### Changed
 
