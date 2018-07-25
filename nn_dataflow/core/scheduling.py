@@ -170,7 +170,7 @@ class Scheduling(object):
                              'input layer.')
 
         # Filter nodes. All memory nodes can store filters. Deduplicate.
-        filter_nodes = set(itertools.chain(
+        filter_nodes = frozenset(itertools.chain(
             resource.src_data_region.iter_node(),
             resource.dst_data_region.iter_node()))
 
