@@ -24,7 +24,7 @@ from . import data_category_enum as de
 from . import loop_enum as le
 from . import parallel_enum as pe
 from .. import util
-from .data_dim_loops import DataDimLoops
+from .layer import ConvLayer
 from .phy_dim2 import PhyDim2
 
 class BufShrScheme(object):
@@ -49,10 +49,7 @@ class BufShrScheme(object):
                              'in the node region')
 
         if data_loops is None:
-            data_loops = [None] * de.NUM
-            data_loops[de.FIL] = DataDimLoops(le.IFM, le.OFM)
-            data_loops[de.IFM] = DataDimLoops(le.IFM, le.BAT)
-            data_loops[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+            data_loops = ConvLayer.data_loops()
 
         # Get node group corresponding to each LoopEnum, and the distance
         # between neighbors in that node group.
