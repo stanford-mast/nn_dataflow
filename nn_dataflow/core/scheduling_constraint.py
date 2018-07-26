@@ -21,8 +21,9 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import numbers
 
 from . import loop_enum as le
+from .. import util
 
-class SchedulingConstraint(object):
+class SchedulingConstraint(util.ContentHashClass):
     '''
     Layer scheduling constraint, which constrains top loop blocking factors.
     '''
@@ -47,6 +48,7 @@ class SchedulingConstraint(object):
         if not isinstance(update_dict, dict):
             raise TypeError('SchedulingConstraint: '
                             'update_dict must be a dict instance.')
+        update_dict = util.HashableDict.fromdict(update_dict)
         for val in update_dict.values():
             if not callable(val):
                 raise TypeError('SchedulingConstraint: '
@@ -96,7 +98,7 @@ class SchedulingConstraint(object):
         '''
         for layer_name in self.update_dict:
             self.update_dict[layer_name](self, prev_results[layer_name])
-        self.update_dict = {}  # clear updated rules.
+        self.update_dict = util.HashableDict()  # clear updated rules.
 
     def __repr__(self):
         return '{}({})'.format(

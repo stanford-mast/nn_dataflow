@@ -176,6 +176,27 @@ class TestSchedulingConstraint(TestSchedulingConstraintFixture):
         self.assertFalse(cstr.is_valid_top_bl([1, 4, 1], range(le.NUM)))
         self.assertTrue(cstr.is_valid_top_bl([2, 4, 1], range(le.NUM)))
 
+    def test_content_hash(self):
+        ''' Content-based hash. '''
+        cstr1 = SchedulingConstraint(topbat=2)
+        cstr2 = SchedulingConstraint(topbat=2)
+        self.assertNotEqual(id(cstr1), id(cstr2))
+        self.assertEqual(hash(cstr1), hash(cstr2))
+        self.assertEqual(cstr1, cstr2)
+
+        cstr3 = SchedulingConstraint(
+            topbat=2,
+            update_dict={
+                'l1': lambda s, _: setattr(s, 'topbat', 1),
+                'l2': lambda s, r: setattr(s, 'topifm', r.topifm),
+            })
+        r = SchedulingConstraint(topifm=2)
+        cstr3.update_by_prev({'l1': None, 'l2': r})
+        cstr4 = SchedulingConstraint(topifm=2, topbat=1)
+        self.assertNotEqual(id(cstr3), id(cstr4))
+        self.assertEqual(hash(cstr3), hash(cstr4))
+        self.assertEqual(cstr3, cstr4)
+
     def test_repr(self):
         ''' __repr__. '''
         cstr = SchedulingConstraint(topbat=2)
