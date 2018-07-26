@@ -89,7 +89,7 @@ class PipelineSegment(object):
             return None
         return self.alloc
 
-    def gen_constraint(self):
+    def gen_constraint(self, max_time_overhead=float('inf')):
         '''
         Generate scheduling constraint for the segment, as a tuple of
         sub-tuples of SchedulingConstraint instances, corresponding to the
@@ -113,6 +113,13 @@ class PipelineSegment(object):
         # hint A are larger than the corresponding values in hint B, A will be
         # generated after B.
         vals = [sorted(v) for v in vals]
+
+        if self.cstr_topbat_idx is not None:
+            # Tovhd =  (1 + 1/to + 1 + 1/to + ...) / tb
+            #       >= (1 + 1 + ...) / tb = num_sp_fbs / tb
+            min_topbat = 1. * self.cstr_num_sp_fbs / max_time_overhead
+            pos = self.cstr_topbat_idx
+            vals[pos] = [t for t in vals[pos] if t >= min_topbat]
 
         for valp in itertools.product(*vals):
 
@@ -675,6 +682,7 @@ class PipelineSegment(object):
             fbofm_init = symbols('_dummy_fbofm_init')
         opt_val = None
         opt_key = (float('inf'),) * 2  # (num of fb pairs, max fb size)
+        num_sp_fbs = 0
         for val in fbofm_init_vals:
             subs_symargs = self._subs_symargs(symargs, fbofm_init, val)
             maxsz = 0
@@ -697,6 +705,7 @@ class PipelineSegment(object):
                 key = (numfb, maxsz)
                 if key < opt_key:
                     opt_val, opt_key = val, key
+                    num_sp_fbs = numfb
         if opt_val is None:
             return False
         # Use the optimal value.
@@ -716,6 +725,11 @@ class PipelineSegment(object):
 
         self.cstr_symargs = symargs
         self.cstr_symvals = symvals
+        self.cstr_num_sp_fbs = num_sp_fbs
+        try:
+            self.cstr_topbat_idx = list(symvals.keys()).index(topbat)
+        except ValueError:
+            self.cstr_topbat_idx = None
 
         return True
 

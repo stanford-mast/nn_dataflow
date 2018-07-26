@@ -20,14 +20,22 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import unittest
 
+from collections import OrderedDict
+
+from nn_dataflow.core import DataLayout
+from nn_dataflow.core import FmapRange
 from nn_dataflow.core import InputLayer, ConvLayer, FCLayer, PoolingLayer
 from nn_dataflow.core import InterLayerPipeline
+from nn_dataflow.core import LoopEnum as le
 from nn_dataflow.core import Network
 from nn_dataflow.core import NodeRegion
+from nn_dataflow.core import ParallelEnum as pe
+from nn_dataflow.core import PartitionScheme
 from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import PipelineSegment
 from nn_dataflow.core import Resource
 from nn_dataflow.core import SchedulingConstraint
+from nn_dataflow.core import SchedulingResult
 
 from nn_dataflow.nns import import_network, all_networks
 
@@ -176,6 +184,13 @@ class TestPipelineFixture(unittest.TestCase):
             dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
 
+        part = PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM)
+        self.ofmap_layout = DataLayout(
+            frngs=(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)),),
+            regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                type=NodeRegion.DRAM),),
+            parts=(part,))
+
 
     def _make_ilp(self, network):
         ''' Make an InterLayerPipeline instance. '''
@@ -192,6 +207,26 @@ class TestPipelineFixture(unittest.TestCase):
             seg = (sum(seg, tuple()),)
         return PipelineSegment(seg, ilp.network, ilp.batch_size, ilp.resource,
                                **kwargs)
+
+    def _make_sched_res(self, sched_seq, time, top_ti=1, top_to=1, top_tb=1,
+                        top_ord=range(le.NUM), dram_time=0, num_nodes=4):
+        scheme = OrderedDict()
+        scheme['cost'] = 1.234 + 9.876
+        scheme['time'] = max(time, dram_time)
+        scheme['num_nodes'] = num_nodes
+        scheme['cost_loop'] = 1.234
+        scheme['cost_part'] = 9.876
+        scheme['proc_time'] = time
+        scheme['bus_time'] = 0
+        scheme['dram_time'] = dram_time
+        scheme['ti'] = [top_ti, 1, 1]
+        scheme['to'] = [top_to, 1, 1]
+        scheme['tb'] = [top_tb, 1, 1]
+        scheme['tvals'] = [[top_ti, top_to, top_tb], [1] * 3, [1] * 3]
+        scheme['orders'] = [top_ord, range(le.NUM), range(le.NUM)]
+        return SchedulingResult(scheme=scheme,
+                                ofmap_layout=self.ofmap_layout,
+                                sched_seq=sched_seq)
 
     def _gen_all_segment(self, network, **kwargs):
         '''

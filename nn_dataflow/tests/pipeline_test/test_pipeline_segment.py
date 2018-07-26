@@ -23,6 +23,7 @@ import itertools
 from nn_dataflow.core import NodeRegion
 from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import PipelineSegment
+from nn_dataflow.core import PipelineSegmentTiming
 
 from . import TestPipelineFixture
 
@@ -452,4 +453,59 @@ class TestPipelineSegment(TestPipelineFixture):
                                        'hints should be generated from small '
                                        'to large.')
                 last_hints = hints
+
+    def test_gen_constraint_max_ovhd(self):
+        ''' gen_constraint() with max_time_overhead. '''
+
+        def _make_key(constraint):
+            return tuple((c.topifm, c.topofm, c.topbat)
+                         for c in itertools.chain.from_iterable(constraint))
+
+        net = self.net['zfnet']
+
+        for segment in self._gen_all_segment(net):
+            if not segment.valid:
+                continue
+
+            set_all = set()
+            set_1 = set()
+            set_5 = set()
+
+            for constraint, _ in segment.gen_constraint():
+
+                timing = PipelineSegmentTiming(net, 0)
+                for sp_idx, (ltpl, ctpl) in enumerate(zip(segment, constraint)):
+                    for tm_idx, (l, c) in enumerate(zip(ltpl, ctpl)):
+                        res = self._make_sched_res((0, sp_idx, tm_idx),
+                                                   65536 // len(ltpl),
+                                                   top_ti=c.topifm,
+                                                   top_to=c.topofm,
+                                                   top_tb=c.topbat)
+                        timing.add(l, res)
+
+                key = _make_key(constraint)
+
+                set_all.add(key)
+                if timing.time_overhead <= 0.1:
+                    set_1.add(key)
+                if timing.time_overhead <= 0.5:
+                    set_5.add(key)
+
+            for constraint, _ in segment.gen_constraint(max_time_overhead=0.1):
+                key = _make_key(constraint)
+                set_1.discard(key)
+
+            self.assertFalse(set_1,
+                             'gen_constraint with max_time_overhead: '
+                             'miss generating constraints with <= 0.1 ovhd:\n'
+                             '{}'.format(set_1))
+
+            for constraint, _ in segment.gen_constraint(max_time_overhead=0.5):
+                key = _make_key(constraint)
+                set_5.discard(key)
+
+            self.assertFalse(set_5,
+                             'gen_constraint with max_time_overhead: '
+                             'miss generating constraints with <= 0.5 ovhd:\n'
+                             '{}'.format(set_5))
 

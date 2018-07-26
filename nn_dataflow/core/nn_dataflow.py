@@ -175,7 +175,7 @@ class NNDataflow(object):
         frontier = set()
 
         # Explore constraints.
-        for constraint, hints in segment.gen_constraint():
+        for constraint, hints in segment.gen_constraint(max_time_ovhd):
 
             # Filter out off-frontier constraints.
             if any(all(h >= fh for h, fh in zip(hints, fhints))

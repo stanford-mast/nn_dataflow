@@ -18,19 +18,9 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from collections import OrderedDict
-
 from nn_dataflow.core import InputLayer, FCLayer, PoolingLayer
-from nn_dataflow.core import DataLayout
-from nn_dataflow.core import FmapRange
-from nn_dataflow.core import LoopEnum as le
 from nn_dataflow.core import Network
-from nn_dataflow.core import NodeRegion
-from nn_dataflow.core import ParallelEnum as pe
-from nn_dataflow.core import PartitionScheme
-from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import PipelineSegmentTiming
-from nn_dataflow.core import SchedulingResult
 
 from . import TestPipelineFixture
 
@@ -50,13 +40,6 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         self.netlr.add('0p2', PoolingLayer(10, 1, 1))
         self.netlr.add('0p3', PoolingLayer(10, 1, 1))
         self.netlr.add('1', FCLayer(10, 20))
-
-        part = PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM)
-        self.ofmap_layout = DataLayout(
-            frngs=(FmapRange((0, 0, 0, 0), (2, 4, 16, 16)),),
-            regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
-                                type=NodeRegion.DRAM),),
-            parts=(part,))
 
     def test_valid_args(self):
         ''' Valid arguments. '''
@@ -362,24 +345,4 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         time_indv = 120 * 4 / 13. + (130 + 20) * 6 / 13. + 138 * 3 / 13.
         self.assertAlmostEqual(timing.time_overhead,
                                timing.time / time_indv - 1)
-
-    def _make_sched_res(self, sched_seq, time, top_ti=1, top_to=1, top_tb=1,
-                        top_ord=range(le.NUM), dram_time=0, num_nodes=4):
-        scheme = OrderedDict()
-        scheme['cost'] = 1.234 + 9.876
-        scheme['time'] = max(time, dram_time)
-        scheme['num_nodes'] = num_nodes
-        scheme['cost_loop'] = 1.234
-        scheme['cost_part'] = 9.876
-        scheme['proc_time'] = time
-        scheme['bus_time'] = 0
-        scheme['dram_time'] = dram_time
-        scheme['ti'] = [top_ti, 1, 1]
-        scheme['to'] = [top_to, 1, 1]
-        scheme['tb'] = [top_tb, 1, 1]
-        scheme['tvals'] = [[top_ti, top_to, top_tb], [1] * 3, [1] * 3]
-        scheme['orders'] = [top_ord, range(le.NUM), range(le.NUM)]
-        return SchedulingResult(scheme=scheme,
-                                ofmap_layout=self.ofmap_layout,
-                                sched_seq=sched_seq)
 
