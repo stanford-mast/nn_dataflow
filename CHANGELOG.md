@@ -45,12 +45,6 @@ List of major changes and improvements
     pipelining.
 
 
-### Fixed
-
-- Allow `DataLayout` with different types to merge, which results in the more
-  conservative type.
-
-
 ## [v1.5 -- v1.6] -- 2018-07-26
 
 ### Added
