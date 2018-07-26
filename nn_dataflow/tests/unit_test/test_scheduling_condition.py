@@ -38,6 +38,8 @@ class TestSchedulingCondition(unittest.TestCase):
         self.resource = Resource(
             proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                    type=NodeRegion.PROC),
+            dram_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                   type=NodeRegion.DRAM),
             src_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                        type=NodeRegion.DRAM),
             dst_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),

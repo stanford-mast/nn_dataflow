@@ -58,19 +58,19 @@ class TestLoopBlockingFixture(unittest.TestCase):
                                  type=NodeRegion.DRAM)
         # Typical resource.
         self.resource['BASE'] = Resource(
-            proc_region=proc_region,
+            proc_region=proc_region, dram_region=data_region,
             src_data_region=data_region, dst_data_region=data_region,
             dim_array=dim_array, size_gbuf=65536, size_regf=64,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
         # Larger resource with sufficient capacity, to make all schemes valid.
         self.resource['LG'] = Resource(
-            proc_region=proc_region,
+            proc_region=proc_region, dram_region=data_region,
             src_data_region=data_region, dst_data_region=data_region,
             dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
         # Small resource.
         self.resource['SM'] = Resource(
-            proc_region=proc_region,
+            proc_region=proc_region, dram_region=data_region,
             src_data_region=data_region, dst_data_region=data_region,
             dim_array=dim_array, size_gbuf=4096, size_regf=16,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
@@ -78,17 +78,17 @@ class TestLoopBlockingFixture(unittest.TestCase):
         proc_data_region = NodeRegion(origin=PhyDim2(1, 1), dim=PhyDim2(1, 1),
                                       type=NodeRegion.PROC)
         self.resource['SRCNOTDATA'] = Resource(
-            proc_region=proc_region,
+            proc_region=proc_region, dram_region=data_region,
             src_data_region=proc_data_region, dst_data_region=data_region,
             dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
         self.resource['DSTNOTDATA'] = Resource(
-            proc_region=proc_region,
+            proc_region=proc_region, dram_region=data_region,
             src_data_region=data_region, dst_data_region=proc_data_region,
             dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
         self.resource['DATALOCAL'] = Resource(
-            proc_region=proc_region,
+            proc_region=proc_region, dram_region=data_region,
             src_data_region=proc_region, dst_data_region=proc_region,
             dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))

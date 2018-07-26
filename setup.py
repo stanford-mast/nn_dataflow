@@ -55,6 +55,7 @@ setuptools.setup(
     install_requires=[
         'argparse',
         'coverage>=4',
+        'fastcache>=1',
         'pytest>=3',
         'pytest-cov>=2',
         'pytest-xdist>=1',

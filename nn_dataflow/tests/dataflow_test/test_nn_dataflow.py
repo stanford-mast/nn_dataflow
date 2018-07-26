@@ -57,6 +57,9 @@ class TestNNDataflow(unittest.TestCase):
         self.resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
                                                         dim=PhyDim2(1, 1),
                                                         type=NodeRegion.PROC),
+                                 dram_region=NodeRegion(
+                                     origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                     type=NodeRegion.DRAM),
                                  src_data_region=NodeRegion(
                                      origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                      type=NodeRegion.DRAM),
@@ -260,6 +263,9 @@ class TestNNDataflow(unittest.TestCase):
         self.resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
                                                         dim=PhyDim2(4, 4),
                                                         type=NodeRegion.PROC),
+                                 dram_region=NodeRegion(
+                                     origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                     type=NodeRegion.DRAM),
                                  src_data_region=NodeRegion(
                                      origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
                                      type=NodeRegion.DRAM),
@@ -388,6 +394,9 @@ class TestNNDataflow(unittest.TestCase):
         resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
                                                    dim=PhyDim2(1, 1),
                                                    type=NodeRegion.PROC),
+                            dram_region=NodeRegion(
+                                origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                type=NodeRegion.DRAM),
                             src_data_region=NodeRegion(
                                 origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                 type=NodeRegion.DRAM),
@@ -481,6 +490,9 @@ class TestNNDataflow(unittest.TestCase):
         resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
                                                    dim=PhyDim2(1, 1),
                                                    type=NodeRegion.PROC),
+                            dram_region=NodeRegion(
+                                origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                type=NodeRegion.DRAM),
                             src_data_region=NodeRegion(
                                 origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                 type=NodeRegion.DRAM),
@@ -510,6 +522,9 @@ class TestNNDataflow(unittest.TestCase):
         resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
                                                    dim=PhyDim2(4, 4),
                                                    type=NodeRegion.PROC),
+                            dram_region=NodeRegion(
+                                origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
+                                type=NodeRegion.DRAM),
                             src_data_region=NodeRegion(
                                 origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
                                 type=NodeRegion.DRAM),

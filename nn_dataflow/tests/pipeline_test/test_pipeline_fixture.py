@@ -177,6 +177,8 @@ class TestPipelineFixture(unittest.TestCase):
         self.resource = Resource(
             proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 8),
                                    type=NodeRegion.PROC),
+            dram_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 8),
+                                   type=NodeRegion.DRAM),
             src_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 4),
                                        type=NodeRegion.DRAM),
             dst_data_region=NodeRegion(origin=PhyDim2(0, 4), dim=PhyDim2(8, 4),

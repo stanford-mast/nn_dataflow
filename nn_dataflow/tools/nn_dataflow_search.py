@@ -126,6 +126,7 @@ def do_scheduling(args):
                                  type=NodeRegion.DRAM)
 
     resource = Resource(proc_region=proc_region,
+                        dram_region=data_region,
                         src_data_region=data_region,
                         dst_data_region=data_region,
                         dim_array=dim_array,

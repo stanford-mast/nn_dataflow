@@ -363,15 +363,10 @@ class PipelineSegment(object):
                 # assume each layer can use the full DRAM bandwidth at
                 # different time. We adjust this assumption when calculating
                 # the segment timing.
-                rtpl += (Resource(proc_region=proc_region,
-                                  src_data_region=src_data_region,
-                                  dst_data_region=dst_data_region,
-                                  dim_array=self.resource.dim_array,
-                                  size_gbuf=self.resource.size_gbuf,
-                                  size_regf=self.resource.size_regf,
-                                  array_bus_width=self.resource.array_bus_width,
-                                  dram_bandwidth=self.resource.dram_bandwidth,
-                                 ),)
+                rtpl += (self.resource._replace(
+                    proc_region=proc_region,
+                    src_data_region=src_data_region,
+                    dst_data_region=dst_data_region),)
 
             assert len(rtpl) == len(ltpl)
             self.alloc += (rtpl,)
