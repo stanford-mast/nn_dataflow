@@ -84,7 +84,7 @@ class TestUnitNhopsToProcRegion(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(2, 2),
             (1, 1), (2, 1), PhyDim2(2, 2))
 
-        filter_nodes = [PhyDim2(0, 0)]
+        filter_nodes = frozenset([PhyDim2(0, 0)])
 
         # filter: (0, 0) -> all, 6 * 4 * 3 * 3
 
@@ -151,7 +151,7 @@ class TestUnitNhopsToProcRegion(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(5, 5),
             (1, 1), (1, 2), PhyDim2(2, 4))
 
-        filter_nodes = [PhyDim2(0, 0), PhyDim2(7, 7)]
+        filter_nodes = frozenset([PhyDim2(0, 0), PhyDim2(7, 7)])
 
         nhops = partition.unit_nhops_to_proc_region(
             layer, self.batch_size, nr, part,
@@ -180,7 +180,7 @@ class TestUnitNhopsToProcRegion(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(1, 1),
             (2, 1), (1, 2), PhyDim2(2, 2))
 
-        filter_nodes = [PhyDim2(0, 0), PhyDim2(0, 7)]
+        filter_nodes = frozenset([PhyDim2(0, 0), PhyDim2(0, 7)])
 
         nhops = partition.unit_nhops_to_proc_region(
             layer, self.batch_size, nr, part,
@@ -209,7 +209,7 @@ class TestUnitNhopsToProcRegion(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(5, 5),
             (1, 2), (1, 1), PhyDim2(2, 4))
 
-        filter_nodes = []
+        filter_nodes = frozenset()
 
         nhops = partition.unit_nhops_to_proc_region(
             layer, self.batch_size, nr, part,
@@ -238,7 +238,7 @@ class TestUnitNhopsToProcRegion(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(5, 5),
             (1, 1), (1, 2), PhyDim2(2, 4))
 
-        filter_nodes = []
+        filter_nodes = frozenset()
 
         nhops = partition.unit_nhops_to_proc_region(
             layer, self.batch_size, nr, part,
@@ -267,7 +267,7 @@ class TestUnitNhopsToProcRegion(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(3, 3),
             (1, 1), (1, 1), PhyDim2(1, 1))
 
-        filter_nodes = [PhyDim2(3, -3)]
+        filter_nodes = frozenset([PhyDim2(3, -3)])
 
         nhops_1 = partition.unit_nhops_to_proc_region(
             layer, self.batch_size, nr, part,
@@ -284,13 +284,42 @@ class TestUnitNhopsToProcRegion(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(6, 6),
             (1, 1), (1, 1), PhyDim2(1, 1))
 
-        filter_nodes = [PhyDim2(6, -6)]
+        filter_nodes = frozenset([PhyDim2(6, -6)])
 
         nhops_2 = partition.unit_nhops_to_proc_region(
             layer, self.batch_size, nr, part,
             filter_nodes, ilayout, olayout, self.options['BASE'])
 
         self.assertListEqual(nhops_2, [n * 2 for n in nhops_1])
+
+    def test_ofmap_local(self):
+        ''' With locally stored ofmaps. '''
+        layer = self.layers['BASE']
+
+        part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
+                               pdims=((4, 1), (1, 1), (1, 4), (1, 1)))
+
+        nr = NodeRegion(origin=PhyDim2(3, 3), dim=part.dim(),
+                        type=NodeRegion.PROC)
+
+        ilayout = self._make_data_layout(
+            layer.nifm, layer.hifm, layer.wifm, PhyDim2(-3, -3),
+            (1, 1), (1, 1), PhyDim2(1, 1))
+
+        olayout = DataLayout(
+            frngs=(FmapRange((0,) * 4,
+                             (self.batch_size, layer.nofm,
+                              layer.hofm, layer.wofm)),),
+            regions=(nr,),
+            parts=(part,))
+
+        filter_nodes = frozenset([PhyDim2(3, -3)])
+
+        nhops = partition.unit_nhops_to_proc_region(
+            layer, self.batch_size, nr, part,
+            filter_nodes, ilayout, olayout, self.options['BASE'])
+
+        self.assertEqual(nhops[de.OFM], 0)
 
     def test_use_fwd(self):
         ''' Use access forwarding. '''
@@ -312,7 +341,7 @@ class TestUnitNhopsToProcRegion(TestPartitionFixture):
             layer.nofm, layer.hofm, layer.wofm, PhyDim2(0, -far_dist),
             (1, 1), (1, 1), PhyDim2(1, 1))
 
-        filter_nodes = [PhyDim2(far_dist, 0), PhyDim2(0, far_dist)]
+        filter_nodes = frozenset([PhyDim2(far_dist, 0), PhyDim2(0, far_dist)])
 
         nhops_base = partition.unit_nhops_to_proc_region(
             layer, self.batch_size, nr, part,

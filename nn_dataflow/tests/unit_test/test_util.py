@@ -23,6 +23,71 @@ import unittest
 
 from nn_dataflow import util
 
+class TestUtilHashableDict(unittest.TestCase):
+    ''' Tests for util.HashableDict. '''
+
+    def test_fromdict(self):
+        ''' fromdict. '''
+        d = {'k': 1, 3: 'a'}
+
+        hd1 = util.HashableDict.fromdict(d)
+        self.assertSetEqual(set(d.items()), set(hd1.items()))
+
+        hd2 = util.HashableDict.fromdict(d)
+        self.assertNotEqual(id(hd1), id(hd2))
+        self.assertEqual(hd1, hd2)
+        self.assertEqual(hash(hd1), hash(hd2))
+
+        hd3 = util.HashableDict.fromdict(
+            d, keyfunc=str, valfunc=lambda x: frozenset([x]))
+        self.assertNotEqual(hd1, hd3)
+
+    def test_fromdict_error(self):
+        ''' fromdict error. '''
+        with self.assertRaisesRegexp(TypeError, 'HashableDict: .*dict.*'):
+            _ = util.HashableDict.fromdict([1, 2])
+
+    def test_eq(self):
+        ''' __eq__ and __ne__. '''
+        hd = util.HashableDict([('k', 1), (3, 'a')])
+        lst = ['k', 3]
+        self.assertEqual(hd, hd.copy())
+        self.assertNotEqual(hd, lst)
+
+    def test_copy(self):
+        ''' copy. '''
+        hd = util.HashableDict([('k', 1), (3, 'a')])
+        self.assertNotEqual(id(hd), id(hd.copy()))
+        self.assertEqual(hd, hd.copy())
+        self.assertEqual(hash(hd), hash(hd.copy()))
+
+    def test_setitem_delitem(self):
+        ''' __setitem__ and __delitem__. '''
+        hd = util.HashableDict([('k', 1), (3, 'a')])
+
+        self.assertIn('k', hd)
+        self.assertEqual(hd[3], 'a')
+        self.assertEqual(len(hd), 2)
+
+        with self.assertRaises(KeyError):
+            hd[2] = 'b'
+        with self.assertRaises(KeyError):
+            hd[3] = 'b'
+        with self.assertRaises(KeyError):
+            hd.update([(2, 'b')])
+        with self.assertRaises(KeyError):
+            hd.setdefault(2, [])
+
+        with self.assertRaises(KeyError):
+            del hd[3]
+        with self.assertRaises(KeyError):
+            hd.pop(3)
+        with self.assertRaises(KeyError):
+            hd.popitem()
+        with self.assertRaises(KeyError):
+            hd.clear()
+
+
 class TestUtilIdivc(unittest.TestCase):
     ''' Tests for util.idivc. '''
 

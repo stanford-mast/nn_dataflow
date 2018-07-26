@@ -115,23 +115,25 @@ class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
         '''
         Get the partitioned fmap range for the given partition index.
         '''
+        fp_beg = frng.fp_beg
+        fp_end = frng.fp_end
 
         # Batch partition.
         idx_bat = pidx[pe.BATP].h * self.pdims[pe.BATP].w + pidx[pe.BATP].w
-        b_beg, b_end = util.get_ith_range(frng.beg_end('b'), idx_bat,
+        b_beg, b_end = util.get_ith_range((fp_beg.b, fp_end.b), idx_bat,
                                           self.pdims[pe.BATP].size())
 
         # Ofmap channel partition.
         idx_ofm = pidx[pe.OUTP].h * self.pdims[pe.OUTP].w + pidx[pe.OUTP].w
-        n_beg, n_end = util.get_ith_range(frng.beg_end('n'), idx_ofm,
+        n_beg, n_end = util.get_ith_range((fp_beg.n, fp_end.n), idx_ofm,
                                           self.pdims[pe.OUTP].size())
 
         # Fmap height tiling.
-        h_beg, h_end = util.get_ith_range(frng.beg_end('h'), pidx[pe.OFMP].h,
+        h_beg, h_end = util.get_ith_range((fp_beg.h, fp_end.h), pidx[pe.OFMP].h,
                                           self.pdims[pe.OFMP].h)
 
         # Fmap width tiling.
-        w_beg, w_end = util.get_ith_range(frng.beg_end('w'), pidx[pe.OFMP].w,
+        w_beg, w_end = util.get_ith_range((fp_beg.w, fp_end.w), pidx[pe.OFMP].w,
                                           self.pdims[pe.OFMP].w)
 
         return FmapRange(FmapPosition(b=b_beg, n=n_beg, h=h_beg, w=w_beg),

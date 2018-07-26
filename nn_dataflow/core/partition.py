@@ -19,6 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 import itertools
+import fastcache
 
 from . import data_category_enum as de
 from . import parallel_enum as pe
@@ -242,6 +243,7 @@ def proc_data_range(layer, batch_size, part, pidx):
     return filrng, ifrng, ofrng
 
 
+@fastcache.clru_cache(maxsize=1024)
 def unit_nhops_to_proc_region(layer, batch_size, region, part,
                               filter_nodes, ifmap_layout, ofmap_layout,
                               options):
@@ -284,6 +286,10 @@ def unit_nhops_to_proc_region(layer, batch_size, region, part,
     assert len(set(len(v) for v in ofm_dict.values())) <= 1, \
             'ofm val len: {}'.format([len(v) for v in ofm_dict.values()])
 
+    fil_dict = util.HashableDict.fromdict(fil_dict, valfunc=tuple)
+    ifm_dict = util.HashableDict.fromdict(ifm_dict, valfunc=tuple)
+    ofm_dict = util.HashableDict.fromdict(ofm_dict, valfunc=tuple)
+
     # When using access forwarding, each piece of data is only fetched by the
     # closest node, and then forwarded to ALL nodes that process it, regardless
     # of which nodes initially store it. In this way, AF nhops is independent
@@ -292,7 +298,27 @@ def unit_nhops_to_proc_region(layer, batch_size, region, part,
 
     nhops = [0] * de.NUM
 
-    # Filter access.
+    nhops[de.FIL] = _unit_nhops_to_fil(layer, filter_nodes, fil_dict, fwd)
+
+    nhops[de.IFM] = _unit_nhops_to_ifm(ifmap_layout, ifm_dict, fwd)
+
+    if ofmap_layout.parts == (part,) and ofmap_layout.regions == (region,):
+        # Ofmaps are stored locally, no data transfer.
+        pass
+    else:
+        nhops[de.OFM] = _unit_nhops_to_ofm(ofmap_layout, ofm_dict, fwd)
+
+    return nhops
+
+
+@fastcache.clru_cache(maxsize=1024)
+def _unit_nhops_to_fil(layer, filter_nodes, fil_dict, fwd=False):
+    '''
+    Get the total number of hops to transfer filter data.
+
+    `fil_dict` maps each filter range to the nodes that process it.
+    '''
+    nhops = 0
 
     for filrng, coord_list in fil_dict.items():
         fil_size = filrng[0].size() * filrng[1].size() * layer.filter_size()
@@ -309,21 +335,40 @@ def unit_nhops_to_proc_region(layer, batch_size, region, part,
                                key=lambda (s, d): d.hop_dist(s))
                 dst_set.remove(dst)
                 src_set.add(dst)
-                nhops[de.FIL] += fil_size * dst.hop_dist(src)
+                nhops += fil_size * dst.hop_dist(src)
 
         else:
             # Min hops to each processing node across all filter source nodes.
             min_hops = [min(coord.hop_dist(c) for c in filter_nodes)
                         for coord in coord_list]
-            nhops[de.FIL] += fil_size * sum(min_hops)
+            nhops += fil_size * sum(min_hops)
 
-    # Ifmap access.
+    return nhops
+
+
+@fastcache.clru_cache(maxsize=1024)
+def _unit_nhops_to_ifm(ifmap_layout, ifm_dict, fwd=False):
+    '''
+    Get the total number of hops to transfer ifmap data.
+
+    `ifm_dict` maps each fmap range to the nodes that process it.
+    '''
+    nhops = 0
 
     for ifrng, coord_list in ifm_dict.items():
-        nhops[de.IFM] += ifmap_layout.nhops_to(ifrng, *coord_list,
-                                               forwarding=fwd)
+        nhops += ifmap_layout.nhops_to(ifrng, *coord_list, forwarding=fwd)
 
-    # Ofmap access.
+    return nhops
+
+
+@fastcache.clru_cache(maxsize=1024)
+def _unit_nhops_to_ofm(ofmap_layout, ofm_dict, fwd=False):
+    '''
+    Get the total number of hops to transfer ofmap data.
+
+    `ofm_dict` maps each fmap range to the nodes that process it.
+    '''
+    nhops = 0
 
     for ofrng, coord_list in ofm_dict.items():
         # Additional synchronization is necessary between INPP nodes. Only one
@@ -340,7 +385,7 @@ def unit_nhops_to_proc_region(layer, batch_size, region, part,
                                                 forwarding=True)
             # The path between mid node and memory is in both, and accumulation
             # is one-way.
-            nhops[de.OFM] += util.idivc(nhops_read + nhops_accum, 2)
+            nhops += util.idivc(nhops_read + nhops_accum, 2)
 
         else:
             # Use the middle node.
@@ -348,11 +393,11 @@ def unit_nhops_to_proc_region(layer, batch_size, region, part,
             for idx, coord in enumerate(coord_list):
                 if idx == mid_idx:
                     # The mid node. Fetch from memory.
-                    nhops[de.OFM] += ofmap_layout.nhops_to(ofrng, coord)
+                    nhops += ofmap_layout.nhops_to(ofrng, coord)
                 else:
                     # Others. Send to the mid node (one way).
                     dist = coord.hop_dist(coord_list[mid_idx])
-                    nhops[de.OFM] += util.idivc(ofrng.size() * dist, 2)
+                    nhops += util.idivc(ofrng.size() * dist, 2)
 
     return nhops
 

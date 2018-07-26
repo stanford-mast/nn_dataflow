@@ -52,6 +52,8 @@ class TestScheduling(unittest.TestCase):
         self.resource = Resource(
             proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
                                    type=NodeRegion.PROC),
+            dram_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 1),
+                                   type=NodeRegion.DRAM),
             src_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 1),
                                        type=NodeRegion.DRAM),
             dst_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 1),
@@ -191,32 +193,41 @@ class TestScheduling(unittest.TestCase):
 
     def test_pernode_sched_cache(self):
         ''' Per-node scheduling cache. '''
+        # pylint: disable=no-member
+        Scheduling.schedule_search_per_node.cache_clear()
+
         layer = self.layers['BASE']
         ifmap_layout = self.ifmap_layouts['BASE']
 
         schd = Scheduling(layer, self.batch_size, self.cost,
                           MapStrategyEyeriss)
 
-        self.assertEqual(len(schd.pernode_sched_cache), 0)
+        self.assertEqual(schd.schedule_search_per_node.cache_info().currsize, 0)
         self.assertTupleEqual(schd.cache_stats(), (0, 0))
 
         condition = SchedulingCondition(resource=self.resource,
                                         ifmap_layout=ifmap_layout)
 
+        Scheduling.schedule_search.cache_clear()
         _ = schd.schedule_search(condition, self.options)
 
         h, m = schd.cache_stats()
-        self.assertEqual(len(schd.pernode_sched_cache), m)
+        self.assertEqual(schd.schedule_search_per_node.cache_info().currsize, m)
         self.assertEqual(h, 0)
         n = m
 
+        Scheduling.schedule_search.cache_clear()
         _ = schd.schedule_search(condition, self.options)
 
-        self.assertEqual(len(schd.pernode_sched_cache), n)
+        self.assertEqual(schd.schedule_search_per_node.cache_info().currsize, n)
         self.assertTupleEqual(schd.cache_stats(), (n, n))
 
     def test_pernode_sched_cache_key(self):
         ''' Per-node scheduling cache key must be hash-able. '''
+        # pylint: disable=no-member
+        Scheduling.schedule_search.cache_clear()
+        Scheduling.schedule_search_per_node.cache_clear()
+
         layer = self.layers['BASE']
         ifmap_layout = self.ifmap_layouts['BASE']
 
