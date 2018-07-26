@@ -25,6 +25,7 @@ from .node_region import NodeRegion
 from .phy_dim2 import PhyDim2
 
 RESOURCE_LIST = ['proc_region',
+                 'dram_region',
                  'src_data_region',
                  'dst_data_region',
                  'dim_array',
@@ -49,6 +50,12 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
                             'a NodeRegion instance.')
         if ntp.proc_region.type != NodeRegion.PROC:
             raise ValueError('Resource: proc_region must have type PROC.')
+
+        if not isinstance(ntp.dram_region, NodeRegion):
+            raise TypeError('Resource: dram_region must be '
+                            'a NodeRegion instance.')
+        if ntp.dram_region.type != NodeRegion.DRAM:
+            raise ValueError('Resource: dram_region must have type DRAM.')
 
         if not isinstance(ntp.src_data_region, NodeRegion):
             raise TypeError('Resource: src_data_region must be '

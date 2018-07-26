@@ -21,6 +21,8 @@ List of major changes and improvements
 
 - Hardware models:
 
+  - Add DRAM region in `Resource`.
+
   - Consider array bus width and its impact on data multicast latency.
 
   - Consider DRAM access time due to bandwidth limit.
@@ -96,6 +98,8 @@ List of major changes and improvements
 - ITCN access calculation for unit pass in `MapStrategy`.
 
 - `FmapRange` comparison.
+
+- Unit nhops calculation for filter data uses DRAM region.
 
 
 ## [v1.4 -- v1.5] -- 2017-08-18

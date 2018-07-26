@@ -18,7 +18,6 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-import itertools
 from collections import OrderedDict, namedtuple
 import fastcache
 
@@ -170,9 +169,7 @@ class Scheduling(object):
                              'input layer.')
 
         # Filter nodes. All memory nodes can store filters. Deduplicate.
-        filter_nodes = frozenset(itertools.chain(
-            resource.src_data_region.iter_node(),
-            resource.dst_data_region.iter_node()))
+        filter_nodes = frozenset(resource.dram_region.iter_node())
 
         # Explore parallel partitioning schemes.
         for part in partition.gen_partition(self.layer, self.batch_size,

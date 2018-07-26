@@ -68,7 +68,7 @@ class TestMapStrategyFixture(unittest.TestCase):
                                  type=NodeRegion.DRAM)
         # Eyeriss, ISSCC'16, JSSC'17.
         self.resource['BASE'] = Resource(
-            proc_region=proc_region,
+            proc_region=proc_region, dram_region=data_region,
             src_data_region=data_region, dst_data_region=data_region,
             dim_array=PhyDim2(12, 14), size_gbuf=108*1024, size_regf=520,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
