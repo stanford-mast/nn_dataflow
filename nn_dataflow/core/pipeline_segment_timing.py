@@ -84,17 +84,14 @@ class PipelineSegmentTiming(object):
         The time overhead as a percentage, to process layers in segment
         compared to processing layers individually.
         '''
-        num_nodes_list = [tlist[0].num_nodes
-                          for tlist in self.timing_list]
-        total_num_nodes = sum(num_nodes_list)
-        node_time_list = [sum(timing.node_time for timing in tlist)
-                          for tlist in self.timing_list]
-        dram_time_list = [sum(timing.dram_time for timing in tlist)
-                          for tlist in self.timing_list]
+        total_num_nodes = sum(tlist[0].num_nodes
+                              for tlist in self.timing_list)
         # Sum up the max of scaled node time and DRAM time.
-        time_indv = sum(max(1. * nt * n / total_num_nodes, dt)
-                        for nt, dt, n in zip(node_time_list, dram_time_list,
-                                             num_nodes_list))
+        time_indv = sum(max(1. * timing.node_time * timing.num_nodes
+                            / total_num_nodes,
+                            timing.dram_time)
+                        for tlist in self.timing_list
+                        for timing in tlist)
         assert self.time >= time_indv
         return (self.time - time_indv) / time_indv
 
