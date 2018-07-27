@@ -22,6 +22,7 @@ import numbers
 
 from . import loop_enum as le
 from .. import util
+from .loop_blocking_scheme import LoopBlockingScheme
 
 class SchedulingConstraint(util.ContentHashClass):
     '''
@@ -164,9 +165,8 @@ class SchedulingConstraintLayerPipeline(SchedulingConstraint):
 
         # Loop orders.
         # Ordered loops from outer to inner.
-        ord_lpe = list(sorted([lpe for lpe in range(le.NUM)
-                               if top_bl_t[lpe] > 1],
-                              key=lambda lpe: top_bl_ord[lpe], reverse=True))
+        ord_lpe = LoopBlockingScheme.ordered_loops(top_bl_t, top_bl_ord,
+                                                   lpe_only=True)
         if self.topbat > 1:
             if ord_lpe.pop(0) != le.BAT:
                 return False
