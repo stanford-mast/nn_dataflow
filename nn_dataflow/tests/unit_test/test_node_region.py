@@ -309,6 +309,7 @@ class TestNodeRegion(unittest.TestCase):
             self.assertEqual(len(subregions), length)
             aggr_node_set = set()
             for sr in subregions:
+                self.assertTupleEqual(sr.dist, nr.dist)
                 self.assertEqual(sr.type, NodeRegion.PROC)
                 self.assertEqual(sr.wtot, 4)
                 for c in sr.iter_node():
@@ -382,4 +383,20 @@ class TestNodeRegion(unittest.TestCase):
         self.assertTupleEqual(subregions[4].dim, (2, 2))
         self.assertTupleEqual(subregions[4].origin, (3, 4))
         self.assertEqual(subregions[4].wbeg, -2)
+
+        nr = nr._replace(dist=PhyDim2(2, 1))
+
+        request_list = [10, 6]
+        subregions = nr.allocate(request_list)
+        # 1110
+        # 1110
+        # 0000
+        # 0000
+        _common_check(len(request_list))
+        self.assertTupleEqual(subregions[0].dim, (2, 5))
+        self.assertTupleEqual(subregions[0].origin, (1, 3))
+        self.assertEqual(subregions[0].wbeg, 4)
+        self.assertTupleEqual(subregions[1].dim, (2, 3))
+        self.assertTupleEqual(subregions[1].origin, (5, 5))
+        self.assertEqual(subregions[1].wbeg, -3)
 

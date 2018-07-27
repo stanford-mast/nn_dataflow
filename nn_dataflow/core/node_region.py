@@ -189,7 +189,9 @@ class NodeRegion(namedtuple('NodeRegion', NODE_REGION_LIST)):
                 assert wbeg < 0
 
             subregions.append(NodeRegion(dim=subdim,
-                                         origin=self.origin + origin,
+                                         origin=self.origin \
+                                            + origin * self.dist,
+                                         dist=self.dist,
                                          type=self.type,
                                          wtot=wtot,
                                          wbeg=wbeg))
