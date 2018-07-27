@@ -412,12 +412,6 @@ class TestPipelineSegment(TestPipelineFixture):
                 for constraint, _ in segment.gen_constraint():
                     self._validate_constraint(segment, constraint)
 
-                    # Single spatial scheduling in temporal pipelining do not
-                    # require top BAT loop.
-                    for ctpl in constraint:
-                        for c in ctpl:
-                            self.assertEqual(c.topbat, 0)
-
     def test_gen_constraint_hints(self):
         ''' gen_constraint() pruning hints. '''
 

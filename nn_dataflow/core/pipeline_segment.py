@@ -461,9 +461,8 @@ class PipelineSegment(object):
 
         - Top BAT loop factor.
 
-        With a single spatial scheduling, there is no constraint on the top BAT
-        loop factor. Otherwise all layers must share the same factor, namely
-        `topbat_shr`.
+        With a single layer, there is no constraint on the top BAT loop factor.
+        Otherwise all layers must share the same factor, namely `topbat_shr`.
 
         - Fmap forwarding and fully buffering.
 
@@ -509,17 +508,13 @@ class PipelineSegment(object):
         # Symbolic variables mapping to numerical values.
         symvals = dict()
 
-        if len(self.seg) > 1:
-            # Top BAT loop factor.
-            topbat = symbols('topbat_shr', integer=True)
-            symvals[topbat] = \
-                [t for t, _ in util.factorize(self.batch_size, 2)]
-            # Whether the initial CONV layer fully buffers ofmaps.
-            fbofm_init = symbols('fbofm_init')
-            symvals[fbofm_init] = [False, True]
-        else:
-            topbat = 0
-            fbofm_init = False
+        # Top BAT loop factor.
+        topbat = symbols('topbat_shr', integer=True)
+        symvals[topbat] = [t for t, _ in util.factorize(self.batch_size, 2)]
+
+        # Whether the initial CONV layer fully buffers ofmaps.
+        fbofm_init = symbols('fbofm_init')
+        symvals[fbofm_init] = [False, True]
 
         def _layer_topofm_vals(layer_name):
             layer = self.network[layer_name]
@@ -668,17 +663,10 @@ class PipelineSegment(object):
         sp_crit_path = max(sp_crit_path_cands, key=len)
 
         # Check maximum fully-buffering size, and decide fbofm_init.
-        fbofm_init_vals = symvals.get(fbofm_init, [])
-        if fbofm_init_vals:
-            assert len(fbofm_init_vals) > 1
-        else:
-            # A single value, or simplified out.
-            fbofm_init_vals = [fbofm_init]
-            fbofm_init = symbols('_dummy_fbofm_init')
         opt_val = None
         opt_key = (float('inf'),) * 2  # (num of fb pairs, max fb size)
         num_sp_fbs = 0
-        for val in fbofm_init_vals:
+        for val in symvals.get(fbofm_init, [False]):
             subs_symargs = self._subs_symargs(symargs, fbofm_init, val)
             maxsz = 0
             numfb = 0
