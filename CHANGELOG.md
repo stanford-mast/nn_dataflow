@@ -34,6 +34,9 @@ List of major changes and improvements
 
   - Allow data source/destination regions in `Resource` to be non-DATA type.
 
+  - Add `src_data_region_final` attribute to `Resource`, to denote the final
+    source data region after resolving forwarding and sharing.
+
   - Allow `NodeRegion` to be folded along the w dimension in a zig-zag manner.
 
 - Software models.

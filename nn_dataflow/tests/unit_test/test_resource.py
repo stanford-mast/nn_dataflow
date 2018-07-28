@@ -50,6 +50,7 @@ class TestResource(unittest.TestCase):
                             size_regf=512,
                             array_bus_width=8,
                             dram_bandwidth=128,
+                            src_data_region_final_=self.dst_data_region,
                            )
         self.assertTupleEqual(resource.proc_region.dim, (2, 2), 'proc_region')
         self.assertTupleEqual(resource.dram_region.dim, (2, 2), 'dram_region')
@@ -58,6 +59,34 @@ class TestResource(unittest.TestCase):
         self.assertEqual(resource.size_regf, 512, 'size_regf')
         self.assertEqual(resource.array_bus_width, 8, 'array_bus_width')
         self.assertEqual(resource.dram_bandwidth, 128, 'dram_bandwidth')
+        self.assertEqual(resource.src_data_region_final, self.dst_data_region,
+                         'src_data_region_final')
+
+    def test_default_sdr_final(self):
+        ''' Default src_data_region_final. '''
+        resource = Resource(proc_region=self.proc_region,
+                            dram_region=self.dram_region,
+                            src_data_region=self.src_data_region,
+                            dst_data_region=self.dst_data_region,
+                            dim_array=PhyDim2(16, 16),
+                            size_gbuf=131072,
+                            size_regf=512,
+                            array_bus_width=8,
+                            dram_bandwidth=128,
+                           )
+        self.assertEqual(resource.src_data_region_final, self.src_data_region)
+
+        resource = Resource(self.proc_region,
+                            self.dram_region,
+                            self.src_data_region,
+                            self.dst_data_region,
+                            PhyDim2(16, 16),
+                            131072,
+                            512,
+                            8,
+                            128,
+                           )
+        self.assertEqual(resource.src_data_region_final, self.src_data_region)
 
     def test_invalid_proc_region(self):
         ''' Invalid proc_region. '''
@@ -142,6 +171,20 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=8,
                          dram_bandwidth=128,
+                        )
+
+        with self.assertRaisesRegexp(TypeError,
+                                     'Resource: .*src_data_region_final.*'):
+            _ = Resource(proc_region=self.proc_region,
+                         dram_region=self.dram_region,
+                         src_data_region=self.src_data_region,
+                         dst_data_region=self.dst_data_region,
+                         dim_array=PhyDim2(16, 16),
+                         size_gbuf=131072,
+                         size_regf=512,
+                         array_bus_width=8,
+                         dram_bandwidth=128,
+                         src_data_region_final_=PhyDim2(2, 1),
                         )
 
     def test_invalid_dim_array(self):
