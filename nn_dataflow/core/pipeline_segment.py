@@ -212,10 +212,20 @@ class PipelineSegment(object):
         Local dependencies are omitted, as by default each layer has its
         immediately previous layer as local source and immediately next layer
         as local destination.
+
+        Also construct a dict for shared memory source data, mapping the
+        spatial index of a layer that shares the exact same memory source data,
+        to the spatial index of the layer responsible to fetch it. We allow
+        shared memory source data between two layers only when both layers have
+        memory dependency only (so they must be the first temporal scheduled),
+        and their previous layers are exactly the same.
         '''
 
         self.src_dict = [[None for _ in ltpl] for ltpl in self.seg]
         self.dst_dict = [[None for _ in ltpl] for ltpl in self.seg]
+
+        self.sh_mem_src_dict = {}
+        sh_mem_src_prevs2idx = {}
 
         # Mapping from layer to spatial/temporal indices in the segment.
         layer2idx = {l: PipelineSegment.SchedIndex(sp_idx, tm_idx)
@@ -265,6 +275,15 @@ class PipelineSegment(object):
                     assert single_nbr_src is None or single_nbr_src == prev_idx
                     single_nbr_src = prev_idx
                     src += (prev_idx,)
+
+                # Shared memory source.
+                if mem_src and not lcl_src:
+                    assert not nbr_src
+                    assert tm_idx == 0
+                    if prevs in sh_mem_src_prevs2idx:
+                        self.sh_mem_src_dict[sp_idx] = sh_mem_src_prevs2idx[prevs]
+                    else:
+                        sh_mem_src_prevs2idx[prevs] = sp_idx
 
                 # Destinations.
                 dst = tuple()
@@ -343,6 +362,13 @@ class PipelineSegment(object):
                 else:
                     # Data source is all local.
                     src_data_region = proc_region
+                # Shared memory source.
+                src_data_region_final = None
+                if sp_idx in self.sh_mem_src_dict and tm_idx == 0:
+                    sh_sp_idx = self.sh_mem_src_dict[sp_idx]
+                    assert sh_sp_idx < sp_idx
+                    src_data_region_final = src_data_region
+                    src_data_region = self.alloc[sh_sp_idx][0].proc_region
 
                 # Data destination.
                 dst = self.dst_dict[sp_idx][tm_idx]
@@ -366,7 +392,8 @@ class PipelineSegment(object):
                 rtpl += (self.resource._replace(
                     proc_region=proc_region,
                     src_data_region=src_data_region,
-                    dst_data_region=dst_data_region),)
+                    dst_data_region=dst_data_region,
+                    src_data_region_final_=src_data_region_final),)
 
             assert len(rtpl) == len(ltpl)
             self.alloc += (rtpl,)
@@ -527,6 +554,17 @@ class PipelineSegment(object):
             assert vals
             return vals
 
+        def _layer_topifm_vals(layer_name):
+            layer = self.network[layer_name]
+            # We require that the total ifmap size takes at least 5% of the
+            # gbuf capacity of a single node, to avoid too fine blocking.
+            tmax = layer.total_ifmap_size(self.batch_size) \
+                    / (0.05 * self.resource.size_gbuf)
+            vals = [t for t, _ in util.factorize(layer.nifm, 2)
+                    if t <= tmax or t == 1]
+            assert vals
+            return vals
+
         # Layer constraint kwargs.
         symargs = [[{'topbat': topbat} for _ in ltpl] for ltpl in self.seg]
 
@@ -651,10 +689,6 @@ class PipelineSegment(object):
                         and tm_idx == len(ltpl) - 1:
                     curr_sa.pop('fbofm', False)
 
-        # Sort symbol dict.
-        symvals = OrderedDict(sorted(((s, symvals[s]) for s in symvals),
-                                     key=lambda item: str(item[0])))
-
         # Simplify.
         self._simplify_symargs(symargs, symvals)
 
@@ -693,14 +727,44 @@ class PipelineSegment(object):
             return False
         # Use the optimal value.
         symvals[fbofm_init] = [opt_val]
-
-        # Simplify twice. First substitute fbofm_init, then simplify.
         self._simplify_symargs(symargs, symvals)
+
+        # Shared memory source must have the same topifm.
+        sh_mem_src_groups = {}  # indexed by the layer responsible to fetch.
+        for rcv_sp_idx, fet_sp_idx in self.sh_mem_src_dict.items():
+            sh_mem_src_groups.setdefault(fet_sp_idx, []).append(rcv_sp_idx)
+        for fet_sp_idx, rcv_sp_idx_list in sh_mem_src_groups.items():
+            sh_sp_idx_list = [fet_sp_idx] + rcv_sp_idx_list
+            sh_symarg_list = [symargs[sh_sp_idx][0]
+                              for sh_sp_idx in sh_sp_idx_list]
+
+            # Must have no constraint on ifmaps access from memory.
+            assert all(not sa.get('fbifm', False) and not sa.get('topifm', 0)
+                       for sa in sh_symarg_list)
+
+            # Cannot constrain both topifm and topofm.
+            if any(sa.get('fbofm', False) or sa.get('topofm', 0)
+                   for sa in sh_symarg_list):
+                sh_kwargs = {'fbifm': True}
+            else:
+                topifm = symbols('topifm_{}'.format(fet_sp_idx), integer=True)
+                symvals[topifm] = _layer_topifm_vals(self.seg[fet_sp_idx][0])
+                sh_kwargs = {'topifm': topifm}
+
+            # Set constraints.
+            for sa in sh_symarg_list:
+                sa.update(sh_kwargs)
+
+        # Simplify.
         self._simplify_symargs(symargs, symvals)
 
         # Turn constraints into lazily updated rules.
         self._lazify_topofm_symargs(symargs, symvals)
         # Cannot simplify any more as update_dict is not sympifi-able.
+
+        # Sort symbol dict.
+        symvals = OrderedDict(sorted(((s, symvals[s]) for s in symvals),
+                                     key=lambda item: str(item[0])))
 
         if not symvals:
             # Must add a dummy symbol so iterative substitution can happen.

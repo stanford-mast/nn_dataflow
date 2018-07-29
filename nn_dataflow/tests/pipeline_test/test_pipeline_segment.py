@@ -267,6 +267,39 @@ class TestPipelineSegment(TestPipelineFixture):
 
                 self._validate_allocation(segment, alloc)
 
+    def test_allocation_sh_mem_src(self):
+        ''' allocation() shared mem src. '''
+
+        net = self.net['net3']
+
+        segment = self._make_segment((6, 7, 8, 9), net)
+        self.assertTrue(segment.valid)
+
+        alloc = segment.allocation()
+        self.assertEqual(alloc[3][0].src_data_region, alloc[0][0].proc_region)
+        self.assertEqual(alloc[3][0].src_data_region_final,
+                         alloc[0][0].src_data_region_final)
+
+        net = self.net['net5']
+
+        segment = self._make_segment((1, 2, 3), net)
+        self.assertTrue(segment.valid)
+
+        alloc = segment.allocation()
+        self.assertEqual(alloc[2][0].src_data_region, alloc[0][0].proc_region)
+        self.assertEqual(alloc[2][0].src_data_region_final,
+                         alloc[0][0].src_data_region_final)
+
+        net = self.net['net4']
+
+        segment = self._make_segment((8, 9), net)
+        self.assertTrue(segment.valid)
+
+        alloc = segment.allocation()
+        self.assertEqual(alloc[1][0].src_data_region, alloc[0][0].proc_region)
+        self.assertEqual(alloc[1][0].src_data_region_final,
+                         alloc[0][0].src_data_region_final)
+
     def test_allocation_temp(self):
         ''' allocation() temporal. '''
 
@@ -397,6 +430,55 @@ class TestPipelineSegment(TestPipelineFixture):
         self.assertTrue(segment.cstr_symargs[1][0]['fbifm'])
         self.assertFalse(segment.cstr_symargs[1][0].get('fbofm', False))
         self.assertFalse(segment.cstr_symargs[2][0].get('fbifm', False))
+
+    def test_gen_constraint_sh_mem_src(self):
+        ''' gen_constraint() shared mem src. '''
+
+        net = self.net['net3']
+
+        segment = self._make_segment((6, 7, 8, 9), net)
+        self.assertTrue(segment.valid)
+
+        # 0 and 3 share memory source.
+        for constraint, _ in segment.gen_constraint():
+            self._validate_constraint(segment, constraint)
+
+            self.assertEqual(constraint[3][0].topifm, constraint[0][0].topifm)
+            self.assertTrue(constraint[3][0].topifm <= 1
+                            or constraint[3][0].topofm <= 1)
+            self.assertTrue(constraint[0][0].topifm <= 1
+                            or constraint[0][0].topofm <= 1)
+
+        net = self.net['net5']
+
+        segment = self._make_segment((1, 2, 3), net)
+        self.assertTrue(segment.valid)
+
+        # 0 and 2 share memory source.
+        for constraint, _ in segment.gen_constraint():
+            self._validate_constraint(segment, constraint)
+
+            # 0 constrains topofm.
+            self.assertNotEqual(constraint[0][0].topofm, 0)
+
+            # Must fully buffer ifmaps.
+            self.assertEqual(constraint[2][0].topifm, 1)
+            self.assertEqual(constraint[0][0].topifm, 1)
+
+        net = self.net['net4']
+
+        segment = self._make_segment((8, 9), net)
+        self.assertTrue(segment.valid)
+
+        # 0 and 1 share memory source.
+        for constraint, _ in segment.gen_constraint():
+            self._validate_constraint(segment, constraint)
+
+            # No topofm constraint.
+            self.assertEqual(constraint[0][0].topofm, 0)
+            self.assertEqual(constraint[1][0].topofm, 0)
+
+            self.assertEqual(constraint[1][0].topifm, constraint[0][0].topifm)
 
     def test_gen_constraint_temporal(self):
         ''' gen_constraint() temporal. '''
