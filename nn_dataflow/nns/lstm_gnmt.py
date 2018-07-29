@@ -19,7 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from nn_dataflow.core import Network
-from nn_dataflow.core import InputLayer, FCLayer
+from nn_dataflow.core import InputLayer, EltwiseLayer
 
 from nn_dataflow.nns import add_lstm_cell
 
@@ -31,13 +31,11 @@ Sutskever, Vinyals, Le, Google, NIPS 2014
 
 NN = Network('GNMT')
 
-NN.set_input_layer(InputLayer(80000, 1))
-
-NN.add('init', FCLayer(80000, 1000))
+NN.set_input_layer(InputLayer(1000, 1))
 
 NL = 4
-CL = ['init'] * NL
-HL = ['init'] * NL
+CL = [None] * NL
+HL = [None] * NL
 
 # Unroll by the sequence length, assuming 10.
 for idx in range(10):
@@ -46,7 +44,7 @@ for idx in range(10):
     new_HL = []
 
     we = 'We_{}'.format(idx)
-    NN.add(we, FCLayer(80000, 1000), prevs=(NN.INPUT_LAYER_KEY,))
+    NN.add(we, EltwiseLayer(1000, 1, 1), prevs=(NN.INPUT_LAYER_KEY,))
     x = we
 
     for l in range(NL):
@@ -57,7 +55,7 @@ for idx in range(10):
         x = H
 
     wd = 'Wd_{}'.format(idx)
-    NN.add(wd, FCLayer(1000, 80000), prevs=(x,))
+    NN.add(wd, EltwiseLayer(1000, 1, 1), prevs=(x,))
 
     CL = new_CL
     HL = new_HL

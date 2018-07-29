@@ -43,7 +43,7 @@ def all_networks():
     return list(sorted(nns))
 
 
-def add_lstm_cell(network, name, size, xin, cin, hin):
+def add_lstm_cell(network, name, size, xin, cin=None, hin=None):
     '''
     Add a LSTM cell named `name` to the `network`, with the dimension `size`.
     `xin`, `cin`, `hin` are the layers' names whose outputs are x_t, C_{t-1},
@@ -54,7 +54,8 @@ def add_lstm_cell(network, name, size, xin, cin, hin):
 
     if not isinstance(network, Network):
         raise TypeError('add_lstm_cell: network must be a Network instance.')
-    if cin not in network or hin not in network or xin not in network:
+    if (cin and cin not in network) or (hin and hin not in network) \
+            or (xin not in network):
         raise ValueError('add_lstm_cell: cin {}, hin {}, xin {} must all be '
                          'in the network.'.format(cin, hin, xin))
 
@@ -63,22 +64,25 @@ def add_lstm_cell(network, name, size, xin, cin, hin):
         return '{}_{}gate'.format(name, gate)
 
     # Three gates.
+    prevs = (hin, xin) if hin else (xin,)
     for g in ['f', 'i', 'o']:
-        network.add(gate_name(g), FCLayer(2 * size, size), prevs=(hin, xin))
+        network.add(gate_name(g), FCLayer(len(prevs) * size, size), prevs=prevs)
 
     # Candidate.
     cand_name = '{}_cand'.format(name)
-    network.add(cand_name, FCLayer(2 * size, size), prevs=(hin, xin))
+    prevs = (hin, xin) if hin else (xin,)
+    network.add(cand_name, FCLayer(len(prevs) * size, size), prevs=prevs)
 
     # C_t.
     cout_name = '{}_cout'.format(name)
-    network.add(cout_name, EltwiseLayer(size, 1, 4),
-                prevs=(cin, gate_name('f'), cand_name, gate_name('i')))
+    prevs = (cin, gate_name('f'), cand_name, gate_name('i')) if cin \
+            else (gate_name('f'), cand_name, gate_name('i'))
+    network.add(cout_name, EltwiseLayer(size, 1, len(prevs)), prevs=prevs)
 
     # h_t.
     hout_name = '{}_hout'.format(name)
-    network.add(hout_name, EltwiseLayer(size, 1, 2),
-                prevs=(cout_name, gate_name('o')))
+    prevs = (cout_name, gate_name('o'))
+    network.add(hout_name, EltwiseLayer(size, 1, 2), prevs=prevs)
 
     return cout_name, hout_name
 
