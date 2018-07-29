@@ -101,6 +101,8 @@ List of major changes and improvements
 
 - Unit nhops calculation for filter data uses DRAM region.
 
+- Unit nhops calculation considers nodes with both non-empty ifmaps and ofmaps.
+
 
 ## [v1.4 -- v1.5] -- 2017-08-18
 

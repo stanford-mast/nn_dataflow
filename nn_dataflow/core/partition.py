@@ -273,12 +273,11 @@ def unit_nhops_to_proc_region(layer, batch_size, region, part,
         coord = part.coordinate(region, pidx)
         filrng, ifrng, ofrng = proc_data_range(layer, batch_size, part, pidx)
 
-        if not filrng[0].empty() and not filrng[1].empty():
-            fil_dict.setdefault(filrng, []).append(coord)
-        if ifrng.size() > 0:
+        if ifrng.size() > 0 and ofrng.size() > 0:
             ifm_dict.setdefault(ifrng, []).append(coord)
-        if ofrng.size() > 0:
             ofm_dict.setdefault(ofrng, []).append(coord)
+            if not filrng[0].empty() and not filrng[1].empty():
+                fil_dict.setdefault(filrng, []).append(coord)
 
     # All data should be processed by the same number of nodes, or no node.
     assert len(set(len(v) for v in fil_dict.values())) <= 1, \
