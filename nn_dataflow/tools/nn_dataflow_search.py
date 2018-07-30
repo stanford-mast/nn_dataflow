@@ -76,6 +76,7 @@ def stats_dict(dfsch, cost):
 
     stats['active_node_pes'] = dfsch.perlayer_stats('active_node_pes')
     stats['total_dram_bandwidth'] = dfsch.perlayer_stats('total_dram_bandwidth')
+    stats['input_layout'] = dfsch.input_layout
     stats['schedules'] = dfsch.res_dict
 
     return stats
