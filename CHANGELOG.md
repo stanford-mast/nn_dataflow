@@ -27,6 +27,10 @@ List of major changes and improvements
 
   - Consider DRAM access time due to bandwidth limit.
 
+- Software models.
+
+  - Add choices for optimization goal: E(nergy), D(elay), or ED.
+
 - Software engineering.
 
   - Record search time.

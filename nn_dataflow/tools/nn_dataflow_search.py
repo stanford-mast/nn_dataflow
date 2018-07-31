@@ -159,6 +159,7 @@ def do_scheduling(args):
                      partition_dimensional=args.dimensional_partition,
                      partition_batch=args.batch_partition,
                      partition_ifmaps=args.ifmaps_partition,
+                     opt_goal=args.goal.lower(),
                      ntops=args.top,
                      nprocesses=args.processes,
                      verbose=args.verbose)
@@ -271,6 +272,9 @@ def argparser():
                     help='Allow partitioning ifmap channel dimension, which '
                          'requires extra data synchronization.')
 
+    ap.add_argument('-g', '--goal', default='e',
+                    choices=['e', 'd', 'ed', 'E', 'D', 'ED'],
+                    help='Goal of optimization: E(nergy), D(elay), or ED.')
     ap.add_argument('-t', '--top', type=int, default=1,
                     help='Number of top schedules to keep during search.')
     ap.add_argument('-p', '--processes', type=int,

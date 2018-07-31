@@ -131,6 +131,60 @@ class TestNNDataflow(unittest.TestCase):
         for layer in network:
             self.assertIn(layer, stderr_value)
 
+    def test_opt_goal(self):
+        ''' Optimization goal. '''
+        network = self.alex_net
+
+        batch_size = 8
+
+        resource = self.resource._replace(
+            proc_region=NodeRegion(origin=PhyDim2(0, 0),
+                                   dim=PhyDim2(8, 8),
+                                   type=NodeRegion.PROC)
+        )
+
+        nnd = NNDataflow(network, batch_size, resource, self.cost,
+                         self.map_strategy)
+
+        options_e = Option(sw_gbuf_bypass=(True, True, True),
+                           sw_solve_loopblocking=True,
+                           partition_hybrid=True,
+                           partition_batch=True,
+                           opt_goal='e',
+                           ntops=16)
+        tops_e, _ = nnd.schedule_search(options_e)
+        self.assertTrue(tops_e)
+
+        options_d = Option(sw_gbuf_bypass=(True, True, True),
+                           sw_solve_loopblocking=True,
+                           partition_hybrid=True,
+                           partition_batch=True,
+                           opt_goal='d',
+                           ntops=16)
+        tops_d, _ = nnd.schedule_search(options_d)
+        self.assertTrue(tops_d)
+
+        options_ed = Option(sw_gbuf_bypass=(True, True, True),
+                            sw_solve_loopblocking=True,
+                            partition_hybrid=True,
+                            partition_batch=True,
+                            opt_goal='ed',
+                            ntops=16)
+        tops_ed, _ = nnd.schedule_search(options_ed)
+        self.assertTrue(tops_ed)
+
+        self.assertLess(tops_e[0].total_cost, tops_d[0].total_cost)
+        self.assertLess(tops_e[0].total_cost, tops_ed[0].total_cost)
+
+        self.assertLess(tops_d[0].total_time, tops_e[0].total_time)
+        self.assertLess(tops_d[0].total_time, tops_ed[0].total_time)
+
+        # Sum of the smallest ED may not be the smallest; allow for error.
+        self.assertLess(tops_ed[0].total_cost * tops_ed[0].total_time,
+                        tops_e[0].total_cost * tops_e[0].total_time * 1.05)
+        self.assertLess(tops_ed[0].total_cost * tops_ed[0].total_time,
+                        tops_d[0].total_cost * tops_d[0].total_time * 1.05)
+
     def test_no_valid_dataflow(self):
         ''' No valid dataflow is found. '''
 

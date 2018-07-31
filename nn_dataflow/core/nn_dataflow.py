@@ -67,10 +67,21 @@ class NNDataflow(object):
                 layer2sched[layer] = sched
             self.layer_sched_dict[layer_name] = sched
 
+        # Default compare key function.
+        self.cmp_key = lambda nndf: (nndf.total_cost, nndf.total_time)
+
     def schedule_search(self, options):
         '''
         Search the optimized dataflows.
         '''
+        # Set key function.
+        if options.opt_goal == 'ed':
+            self.cmp_key = lambda nndf: nndf.total_cost * nndf.total_time
+        elif options.opt_goal == 'd':
+            self.cmp_key = lambda nndf: (nndf.total_time, nndf.total_cost)
+        else:
+            assert options.opt_goal == 'e'
+
         # Clear and reset.
         nndf_tops = []
 
@@ -134,7 +145,7 @@ class NNDataflow(object):
                 nndf_tops.append(nndf)
 
         # Always pick and keep top n at each layer.
-        return sorted(nndf_tops, key=NNDataflowScheme.cmp_key)[:options.ntops]
+        return sorted(nndf_tops, key=self.cmp_key)[:options.ntops]
 
     def _gen_layer_ifmap_layout(self, layer_name, prev_nndf_tops):
         '''

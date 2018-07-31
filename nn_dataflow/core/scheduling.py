@@ -119,10 +119,6 @@ class SchedulingResult(namedtuple('SchedulingResult',
         ''' Get the number of processing nodes. '''
         return self.scheme['num_nodes']
 
-    def cmp_key(self):
-        ''' Key function for comparison. '''
-        return self.total_cost, self.total_time
-
 
 class Scheduling(object):
     '''
@@ -145,11 +141,22 @@ class Scheduling(object):
         self.cost = cost
         self.map_strategy_class = map_strategy_class
 
+        # Default compare key function.
+        self.cmp_key = lambda res: (res.total_cost, res.total_time)
+
     @fastcache.clru_cache(maxsize=1024)
     def schedule_search(self, condition, options):
         '''
         Search the best scheduling results.
         '''
+        # Set key function.
+        if options.opt_goal == 'ed':
+            self.cmp_key = lambda res: res.total_cost * res.total_time
+        elif options.opt_goal == 'd':
+            self.cmp_key = lambda res: (res.total_time, res.total_cost)
+        else:
+            assert options.opt_goal == 'e'
+
         tops = []
 
         resource = condition.resource
@@ -202,7 +209,7 @@ class Scheduling(object):
                      for lbs in lbs_tops]
 
         # Pick the top n.
-        tops = sorted(tops, key=SchedulingResult.cmp_key)[:options.ntops]
+        tops = sorted(tops, key=self.cmp_key)[:options.ntops]
 
         # Check total op count.
         total_layer_ops = self.layer.total_ops(self.batch_size)

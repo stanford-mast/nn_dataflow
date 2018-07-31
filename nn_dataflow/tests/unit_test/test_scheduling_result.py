@@ -150,23 +150,3 @@ class TestSchedulingResult(unittest.TestCase):
                                   ofmap_layout=self.ofmap_layout)
         self.assertEqual(result.num_nodes, 4)
 
-    def test_cmp_key(self):
-        ''' Get cmp_key. '''
-        result1 = SchedulingResult(scheme=self.scheme,
-                                   ofmap_layout=self.ofmap_layout)
-
-        scheme = self.scheme.copy()
-        scheme['cost'] = 2 + 10
-        scheme['time'] = 12.34
-        result2 = SchedulingResult(scheme=scheme,
-                                   ofmap_layout=self.ofmap_layout)
-
-        self.assertGreater(result2.cmp_key(), result1.cmp_key())
-
-        scheme = scheme.copy()
-        scheme['time'] = 23.4
-        result3 = SchedulingResult(scheme=scheme,
-                                   ofmap_layout=self.ofmap_layout)
-
-        self.assertGreater(result3.cmp_key(), result2.cmp_key())
-

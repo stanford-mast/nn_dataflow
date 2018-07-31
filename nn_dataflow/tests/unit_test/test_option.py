@@ -32,6 +32,7 @@ class TestOption(unittest.TestCase):
                          partition_hybrid=True,
                          partition_batch=False,
                          partition_ifmaps=False,
+                         opt_goal='ed',
                          ntops=10,
                          nprocesses=16,
                          verbose=False
@@ -46,6 +47,7 @@ class TestOption(unittest.TestCase):
                          'partition_batch')
         self.assertEqual(options.partition_ifmaps, False,
                          'partition_ifmaps')
+        self.assertEqual(options.opt_goal, 'ed', 'opt_goal')
         self.assertEqual(options.ntops, 10, 'ntops')
         self.assertEqual(options.nprocesses, 16, 'nprocesses')
         self.assertEqual(options.verbose, False, 'verbose')
@@ -66,6 +68,7 @@ class TestOption(unittest.TestCase):
         self.assertEqual(options.partition_hybrid, False)
         self.assertEqual(options.partition_batch, False)
         self.assertEqual(options.partition_ifmaps, False)
+        self.assertEqual(options.opt_goal, 'e')
         self.assertEqual(options.ntops, 1)
         self.assertEqual(options.nprocesses, 1)
         self.assertEqual(options.verbose, False)
@@ -101,6 +104,13 @@ class TestOption(unittest.TestCase):
                                      'Option: .*partition_ifmaps.*'
                                      'partition_hybrid.*'):
             _ = Option(partition_hybrid=False, partition_ifmaps=True)
+
+    def test_invalid_opt_goal(self):
+        ''' Invalid opt_goal. '''
+        with self.assertRaisesRegexp(ValueError, 'Option: .*opt_goal.*'):
+            _ = Option(opt_goal='o')
+        with self.assertRaisesRegexp(ValueError, 'Option: .*opt_goal.*'):
+            _ = Option(opt_goal='E')
 
     def test_option_list(self):
         ''' Accessor option_list. '''

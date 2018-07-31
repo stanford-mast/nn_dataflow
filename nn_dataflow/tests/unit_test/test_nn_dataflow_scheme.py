@@ -250,39 +250,3 @@ class TestNNDataflowScheme(unittest.TestCase):
                                      'NNDataflowScheme: .*not_supported.*'):
             _ = self.dtfl.perlayer_stats('not_supported')
 
-    def test_cmp_key(self):
-        ''' Get cmp_key. '''
-        f1_layer = self.network['f1']
-        f1res = SchedulingResult(
-            scheme=OrderedDict([('cost', 1.5), ('time', 2.), ('ops', 4.),
-                                ('num_nodes', 4),
-                                ('cost_loop', 1.), ('cost_part', 0.5),
-                                ('proc_time', 2), ('bus_time', 0),
-                                ('dram_time', 0),
-                                ('access', [[7, 8, 9]] * me.NUM),
-                                ('total_nhops', [4, 5, 6]),
-                                ('fetch', [[1, 1, 1], [2, 2, 2]])]),
-            ofmap_layout=DataLayout(
-                frngs=(FmapRange((0, 0, 0, 0),
-                                 FmapPosition(b=self.batch_size,
-                                              n=f1_layer.nofm,
-                                              h=f1_layer.hofm,
-                                              w=f1_layer.wofm)),),
-                regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
-                                    type=NodeRegion.DRAM),),
-                parts=(PartitionScheme(order=range(pe.NUM),
-                                       pdims=[(1, 1)] * pe.NUM),)))
-
-        nndf1 = self.dtfl.copy()
-        nndf1['f1'] = f1res
-
-        scheme = f1res.scheme
-        scheme['cost'] = 2.
-        f1res2 = SchedulingResult(scheme=scheme,
-                                  ofmap_layout=f1res.ofmap_layout)
-
-        nndf2 = self.dtfl.copy()
-        nndf2['f1'] = f1res2
-
-        self.assertGreater(nndf2.cmp_key(), nndf1.cmp_key())
-

@@ -105,6 +105,15 @@ def skip_conv(bl_ts, bl_ords):
     return False
 
 
+def _loop_blocking_cmp_key(options, cost):
+    if options.opt_goal == 'ed':
+        return lambda lbs: lbs.get_cost(cost) * lbs.time
+    elif options.opt_goal == 'd':
+        return lambda lbs: (lbs.time, lbs.get_cost(cost))
+    assert options.opt_goal == 'e'
+    return lambda lbs: (lbs.get_cost(cost), lbs.time)
+
+
 def _gen_loopblocking_perprocess(
         nested_loop_desc, resource, cost, options,
         gen_tifm, gen_tofm, gen_tbat, gen_ords):
@@ -134,7 +143,7 @@ def _gen_loopblocking_perprocess(
             yield lbs
 
     return heapq.nsmallest(options.ntops, _sweep(),
-                           key=lambda lbs: (lbs.get_cost(cost), lbs.time))
+                           key=_loop_blocking_cmp_key(options, cost))
 
 
 def gen_loopblocking(nested_loop_desc, resource, cost, options):
@@ -200,7 +209,7 @@ def gen_loopblocking(nested_loop_desc, resource, cost, options):
         results.append(r)
 
     for lbs in heapq.nsmallest(options.ntops, retrieve_func,
-                               key=lambda lbs: (lbs.get_cost(cost), lbs.time)):
+                               key=_loop_blocking_cmp_key(options, cost)):
         yield lbs
 
     if pool is not None:

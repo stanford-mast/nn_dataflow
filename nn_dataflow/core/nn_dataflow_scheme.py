@@ -157,7 +157,3 @@ class NNDataflowScheme(MutableMapping):
         return 1. * sched_result.total_accesses[me.DRAM] \
                 / sched_result.total_time
 
-    def cmp_key(self):
-        ''' Key function for comparison. '''
-        return self.total_cost, self.total_time
-
