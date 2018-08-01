@@ -278,7 +278,8 @@ class PipelineSegment(object):
                     prev_idx = layer2idx[nbr_src[0]]
                     assert prev_idx.tm_idx == len(self.seg[prev_idx.sp_idx]) - 1
                     # Single neighbor source across this spatial scheduling.
-                    assert single_nbr_src is None or single_nbr_src == prev_idx
+                    if single_nbr_src is not None:
+                        return False
                     single_nbr_src = prev_idx
                     src += (prev_idx,)
 

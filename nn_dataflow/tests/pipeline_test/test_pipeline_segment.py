@@ -85,6 +85,11 @@ class TestPipelineSegment(TestPipelineFixture):
         self.assertFalse(segment.valid)
         self.assertFalse(hasattr(segment, 'alloc'))
 
+        # Multiple neighbor source in one spatial scheduling.
+        segment = self._make_segment((1, 2), self.net['net8'])
+        self.assertFalse(segment.valid)
+        self.assertFalse(hasattr(segment, 'alloc'))
+
         # Both memory source and neighbor source.
         segment = self._make_segment((13, 14), self.net['net4'])
         self.assertFalse(segment.valid)
