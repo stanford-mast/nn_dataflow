@@ -436,7 +436,7 @@ class PipelineSegment(object):
 
             # Round to the common factor multiples.
             assert total_nodes % cf == 0
-            nodes = [int(round(nr / cf)) * cf for nr in nodes_raw]
+            nodes = [max(1, int(round(nr / cf))) * cf for nr in nodes_raw]
             # Fix margin.
             while sum(nodes) != total_nodes:
                 diff = [n - nr for n, nr in zip(nodes, nodes_raw)]
