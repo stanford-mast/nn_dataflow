@@ -63,21 +63,26 @@ def add_lstm_cell(network, name, size, xin, cin=None, hin=None):
         ''' Name of a gate. '''
         return '{}_{}gate'.format(name, gate)
 
-    # Three gates.
-    prevs = (hin, xin) if hin else (xin,)
-    for g in ['f', 'i', 'o']:
-        network.add(gate_name(g), FCLayer(len(prevs) * size, size), prevs=prevs)
-
     # Candidate.
     cand_name = '{}_cand'.format(name)
     prevs = (hin, xin) if hin else (xin,)
     network.add(cand_name, FCLayer(len(prevs) * size, size), prevs=prevs)
 
+    # Three gates.
+    prevs = (hin, xin) if hin else (xin,)
+    for g in ['i', 'f', 'o']:
+        network.add(gate_name(g), FCLayer(len(prevs) * size, size), prevs=prevs)
+
     # C_t.
     cout_name = '{}_cout'.format(name)
-    prevs = (cin, gate_name('f'), cand_name, gate_name('i')) if cin \
-            else (gate_name('f'), cand_name, gate_name('i'))
-    network.add(cout_name, EltwiseLayer(size, 1, len(prevs)), prevs=prevs)
+    cout_f_name = cout_name + '_f'
+    prevs = (cin, gate_name('f')) if cin else (gate_name('f'),)
+    network.add(cout_f_name, EltwiseLayer(size, 1, len(prevs)), prevs=prevs)
+    cout_i_name = cout_name + '_i'
+    prevs = (cand_name, gate_name('i'))
+    network.add(cout_i_name, EltwiseLayer(size, 1, 2), prevs=prevs)
+    prevs = (cout_i_name, cout_f_name)
+    network.add(cout_name, EltwiseLayer(size, 1, 2), prevs=prevs)
 
     # h_t.
     hout_name = '{}_hout'.format(name)
