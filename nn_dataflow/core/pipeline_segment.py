@@ -781,13 +781,15 @@ class PipelineSegment(object):
         return True
 
     @staticmethod
-    def _simplify_symargs(symargs, symvals):
+    def _simplify_symargs_one_pass(symargs, symvals):
         '''
         Simplify symargs and symvals in-place:
         - If fbi/ofm is False, then remove it.
         - If fbi/ofm is True, then remove topi/ofm.
         - If a symbol can take only one value, then substitute it.
         - If a symbol only occurs once, then remove its constraint.
+
+        Return whether the symargs and symvals are already simplified.
         '''
         for a in itertools.chain.from_iterable(symargs):
             is_fbifm = a.get('fbifm')
@@ -827,6 +829,12 @@ class PipelineSegment(object):
         for s in subs_dict:
             del symvals[s]
 
+        return not subs_dict
+
+    def _simplify_symargs(self, symargs, symvals):
+        ''' Simplify symargs and symvals in-place iteratively. '''
+        while not self._simplify_symargs_one_pass(symargs, symvals):
+            pass
         used_syms = symtuple(
             *[symtuple(*a.values())
               for a in itertools.chain.from_iterable(symargs)]).free_symbols
