@@ -198,7 +198,13 @@ class TestInterLayerPipeline(TestPipelineFixture):
         # Fork case.
         ilp = self._make_ilp(self.net['net4'])
         vseg_list = list(ilp._gen_vseg())
-        self.assertEqual(len(vseg_list), 34)
+        self.assertEqual(len(vseg_list), 39)
+        # Case with one of multiple previous vertices on-chip.
+        self.assertIn((9, 10), vseg_list)
+        self.assertIn((13, 14), vseg_list)
+        # Case with only one next vertex off-chip.
+        self.assertIn((7, 8), vseg_list)
+        self.assertNotIn((4, 5, 6), vseg_list)
 
         # Multiple first layers.
         self.assertGreater(len(self.net['net3'].firsts()), 1)
@@ -219,9 +225,9 @@ class TestInterLayerPipeline(TestPipelineFixture):
         self.assertNotIn((10, 11, 12), vseg_list)
         # Multiple next layers.
         self.assertNotIn((0, 1, 2, 3), vseg_list)
-        self.assertNotIn((3, 4), vseg_list)
+        self.assertIn((3, 4), vseg_list)
         self.assertIn((3, 4, 5), vseg_list)
-        self.assertNotIn((10, 11), vseg_list)
+        self.assertIn((10, 11), vseg_list)
 
         # No duplicate.
         for net in self.net.values():
@@ -248,10 +254,10 @@ class TestInterLayerPipeline(TestPipelineFixture):
             vseg_list = list(ilp._gen_vseg())
             self.assertEqual(len(vseg_list), len(set(vseg_list)))
 
-            # The number of different vsegs is between one and three times of
+            # The number of different vsegs is between one and eight times of
             # the number of layers.
             self.assertGreater(len(vseg_list), len(net))
-            self.assertLessEqual(len(vseg_list), len(net) * 3)
+            self.assertLessEqual(len(vseg_list), len(net) * 8)
 
     def test_gen_vseg_twice(self):
         ''' _gen_vseg twice. '''
@@ -366,4 +372,41 @@ class TestInterLayerPipeline(TestPipelineFixture):
 
             seg_v_set = set(self._gen_all_segment(net))
             self.assertTrue(seg_set.issubset(seg_v_set))
+
+    def test_gen_segment_multi_prevs(self):
+        ''' gen_segment() with multiple previous vertices. '''
+        # pylint: disable=protected-access
+
+        net = self.net['net4']
+        ilp = self._make_ilp(net)
+
+        vseg_set = set(ilp._gen_vseg())
+        self.assertIn((9, 10), vseg_set)
+        self.assertIn((13, 14), vseg_set)
+
+        options = Option(partition_interlayer=True)
+        seg_set = set(ilp.gen_segment(options))
+
+        # 10 only has neighbor source 9; 10p only has local source 10 and
+        # memory source 8. Valid.
+        self.assertIn(self._make_segment((9, 10), ilp.network), seg_set)
+        # 14 has both neighbor source 13, and memory source 12, etc.. Invalid.
+        self.assertNotIn(self._make_segment((13, 14), ilp.network), seg_set)
+
+    def test_gen_segment_one_nexts(self):
+        ''' gen_segment() with missing one next vertex. '''
+        # pylint: disable=protected-access
+
+        net = self.net['net4']
+        ilp = self._make_ilp(net)
+
+        vseg_set = set(ilp._gen_vseg())
+        self.assertIn((7, 8), vseg_set)
+        self.assertNotIn((4, 5, 6), vseg_set)
+
+        options = Option(partition_interlayer=True)
+        seg_set = set(ilp.gen_segment(options))
+
+        self.assertIn(self._make_segment((7, 8), ilp.network), seg_set)
+        self.assertNotIn(self._make_segment((4, 5, 6), ilp.network), seg_set)
 

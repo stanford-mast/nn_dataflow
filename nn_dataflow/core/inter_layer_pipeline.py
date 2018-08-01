@@ -122,13 +122,13 @@ class InterLayerPipeline(object):
         or among the previous vertices of the current segment, we do not add it
         to the segment, because there is no benefit to co-locate them.
 
-        2. If a vertex has multiple previous vertices, none of them
+        2. If a vertex has multiple previous vertices, at most one of them
         can be in the same segment as this vertex, because the output data
-        availability timing of the previous vertices may not match.
+        availability timing of multiple previous vertices may not match.
 
-        3. If a vertex has multiple next vertices, all or none of them can be
-        in the same segment as this vertex, because only including a subset of
-        the next vertices cannot eliminate the data write-back to memory.
+        3. If a vertex has multiple next vertices, either all or at most one of
+        them can be NOT in the same segment as this vertex, because only
+        including a small subset saves little data write-back to memory.
         '''
 
         vseg = tuple()
@@ -155,14 +155,12 @@ class InterLayerPipeline(object):
             share_deps = not vseg or not frontier_prevs.isdisjoint(
                 set.union(set(vseg), *[self.dag_prev_dict[i] for i in vseg]))
 
-            # Whether some of the multiple previous vertices are in the current
-            # segment.
-            coupled_prevs = len(frontier_prevs) > 1 \
-                    and not frontier_prevs.isdisjoint(vseg)
+            # Whether multiple previous vertices are in the current segment.
+            multi_prevs = len(frontier_prevs.intersection(vseg)) > 1
 
-            if not share_deps or coupled_prevs:
-                # Not sharing any dependencies (rule 1), or previous vertices
-                # overlap with the current segment (rule 2).
+            if not share_deps or multi_prevs:
+                # Not sharing any dependencies (rule 1), or multiple previous
+                # vertices in the current segment (rule 2).
 
                 # Make sure the current segment is not empty.
                 assert vseg
@@ -179,11 +177,11 @@ class InterLayerPipeline(object):
             for idx in vseg:
                 nexts = self.dag_next_dict[idx]
 
-                # The next vertices should either all or none in the segment
-                # (rule 3).
-                if not (nexts.isdisjoint(vseg) or nexts.issubset(vseg)):
+                # The next vertices should either all or at most one not in the
+                # segment (rule 3).
+                if not nexts.isdisjoint(vseg) \
+                        and len(nexts.difference(vseg)) > 1:
                     # The segment is invalid. Need to add more vertices.
-                    assert min(nexts.difference(vseg)) > frontier
                     break
             else:
                 # The segment is valid.

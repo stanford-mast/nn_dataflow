@@ -323,20 +323,18 @@ class TestPipelineFixture(unittest.TestCase):
                                     r.src_data_region))
 
                 # Update data based on destination.
-                if r.dst_data_region == self.resource.dst_data_region:
-                    # Store back to memory.
-                    pass
-                else:
-                    # Local.
-                    self.assertEqual(r.dst_data_region, r.proc_region,
-                                     '_validate_allocation: data can only '
-                                     'be local if not storing back to mem.')
-                    # Overwrite.
-                    local_node_set = set(r.dst_data_region.iter_node())
-                    data_regions = {pl: data_regions[pl] for pl in data_regions
-                                    if local_node_set.isdisjoint(
-                                        data_regions[pl].iter_node())}
-                    data_regions[l] = r.dst_data_region
+                # Local or store back to memory. Both will be available on-chip.
+                self.assertTrue(r.dst_data_region == r.proc_region
+                                or r.dst_data_region
+                                == self.resource.dst_data_region,
+                                '_validate_allocation: data can only '
+                                'be local or storing back to mem.')
+                # Overwrite.
+                local_node_set = set(r.proc_region.iter_node())
+                data_regions = {pl: data_regions[pl] for pl in data_regions
+                                if local_node_set.isdisjoint(
+                                    data_regions[pl].iter_node())}
+                data_regions[l] = r.proc_region
 
     def _validate_constraint(self, segment, constraint):
         ''' Validate segment scheduling constraint. '''

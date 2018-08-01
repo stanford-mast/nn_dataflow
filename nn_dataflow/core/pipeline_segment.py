@@ -206,8 +206,9 @@ class PipelineSegment(object):
         source.
 
         Special index `None` means memory dependency, i.e., from/to memory.
-        Memory dependencies and neighbor dependencies are mutual exclusive,
-        based on the segment generation rule (see InterLayerPipeline).
+        Memory sources and neighbor sources must be mutual exclusive, in order
+        to correctly set the src data regions; memory destinations and neighbor
+        destinations can co-exist.
 
         Local dependencies are omitted, as by default each layer has its
         immediately previous layer as local source and immediately next layer
@@ -260,7 +261,12 @@ class PipelineSegment(object):
                             and layer2idx[lcl_src[0]].tm_idx == tm_idx - 1
 
                 # Mutual exclusive.
-                assert not mem_src or not nbr_src
+                if mem_src and nbr_src:
+                    # We now allow each spatial scheduling (vertex) to have
+                    # both memory source and neighbor source when generating
+                    # segments. But each single layer cannot have both;
+                    # otherwise there would be multiple source data regions.
+                    return False
 
                 if mem_src:
                     # Memory source.
@@ -308,7 +314,8 @@ class PipelineSegment(object):
                         return False
 
                 # Mutual exclusive.
-                assert not mem_dst or not nbr_dst
+                # Now they can co-exist.
+                # assert not mem_dst or not nbr_dst
 
                 if mem_dst:
                     # Memory destination.
@@ -317,7 +324,7 @@ class PipelineSegment(object):
                     # Neighbor destinations.
                     # This layer is the last temporal scheduled.
                     assert tm_idx == len(ltpl) - 1
-                    dst += tuple(nbr_dst)
+                    dst += tuple(layer2idx[n] for n in nbr_dst)
 
                 self.src_dict[sp_idx][tm_idx] = src
                 self.dst_dict[sp_idx][tm_idx] = dst
@@ -374,7 +381,11 @@ class PipelineSegment(object):
                 dst = self.dst_dict[sp_idx][tm_idx]
                 if None in dst:
                     # Data destination is memory.
-                    assert dst == (None,)
+                    # assert dst == (None,)
+                    # Now we can have both memory and neighbor destinations. If
+                    # they co-exist, we need to store them locally and also
+                    # store back to memory. In this case the dst data region is
+                    # set to memory.
                     dst_data_region = self.resource.dst_data_region
                 elif dst:
                     # Data destinations are neighbors.

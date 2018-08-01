@@ -85,6 +85,17 @@ class TestPipelineSegment(TestPipelineFixture):
         self.assertFalse(segment.valid)
         self.assertFalse(hasattr(segment, 'alloc'))
 
+        # Both memory source and neighbor source.
+        segment = self._make_segment((13, 14), self.net['net4'])
+        self.assertFalse(segment.valid)
+        self.assertFalse(hasattr(segment, 'alloc'))
+
+        # Valid cases.
+
+        # Both memory destination and neighbor destination.
+        segment = self._make_segment((7, 8), self.net['net4'])
+        self.assertTrue(segment.valid)
+
     def test_alloc_not_valid(self):
         ''' Not valid segment due to alloc. '''
 
