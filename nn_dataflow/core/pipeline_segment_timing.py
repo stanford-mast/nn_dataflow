@@ -92,7 +92,6 @@ class PipelineSegmentTiming(object):
                             timing.dram_time)
                         for tlist in self.timing_list
                         for timing in tlist)
-        assert self.time >= time_indv
         return (self.time - time_indv) / time_indv
 
     def add(self, layer_name, sched_result):
