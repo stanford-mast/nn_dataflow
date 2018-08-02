@@ -289,10 +289,10 @@ def argparser():
 def main():
     ''' Main function. '''
     args = argparser().parse_args()
-    json.dump(do_scheduling(args), sys.stdout, indent=2,
-              default=lambda _: None)
+    res = do_scheduling(args)
+    json.dump(res, sys.stdout, indent=2, default=lambda _: None)
     sys.stdout.write('\n')
-    return 0
+    return 0 if res else 2
 
 
 if __name__ == '__main__':
