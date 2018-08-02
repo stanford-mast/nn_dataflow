@@ -74,11 +74,6 @@ class TestPartitionFixture(unittest.TestCase):
                                        partition_batch=True,
                                        partition_ifmaps=False,
                                        **optdict)
-        self.options['DIMPART'] = Option(partition_hybrid=True,
-                                         partition_batch=True,
-                                         partition_ifmaps=True,
-                                         partition_dimensional=True,
-                                         **optdict)
 
     def _gen_partition(self, wlkey='BASE', dnkey='BASE', optkey='BASE',
                        guaranteed=False):
@@ -122,6 +117,13 @@ class TestPartitionFixture(unittest.TestCase):
             elif isinstance(layer, LocalRegionLayer):
                 if pdims[pe.INPP].size() > 1:
                     continue
+
+            # Fully utilize one dimension.
+            pdims_no_ofmp = pdims[:pe.OFMP] + pdims[pe.OFMP + 1:]
+            if any(pd.h != 1 and pd.h != dim_nodes.h
+                   and pd.w != 1 and pd.w != dim_nodes.w
+                   for pd in pdims_no_ofmp):
+                continue
 
             for order in itertools.permutations(range(pe.NUM)):
 

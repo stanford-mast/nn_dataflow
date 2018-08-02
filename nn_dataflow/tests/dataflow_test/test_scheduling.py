@@ -249,7 +249,7 @@ class TestScheduling(unittest.TestCase):
         self.assertNotEqual(id(opts), id(self.options))
 
         part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
-                               pdims=((2, 2), (2, 2), (1, 1), (1, 1)))
+                               pdims=((2, 4), (2, 1), (1, 1), (1, 1)))
 
         _ = schd.schedule_search_per_node(part, rsrc, opts)
 

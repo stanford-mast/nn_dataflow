@@ -128,7 +128,7 @@ def prod(lst):
     return reduce(mul, lst, 1)
 
 
-def approx_dividable(total, num, overhead=0.2):
+def approx_dividable(total, num, overhead=0.1):
     ''' Whether it is reasonable to divide `total` into `num` parts.
     `overhead` is the allowed max padding overhead.  '''
     return idivc(total, num) * num <= total * (1 + overhead)

@@ -25,7 +25,6 @@ from . import data_category_enum as de
 OPTION_LIST = ['sw_gbuf_bypass',
                'sw_solve_loopblocking',
                'partition_hybrid',
-               'partition_dimensional',
                'partition_batch',
                'partition_ifmaps',
                'opt_goal',
@@ -62,7 +61,6 @@ class Option(namedtuple('Option', OPTION_LIST)):
         kwdict.setdefault('sw_gbuf_bypass', (False,) * de.NUM)
         kwdict.setdefault('sw_solve_loopblocking', False)
         kwdict.setdefault('partition_hybrid', False)
-        kwdict.setdefault('partition_dimensional', False)
         kwdict.setdefault('partition_batch', False)
         kwdict.setdefault('partition_ifmaps', False)
         kwdict.setdefault('opt_goal', 'e')

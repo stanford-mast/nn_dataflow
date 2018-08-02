@@ -35,9 +35,6 @@ List of major changes and improvements
 
   - Record search time.
 
-  - Add dimensional partitioning option, i.e., each partitioning can only be
-    along one dimension unless it is the only partitioning.
-
   - Add utility `IntRange` for integer ranges.
 
   - Add `HashableDict` class.
@@ -79,6 +76,9 @@ List of major changes and improvements
 
   - `SchedulingResult` uses a combined `OrderedDict` to replace `dict_loop` and
     `dict_part`.
+
+  - In partitioning schemes, each partitioning must fully utilize one dimension
+    before starting the other, except for fmap partitioning.
 
 - Software engineering.
 

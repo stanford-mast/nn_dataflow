@@ -160,9 +160,13 @@ class TestUtilApproxDividable(unittest.TestCase):
         self.assertTrue(util.approx_dividable(24, 3, overhead=0))
         self.assertTrue(util.approx_dividable(24, 4, overhead=0))
 
-        self.assertTrue(util.approx_dividable(7, 2))
-        self.assertTrue(util.approx_dividable(19, 7))
-        self.assertFalse(util.approx_dividable(22, 7))
+        self.assertTrue(util.approx_dividable(11, 2))
+        self.assertFalse(util.approx_dividable(9, 2))
+        self.assertTrue(util.approx_dividable(19, 5))
+
+        self.assertTrue(util.approx_dividable(7, 2, overhead=0.2))
+        self.assertTrue(util.approx_dividable(19, 7, overhead=0.2))
+        self.assertFalse(util.approx_dividable(22, 7, overhead=0.2))
 
         ovhd = util.idivc(19, 7) * 7 / 19. - 1
         self.assertFalse(util.approx_dividable(19, 7, overhead=ovhd - 0.01))
@@ -170,8 +174,8 @@ class TestUtilApproxDividable(unittest.TestCase):
 
     def test_float(self):
         ''' Float. '''
-        self.assertTrue(util.approx_dividable(18.4, 7))
-        self.assertTrue(util.approx_dividable(21.4, 7))
+        self.assertTrue(util.approx_dividable(18.4, 3))
+        self.assertTrue(util.approx_dividable(21.4, 3))
 
 
 class TestUtilFactorize(unittest.TestCase):
