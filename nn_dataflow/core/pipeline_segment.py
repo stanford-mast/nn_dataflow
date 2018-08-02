@@ -342,6 +342,11 @@ class PipelineSegment(object):
 
         self.alloc = tuple()
 
+        # The spatial and temporal indices of the layer which accepts ifmaps
+        # that are stored back to memory. This happens when the source has both
+        # on-chip and off-chip destinations (see InterLayerPipeline).
+        multi_dst_set = set()
+
         # Allocate processing subregions.
         subregions = self._alloc_proc(max_util_drop=max_util_drop)
         if not subregions:
@@ -370,13 +375,19 @@ class PipelineSegment(object):
                 else:
                     # Data source is all local.
                     src_data_region = proc_region
-                # Shared memory source.
                 src_data_region_final = None
                 if sp_idx in self.sh_mem_src_dict and tm_idx == 0:
+                    # Shared memory source.
+                    assert src == (None,)
                     sh_sp_idx = self.sh_mem_src_dict[sp_idx]
                     assert sh_sp_idx < sp_idx
                     src_data_region_final = src_data_region
                     src_data_region = self.alloc[sh_sp_idx][0].proc_region
+                if PipelineSegment.SchedIndex(sp_idx, tm_idx) in multi_dst_set:
+                    # Ifmaps from on-chip (neighbor or local) source that are
+                    # stored back to memory.
+                    assert not src_data_region_final
+                    src_data_region_final = self.resource.dst_data_region
 
                 # Data destination.
                 dst = self.dst_dict[sp_idx][tm_idx]
@@ -388,6 +399,11 @@ class PipelineSegment(object):
                     # store back to memory. In this case the dst data region is
                     # set to memory.
                     dst_data_region = self.resource.dst_data_region
+                    # Record other on-chip (neighbor and local) destinations.
+                    multi_dst_set.update(
+                        (d for d in dst if d is not None),
+                        ([PipelineSegment.SchedIndex(sp_idx, tm_idx + 1)]
+                         if tm_idx + 1 < len(ltpl) else []))
                 elif dst:
                     # Data destinations are neighbors.
                     # Put data in local. The next layers will fetch.
