@@ -26,6 +26,8 @@ List of major changes and improvements
     - Specify maximum allowed execution time overhead due to layer pipelining
       in `Option`.
     - Specify maximum pipelining degree for layer pipelining in `Option`.
+    - Allow disabling optimizations for layer pipelining to fall back to basic
+      pipelining techniques.
 
 
 ### Changed

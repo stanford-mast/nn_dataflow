@@ -20,6 +20,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import itertools
 
+from nn_dataflow.core import ConvLayer
 from nn_dataflow.core import NodeRegion
 from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import PipelineSegment
@@ -29,6 +30,8 @@ from . import TestPipelineFixture
 
 class TestPipelineSegment(TestPipelineFixture):
     ''' Tests for PipelineSegment. '''
+
+    # pylint: disable=too-many-public-methods
 
     def test_valid_args(self):
         ''' Valid arguments. '''
@@ -100,6 +103,28 @@ class TestPipelineSegment(TestPipelineFixture):
         # Both memory destination and neighbor destination.
         segment = self._make_segment((7, 8), self.net['net4'])
         self.assertTrue(segment.valid)
+
+    def test_init_deps_not_opt(self):
+        ''' Init deps for segment not with opt. '''
+
+        # Multiple on-chip sources.
+        segment = self._make_segment((3, 4), self.net['net8'])
+        self.assertTrue(segment.valid)
+        segment = self._make_segment((3, 4), self.net['net8'], with_opt=False)
+        self.assertFalse(segment.valid)
+
+        # Multiple on-chip destinations.
+        segment = self._make_segment((4, 5, 6), self.net['net4'])
+        self.assertTrue(segment.valid)
+        segment = self._make_segment((4, 5, 6), self.net['net4'],
+                                     with_opt=False)
+        self.assertFalse(segment.valid)
+
+        # Multiple linear chains.
+        segment = self._make_segment((5, 6), self.net['net4'])
+        self.assertTrue(segment.valid)
+        segment = self._make_segment((5, 6), self.net['net4'], with_opt=False)
+        self.assertFalse(segment.valid)
 
     def test_alloc_not_valid(self):
         ''' Not valid segment due to alloc. '''
@@ -296,6 +321,9 @@ class TestPipelineSegment(TestPipelineFixture):
         self.assertEqual(alloc[3][0].src_data_region_final,
                          alloc[0][0].src_data_region_final)
 
+        segment = self._make_segment((6, 7, 8, 9), net, with_opt=False)
+        self.assertFalse(segment.valid)
+
         net = self.net['net5']
 
         segment = self._make_segment((1, 2, 3), net)
@@ -306,6 +334,9 @@ class TestPipelineSegment(TestPipelineFixture):
         self.assertEqual(alloc[2][0].src_data_region_final,
                          alloc[0][0].src_data_region_final)
 
+        segment = self._make_segment((1, 2, 3), net, with_opt=False)
+        self.assertFalse(segment.valid)
+
         net = self.net['net4']
 
         segment = self._make_segment((8, 9), net)
@@ -315,6 +346,9 @@ class TestPipelineSegment(TestPipelineFixture):
         self.assertEqual(alloc[1][0].src_data_region, alloc[0][0].proc_region)
         self.assertEqual(alloc[1][0].src_data_region_final,
                          alloc[0][0].src_data_region_final)
+
+        segment = self._make_segment((8, 9), net, with_opt=False)
+        self.assertFalse(segment.valid)
 
     def test_allocation_temp(self):
         ''' allocation() temporal. '''
@@ -600,4 +634,39 @@ class TestPipelineSegment(TestPipelineFixture):
                              'gen_constraint with max_time_overhead: '
                              'miss generating constraints with <= 0.5 ovhd:\n'
                              '{}'.format(set_5))
+
+    def test_gen_constraint_not_opt(self):
+        ''' gen_constraint() not with opt. '''
+
+        def _validate_fully_buffered_constraint(segment, constraint):
+            layer2idx = dict((l, (sp_idx, tm_idx))
+                             for sp_idx, ltpl in enumerate(segment)
+                             for tm_idx, l in enumerate(ltpl))
+            seg_layers = set(layer2idx.keys())
+
+            for l, c in zip(itertools.chain.from_iterable(segment),
+                            itertools.chain.from_iterable(constraint)):
+
+                if not isinstance(net[l], ConvLayer):
+                    continue
+
+                onchip_prevs = seg_layers.intersection(net.prevs(l))
+                if onchip_prevs:
+                    self.assertEqual(c.topifm, 1)
+                    for p in onchip_prevs:
+                        sp_idx, tm_idx = layer2idx[p]
+                        p_c = constraint[sp_idx][tm_idx]
+                        self.assertEqual(p_c.topofm, 1)
+
+        for net_name in self.net:
+
+            net = self.net[net_name]
+
+            # Spatial pipelining.
+            for segment in self._gen_all_segment(net, with_opt=False):
+                if not segment.valid:
+                    continue
+
+                for constraint, _ in segment.gen_constraint():
+                    _validate_fully_buffered_constraint(segment, constraint)
 

@@ -67,6 +67,7 @@ class InterLayerPipeline(object):
                   'batch_size': self.batch_size,
                   'resource': self.resource,
                   'max_util_drop': self.max_util_drop,
+                  'with_opt': options.layer_pipeline_opt,
                  }
 
         # No pipelining, each layer sequentially occupies the whole resource.

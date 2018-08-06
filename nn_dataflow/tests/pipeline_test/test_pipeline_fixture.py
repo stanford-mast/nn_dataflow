@@ -160,12 +160,16 @@ class TestPipelineFixture(unittest.TestCase):
         net = Network('net8')
         # Forward to the middle.
         #    /-\
-        # 0-1-2-2p
+        # 0-1-2-2p-4-4p
+        #  \-3------/
         net.set_input_layer(InputLayer(1, 1))
         net.add('0', FCLayer(1, 1))
         net.add('1', FCLayer(1, 1), prevs='0')
         net.add('2', FCLayer(1, 1), prevs='1')
         net.add('2p', PoolingLayer(2, 1, 1), prevs=('1', '2'))
+        net.add('3', FCLayer(1, 1), prevs='0')
+        net.add('4', FCLayer(2, 1), prevs='2p')
+        net.add('4p', PoolingLayer(2, 1, 1), prevs=('3', '4'))
         self.net[net.net_name] = net
 
         # Real networks.
@@ -198,11 +202,14 @@ class TestPipelineFixture(unittest.TestCase):
         ''' Make an InterLayerPipeline instance. '''
         return InterLayerPipeline(network, self.batch_size, self.resource)
 
-    def _make_segment(self, vseg, network, temporal=False, max_util_drop=None):
+    def _make_segment(self, vseg, network, temporal=False, max_util_drop=None,
+                      with_opt=True):
         ''' Convert vertex segment to (layer) segment. '''
         kwargs = {}
         if max_util_drop is not None:
             kwargs['max_util_drop'] = max_util_drop
+        if not with_opt:
+            kwargs['with_opt'] = False
         ilp = self._make_ilp(network)
         seg = tuple(ilp.dag_vertex_list[vidx] for vidx in vseg)
         if temporal:

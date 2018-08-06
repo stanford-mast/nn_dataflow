@@ -163,6 +163,7 @@ def do_scheduling(args):
                      partition_interlayer=args.interlayer_partition,
                      layer_pipeline_time_ovhd=args.layer_pipeline_time_overhead,
                      layer_pipeline_max_degree=args.layer_pipeline_max_degree,
+                     layer_pipeline_opt=not args.disable_interlayer_opt,
                      ntops=args.top,
                      nprocesses=args.processes,
                      verbose=args.verbose)
@@ -261,6 +262,11 @@ def argparser():
                     help='Allow to save the writeback to memory for the '
                          'intermediate data between layers if able to '
                          'store the entire data set in on-chip buffers.')
+    ap.add_argument('--disable-interlayer-opt',
+                    '--basic-interlayer-partition',
+                    action='store_true',
+                    help='Disable optimizations and only allow basic '
+                         'inter-layer pipeline.')
 
     ap.add_argument('--hybrid-partition',
                     '--hybrid-partition2d',  # deprecated old name

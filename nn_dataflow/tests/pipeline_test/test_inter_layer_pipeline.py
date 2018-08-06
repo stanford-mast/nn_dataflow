@@ -410,3 +410,37 @@ class TestInterLayerPipeline(TestPipelineFixture):
         self.assertIn(self._make_segment((7, 8), ilp.network), seg_set)
         self.assertNotIn(self._make_segment((4, 5, 6), ilp.network), seg_set)
 
+    def test_gen_segment_not_opt(self):
+        ''' gen_segment() not with_opt. '''
+
+        options_with_opt = Option(partition_interlayer=True,
+                                  hw_gbuf_save_writeback=True,
+                                  layer_pipeline_opt=True)
+        options_not_opt = Option(partition_interlayer=True,
+                                 hw_gbuf_save_writeback=True,
+                                 layer_pipeline_opt=False)
+
+        # Linear ones
+        for net_name in ['net1', 'net2', 'zfnet']:
+            net = self.net[net_name]
+            ilp = self._make_ilp(net)
+
+            segs_with_opt = set(seg.seg
+                                for seg in ilp.gen_segment(options_with_opt))
+            segs_not_opt = set(seg.seg
+                               for seg in ilp.gen_segment(options_not_opt))
+
+            self.assertSetEqual(segs_with_opt, segs_not_opt)
+
+        # Non-linear ones
+        for net_name in ['net3', 'net4', 'net5', 'net6', 'net7', 'googlenet']:
+            net = self.net[net_name]
+            ilp = self._make_ilp(net)
+
+            segs_with_opt = set(seg.seg
+                                for seg in ilp.gen_segment(options_with_opt))
+            segs_not_opt = set(seg.seg
+                               for seg in ilp.gen_segment(options_not_opt))
+
+            self.assertTrue(segs_with_opt.issuperset(segs_not_opt))
+

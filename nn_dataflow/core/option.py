@@ -32,6 +32,7 @@ OPTION_LIST = ['sw_gbuf_bypass',
                'partition_interlayer',
                'layer_pipeline_time_ovhd',
                'layer_pipeline_max_degree',
+               'layer_pipeline_opt',
                'ntops',
                'nprocesses',
                'verbose',
@@ -72,6 +73,7 @@ class Option(namedtuple('Option', OPTION_LIST)):
         kwdict.setdefault('partition_interlayer', False)
         kwdict.setdefault('layer_pipeline_time_ovhd', float('inf'))
         kwdict.setdefault('layer_pipeline_max_degree', float('inf'))
+        kwdict.setdefault('layer_pipeline_opt', True)
         kwdict.setdefault('ntops', 1)
         kwdict.setdefault('nprocesses', 1)
         kwdict.setdefault('verbose', False)

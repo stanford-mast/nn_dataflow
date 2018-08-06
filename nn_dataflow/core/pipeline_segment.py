@@ -45,7 +45,8 @@ class PipelineSegment(object):
     # scheduling indices.
     SchedIndex = namedtuple('SchedIndex', ['sp_idx', 'tm_idx'])
 
-    def __init__(self, seg, network, batch_size, resource, max_util_drop=0.05):
+    def __init__(self, seg, network, batch_size, resource, max_util_drop=0.05,
+                 with_opt=True):
         if not isinstance(seg, tuple):
             raise TypeError('PipelineSegment: seg must be a tuple.')
         for ltpl in seg:
@@ -65,6 +66,7 @@ class PipelineSegment(object):
         self.batch_size = batch_size
         self.resource = resource
         self.max_util_drop = max_util_drop
+        self.with_opt = with_opt
 
         self.valid = self._init_deps()
         if not self.valid:
@@ -180,12 +182,13 @@ class PipelineSegment(object):
                 'network={}'.format(repr(self.network)),
                 'batch_size={}'.format(repr(self.batch_size)),
                 'resource={}'.format(repr(self.resource)),
-                'max_util_drop={}'.format(repr(self.max_util_drop))]))
+                'max_util_drop={}'.format(repr(self.max_util_drop)),
+                'with_opt={}'.format(repr(self.with_opt))]))
 
     def _key_attrs(self):
         ''' Used for comparison. '''
         return (self.seg, self.network, self.batch_size, self.resource,
-                self.max_util_drop)
+                self.max_util_drop, self.with_opt)
 
     def _init_deps(self):
         '''
@@ -326,6 +329,14 @@ class PipelineSegment(object):
                     # This layer is the last temporal scheduled.
                     assert tm_idx == len(ltpl) - 1
                     dst += tuple(layer2idx[n] for n in nbr_dst)
+
+                # Basic pipelining requires a linear structure (on-chip).
+                if not self.with_opt:
+                    if len(nbr_src) + len(lcl_src) > 1 \
+                            or len(nbr_dst) + len(lcl_dst) > 1 \
+                            or ((sp_idx, tm_idx) != (0, 0)
+                                    and not nbr_src and not lcl_src):
+                        return False
 
                 self.src_dict[sp_idx][tm_idx] = src
                 self.dst_dict[sp_idx][tm_idx] = dst
@@ -674,6 +685,10 @@ class PipelineSegment(object):
                         # We only look at this rule when inter-temporal rule
                         # does not apply and the ifmaps of this group are not
                         # yet required to fully buffer.
+                        if not self.with_opt:
+                            # Basic pipelining requires fully buffering all
+                            # pairs of neighbor src/dst.
+                            nsrc_sa['fbofm'] = True
                         nsrc_fbofm = nsrc_sa.get('fbofm', False)
                         # (a): if the source already fully buffers ofmaps.
                         # Make this group fully buffer ifmaps.
