@@ -91,6 +91,12 @@ class SchedulingConstraint(util.ContentHashClass):
 
         return True
 
+    def filter_gen_ts(self, gen_tifm, gen_tofm, gen_tbat):
+        ''' Get the filtered generators for loop blocking factors. '''
+        return self._filter_gen(gen_tifm, self.topifm), \
+                self._filter_gen(gen_tofm, self.topofm), \
+                self._filter_gen(gen_tbat, self.topbat)
+
     def update_by_prev(self, prev_results):
         '''
         Based on the previous layer scheduling results `prev_results` as a
@@ -100,6 +106,13 @@ class SchedulingConstraint(util.ContentHashClass):
         for layer_name in self.update_dict:
             self.update_dict[layer_name](self, prev_results[layer_name])
         self.update_dict = util.HashableDict()  # clear updated rules.
+
+    @staticmethod
+    def _filter_gen(gen, topt=0):
+        ''' Get a new generator which filters the top factor. '''
+        for tpl in gen:
+            if topt == 0 or tpl[0] == topt:
+                yield tpl
 
     def __repr__(self):
         return '{}({})'.format(

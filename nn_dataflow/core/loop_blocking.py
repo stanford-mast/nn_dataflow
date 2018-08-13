@@ -116,9 +116,8 @@ def _gen_loopblocking_perprocess(
         Transpose LoopEnum-major to BL-major.
         '''
         gen_lp_ts = [None] * le.NUM
-        gen_lp_ts[le.IFM] = gen_tifm
-        gen_lp_ts[le.OFM] = gen_tofm
-        gen_lp_ts[le.BAT] = gen_tbat
+        gen_lp_ts[le.IFM], gen_lp_ts[le.OFM], gen_lp_ts[le.BAT] = \
+                constraint.filter_gen_ts(gen_tifm, gen_tofm, gen_tbat)
         for lp_ts in itertools.product(*gen_lp_ts):
             bl_ts = tuple(zip(*lp_ts))
             yield bl_ts

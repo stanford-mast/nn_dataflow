@@ -27,6 +27,8 @@ from nn_dataflow.core import PartitionScheme
 from nn_dataflow.core import SchedulingConstraint, \
         SchedulingConstraintLayerPipeline
 
+from nn_dataflow import util
+
 class TestSchedulingConstraintFixture(unittest.TestCase):
     ''' Base fixture class for SchedulingConstraint tests. '''
 
@@ -153,6 +155,54 @@ class TestSchedulingConstraint(TestSchedulingConstraintFixture):
                                      '.*update_dict.*'):
             cstr.is_valid_part(PartitionScheme(order=range(pe.NUM),
                                                pdims=[(2, 2)] * pe.NUM))
+
+    def test_filter_gen_ts(self):
+        ''' Get filter_gen_ts. '''
+        gen_tifm = util.factorize(36, 3)
+        gen_tofm = util.factorize(20, 3)
+        gen_tbat = util.factorize(16, 3)
+
+        cstr = SchedulingConstraint(topbat=2, topofm=4)
+
+        gifm, gifm0, gen_tifm = itertools.tee(gen_tifm, 3)
+        gofm, gofm0, gen_tofm = itertools.tee(gen_tofm, 3)
+        gbat, gbat0, gen_tbat = itertools.tee(gen_tbat, 3)
+        fgifm, fgofm, fgbat = cstr.filter_gen_ts(gifm, gofm, gbat)
+
+        self.assertSetEqual(set(fgifm), set(gifm0))
+        set_fgofm = set(fgofm)
+        set_fgbat = set(fgbat)
+        self.assertTrue(set_fgofm.issubset(set(gofm0)))
+        self.assertTrue(set_fgbat.issubset(set(gbat0)))
+        self.assertSetEqual(set_fgofm,
+                            set([(4,) + tpl for tpl in util.factorize(5, 2)]))
+        self.assertSetEqual(set_fgbat,
+                            set([(2,) + tpl for tpl in util.factorize(8, 2)]))
+
+        cstr = SchedulingConstraint(topifm=4)
+
+        gifm, gifm0, gen_tifm = itertools.tee(gen_tifm, 3)
+        gofm, gofm0, gen_tofm = itertools.tee(gen_tofm, 3)
+        gbat, gbat0, gen_tbat = itertools.tee(gen_tbat, 3)
+        fgifm, fgofm, fgbat = cstr.filter_gen_ts(gifm, gofm, gbat)
+
+        self.assertSetEqual(set(fgofm), set(gofm0))
+        self.assertSetEqual(set(fgbat), set(gbat0))
+        set_fgifm = set(fgifm)
+        self.assertTrue(set_fgifm.issubset(set(gifm0)))
+        self.assertSetEqual(set_fgifm,
+                            set([(4,) + tpl for tpl in util.factorize(9, 2)]))
+
+        cstr = SchedulingConstraint()
+
+        gifm, gifm0, gen_tifm = itertools.tee(gen_tifm, 3)
+        gofm, gofm0, gen_tofm = itertools.tee(gen_tofm, 3)
+        gbat, gbat0, gen_tbat = itertools.tee(gen_tbat, 3)
+        fgifm, fgofm, fgbat = cstr.filter_gen_ts(gifm, gofm, gbat)
+
+        self.assertSetEqual(set(fgifm), set(gifm0))
+        self.assertSetEqual(set(fgofm), set(gofm0))
+        self.assertSetEqual(set(fgbat), set(gbat0))
 
     def test_update_by_prev(self):
         ''' Modifier update_by_prev. '''
