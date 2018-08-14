@@ -166,11 +166,11 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         cnt1 = len(list(self._gen_loopblocking(optkey='BYPSOL')))
 
-        cnt2 = 0
-        for lbs in self._gen_loopblocking(optkey='BYPSOL', cstr=self.cstr):
-            self.assertTrue(self.cstr.is_valid_top_bl(lbs.bl_ts[0],
-                                                      lbs.bl_ords[0]))
-            cnt2 += 1
+        lbs_list = list(self._gen_loopblocking(optkey='BYPSOL', cstr=self.cstr))
+        self.assertTrue(all(
+            self.cstr.is_valid_top_bl(lbs.bl_ts[0], lbs.bl_ords[0])
+            for lbs in lbs_list))
+        cnt2 = len(lbs_list)
 
         self.assertLessEqual(cnt2, cnt1)
 
