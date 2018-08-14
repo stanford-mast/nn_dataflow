@@ -189,6 +189,7 @@ class TestLayer(unittest.TestCase):
         l1 = Layer(4, 12)
         l2 = Layer(4, 13)
         self.assertNotEqual(l1, l2)
+        self.assertNotEqual(l1, (4, 12))
 
     def test_hash(self):
         ''' Get hash. '''

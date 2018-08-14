@@ -54,6 +54,11 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
         # Valid.
         lbs = self._lbs(self._make_bl_ts((0, 1, 1), (0, 1, 1), (0, 1, 1)))
         self.assertTrue(lbs.is_valid())
+        lbs = self._lbs(self._make_bl_ts(
+            (self.nld['BASE'].loopcnt[le.IFM], 1, 1),
+            (self.nld['BASE'].loopcnt[le.OFM], 1, 1),
+            (self.nld['BASE'].loopcnt[le.BAT], 1, 1)))
+        self.assertTrue(lbs.is_valid())
 
     def test_data_size(self):
         ''' Get data_size. '''
