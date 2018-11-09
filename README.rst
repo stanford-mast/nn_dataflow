@@ -44,6 +44,7 @@ Install
 The following are the commands required to install. This program requires 
 Python2.7 and does not work in later versions without modifications::
 
+    > pip install -r requirements.txt
     > pip install --user -e ./
     > python2.7 setup.py install 
 
