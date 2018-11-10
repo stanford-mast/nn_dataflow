@@ -38,6 +38,18 @@ paper(s) below, and send us a citation of your work.
 - Gao et al., "TETRIS: Scalable and Efficient Neural Network Acceleration with
   3D Memory", in ASPLOS, April 2017 [Gao17]_.
 
+Install
+-------
+
+The following are the commands required to install. This program requires 
+Python2.7 and does not work in later versions without modifications::
+
+    > pip install -r requirements.txt
+    > pip install --user -e ./
+    > python2.7 setup.py install 
+
+You might need sudo user when installing the second command. 
+
 
 Usage
 -----
