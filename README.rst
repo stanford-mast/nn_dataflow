@@ -38,17 +38,27 @@ paper(s) below, and send us a citation of your work.
 - Gao et al., "TETRIS: Scalable and Efficient Neural Network Acceleration with
   3D Memory", in ASPLOS, April 2017 [Gao17]_.
 
+
 Install
 -------
 
-The following are the commands required to install. This program requires 
-Python2.7 and does not work in later versions without modifications::
+``nn_dataflow`` requires Python 2.7 and is not yet Python 3 compatible.
 
-    > pip install -r requirements.txt
-    > pip install --user -e ./
-    > python2.7 setup.py install 
+``nn_dataflow`` can be directly used without installation. See the Usage
+section below for details.
 
-You might need sudo user when installing the second command. 
+``nn_dataflow`` has been registered on `PyPI
+<//pypi.org/project/nn-dataflow>`_, so it can be installed through
+``pip`` as::
+
+    > pip install nn-dataflow
+
+And ``pip`` will take care of all dependencies.
+
+To only install ``nn_dataflow`` in local user install directory (without
+``sudo``), and/or to install in editable mode, at the top directory do::
+
+    > pip install --user -e .
 
 
 Usage
