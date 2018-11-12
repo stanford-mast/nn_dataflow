@@ -61,6 +61,8 @@ in one clock cycle.
 
 Other options include:
 
+- ``-g``, ``--goal``: ``E``, ``D``, or ``ED``. the optimization goal, e(nergy),
+  d(elay), or ED product.
 - ``--mem-type``: ``2D`` or ``3D``. With 2D memory, memory channels are only on
   the four corners of the chip; with 3D memory, memory channels are on the top
   of all tile nodes (one per each).
@@ -77,8 +79,6 @@ Other options include:
   layers, and output partitioning for FC layers.
 - ``--batch-partitioning`` and ``--ifmap-partitioning``: whether the hybrid
   partitioning also explores batch and input partitioning.
-- ``--dimensional-partition``: constrains each partitioning scheme to only be
-  mapped to one physical array dimension.
 
 
 Code Structure
