@@ -51,7 +51,7 @@ def layer_stats(args):
     sys.stdout.write(hder_fmt
                      .format('Layer',
                              'Ifmap/kB', 'Ofmap/kB', 'Weight/kB',
-                             'Ops/M', 'MinOptBuf/kB'))
+                             'MACs/M', 'MinOptBuf/kB'))
 
     # Aggregate stats.
     max_fmaps = 0
