@@ -107,6 +107,8 @@ List of major changes and improvements
 
 - Unit nhops calculation considers nodes with both non-empty ifmaps and ofmaps.
 
+- Replication size when underutilizing PE arrays.
+
 
 ## [v1.4 -- v1.5] -- 2017-08-18
 

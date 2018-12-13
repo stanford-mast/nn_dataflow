@@ -182,13 +182,12 @@ class MapStrategyEyeriss(MapStrategy):
         data_loops = self.layer.data_loops()
 
         # Apply replication.
-        for lcnt, locc, rcnt in self._gen_repl():
+        for lcnt, locc, rsz, rcnt in self._gen_repl():
 
             # Number of ops.
             # Replicate to procpass. Also consider external occupancy and loop
             # occupancies.
-            unit_ops = ops_unitpass * self.repl.size() \
-                    * self.occupancy * util.prod(locc)
+            unit_ops = ops_unitpass * rsz * self.occupancy * util.prod(locc)
 
             # Time does not change with replication, and is not affected by
             # loop occupancy.
@@ -213,8 +212,7 @@ class MapStrategyEyeriss(MapStrategy):
             # Replication uses different PEs. regf scales with op replication,
             # i.e., affected by all loop occupancies. Also consider external
             # occupancy.
-            uaccess[me.REGF] = tuple(a * self.repl.size() \
-                                     * self.occupancy * util.prod(locc)
+            uaccess[me.REGF] = tuple(a * rsz * self.occupancy * util.prod(locc)
                                      for a in access_unitpass[me.REGF])
             # Finalize.
             unit_access = tuple(uaccess)
@@ -478,8 +476,8 @@ class MapStrategyEyeriss(MapStrategy):
         Generate all replication with ifmaps/ofmaps, to build procpass from
         unitpass.
 
-        Return the total loop count tuple, the loop occupancy list, and the
-        replicated data counts.
+        Return the total loop count tuple, the loop occupancy list, the actual
+        replication size, and the replicated data counts.
         '''
         if isinstance(self.layer, ConvLayer):
 
@@ -494,6 +492,10 @@ class MapStrategyEyeriss(MapStrategy):
 
                 ifms = t_repl_h[0]
                 ofms = t_repl_h[1] * self.repl.w
+
+                ifms = min(ifms, self.layer.nifm)
+                ofms = min(ofms, self.layer.nofm)
+                repl_size = ifms * ofms
 
                 # Loop trip counts.
                 lcnt = [float('nan')] * le.NUM
@@ -519,13 +521,16 @@ class MapStrategyEyeriss(MapStrategy):
                 repl_cnt[de.IFM] = ifms
                 repl_cnt[de.OFM] = ofms
 
-                yield tuple(lcnt), locc, repl_cnt
+                yield tuple(lcnt), locc, repl_size, repl_cnt
 
         else:
             assert isinstance(self.layer, LocalRegionLayer)
 
             # repl is only used for ofmaps.
             ofms = self.repl.size()
+
+            ofms = min(ofms, self.layer.nofm)
+            repl_size = ofms
 
             # Loop trip counts.
             lcnt = [float('nan')] * le.NUM
@@ -545,5 +550,5 @@ class MapStrategyEyeriss(MapStrategy):
             repl_cnt[de.IFM] = ofms  # ifm and ofm is one-to-one.
             repl_cnt[de.OFM] = ofms
 
-            yield tuple(lcnt), locc, repl_cnt
+            yield tuple(lcnt), locc, repl_size, repl_cnt
 
