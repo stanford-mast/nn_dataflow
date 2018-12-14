@@ -33,7 +33,6 @@ RESOURCE_LIST = ['proc_region',
                  'size_regf',
                  'array_bus_width',
                  'dram_bandwidth',
-                 'src_data_region_final_',
                 ]
 
 class Resource(namedtuple('Resource', RESOURCE_LIST)):
@@ -44,10 +43,6 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
     '''
 
     def __new__(cls, *args, **kwargs):
-        if len(args) <= RESOURCE_LIST.index('src_data_region_final_'):
-            kwargs = kwargs.copy()
-            kwargs.setdefault('src_data_region_final_', None)
-
         ntp = super(Resource, cls).__new__(cls, *args, **kwargs)
 
         if not isinstance(ntp.proc_region, NodeRegion):
@@ -67,9 +62,6 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
                             'a NodeRegion instance.')
         if not isinstance(ntp.dst_data_region, NodeRegion):
             raise TypeError('Resource: dst_data_region must be '
-                            'a NodeRegion instance.')
-        if not isinstance(ntp.src_data_region_final, NodeRegion):
-            raise TypeError('Resource: src_data_region_final must be '
                             'a NodeRegion instance.')
 
         if not isinstance(ntp.dim_array, PhyDim2):
@@ -93,10 +85,4 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
             raise ValueError('Resource: dram_bandwidth must be positive.')
 
         return ntp
-
-    @property
-    def src_data_region_final(self):
-        ''' Final source data region after resolving forwarding and sharing. '''
-        return self.src_data_region_final_ if self.src_data_region_final_ \
-                else self.src_data_region
 
