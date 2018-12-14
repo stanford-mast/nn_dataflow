@@ -183,9 +183,9 @@ class TestPipelineFixture(unittest.TestCase):
                                    type=NodeRegion.PROC),
             dram_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 8),
                                    type=NodeRegion.DRAM),
-            src_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 8),
+            src_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 4),
                                        type=NodeRegion.DRAM),
-            dst_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(8, 8),
+            dst_data_region=NodeRegion(origin=PhyDim2(0, 4), dim=PhyDim2(8, 4),
                                        type=NodeRegion.DRAM),
             dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64,
             array_bus_width=float('inf'), dram_bandwidth=float('inf'))
