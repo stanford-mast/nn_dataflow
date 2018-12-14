@@ -178,8 +178,7 @@ class Scheduling(object):
         # Ifmap layout.
         ifmap_layout = condition.ifmap_layout
         # Ifmap should be from the source data region or local.
-        if not ifmap_layout.is_in(resource.src_data_region, proc_region) \
-                and not ifmap_layout.is_in(resource.src_data_region_final):
+        if not ifmap_layout.is_in(resource.src_data_region, proc_region):
             raise ValueError('Scheduling: ifmap layout is not contained in '
                              'source data region.')
         ifrng = ifmap_layout.complete_fmap_range()

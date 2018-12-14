@@ -296,30 +296,12 @@ class TestPipelineFixture(unittest.TestCase):
                     if pl not in data_regions:
                         # Previous layer is not on-chip, from memory.
                         self.assertEqual(
-                            r.src_data_region_final,
+                            r.src_data_region,
                             self.resource.src_data_region,
                             '_validate_allocation: layer {}\'s prev {} '
                             'is not on-chip, should be from {}, but {}.'
                             .format(l, pl, self.resource.src_data_region,
-                                    r.src_data_region_final))
-                        if r.src_data_region_final != r.src_data_region:
-                            # There exists shared mem src.
-                            # Find the layer responsible to fetch.
-                            sh_sp_idx = next((i for i in range(len(allocation))
-                                              if allocation[i][0].proc_region
-                                              == r.src_data_region), None)
-                            self.assertTrue(sh_sp_idx is not None,
-                                            '_validate_allocation: layer {} '
-                                            'expects on-chip mem src sharing, '
-                                            'but with invalid src_data_region.'
-                                            .format(l))
-                            sh_l = segment[sh_sp_idx][0]
-                            self.assertEqual(segment.network.prevs(l),
-                                             segment.network.prevs(sh_l),
-                                             '_validate_allocation: layer {} '
-                                             'expects on-chip mem src sharing '
-                                             'with {}, but prevs differ.'
-                                             .format(l, sh_l))
+                                    r.src_data_region))
                     elif data_regions[pl] != r.proc_region:
                         # Previous layer is on-chip and not local.
                         self.assertEqual(
@@ -378,15 +360,6 @@ class TestPipelineFixture(unittest.TestCase):
         # Available data in each spatial subregions. Each is represented by a
         # tuple of layer name and its output data access pattern.
         avail_data = [(None, OutAccPat.ANY) for _ in segment]
-
-        # Get groups of layers sharing the same memory source.
-        prevs2layers = {}
-        for ltpl in segment:
-            l = ltpl[0]
-            prevs2layers.setdefault(segment.network.prevs(l), []).append(l)
-        sh_mem_src_groups = [ls for ps, ls in prevs2layers.items()
-                             if not seg_layers.intersection(ps) and len(ls) > 1]
-        sh_mem_src_topifms = [None] * len(sh_mem_src_groups)
 
         # Whether to defer fully buffering output.
         fb_out = False
@@ -452,25 +425,12 @@ class TestPipelineFixture(unittest.TestCase):
 
                 # Validation.
 
-                for g_idx, group in enumerate(sh_mem_src_groups):
-                    if layer in group:
-                        if sh_mem_src_topifms[g_idx] is None:
-                            sh_mem_src_topifms[g_idx] = cstr.topifm
-                        self.assertEqual(sh_mem_src_topifms[g_idx], cstr.topifm,
-                                         '_validate_constraint: layer {} ({}) '
-                                         'share memory source with {}, but has '
-                                         'mismatched topifm {} with {}.'
-                                         .format(layer, (sp_idx, tm_idx),
-                                                 group, cstr.topifm,
-                                                 sh_mem_src_topifms[g_idx]))
-                        break
-                else:
-                    if not has_src:
-                        self.assertEqual(cstr.topifm, 0,
-                                         '_validate_constraint: layer {} ({}) '
-                                         'should not constrain input as it '
-                                         'does not have on-chip sources.'
-                                         .format(layer, (sp_idx, tm_idx)))
+                if not has_src:
+                    self.assertEqual(cstr.topifm, 0,
+                                     '_validate_constraint: layer {} ({}) '
+                                     'should not constrain input as it '
+                                     'does not have on-chip sources.'
+                                     .format(layer, (sp_idx, tm_idx)))
 
                 if isinstance(segment.network[layer], ConvLayer):
 
