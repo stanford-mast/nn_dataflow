@@ -106,6 +106,17 @@ class NNDataflowScheme(MutableMapping):
         assert util.isclose(nndf.total_time, self.total_time, rel_tol=1e-5)
         return nndf
 
+    def fmap_layout(self, layers):
+        '''
+        Get a DataLayout instance that merges the ofmaps of all given layers.
+        '''
+        def _ofmap_layout(layer_name):
+            if layer_name is None:
+                return self.input_layout
+            return self.res_dict[layer_name].ofmap_layout
+
+        return DataLayout.concat(*[_ofmap_layout(l) for l in layers])
+
     @property
     def total_ops(self):
         ''' Get the total ops. '''

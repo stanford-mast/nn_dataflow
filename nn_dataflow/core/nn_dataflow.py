@@ -124,8 +124,9 @@ class NNDataflow(object):
 
         layer_sched = self.layer_sched_dict[layer_name]
 
-        for ifmap_layout, prev_nndf in self._gen_layer_ifmap_layout(
-                layer_name, prev_nndf_tops):
+        for prev_nndf in prev_nndf_tops:
+
+            ifmap_layout = prev_nndf.fmap_layout(self.network.prevs(layer_name))
 
             condition = SchedulingCondition(resource=self.resource,
                                             ifmap_layout=ifmap_layout)
@@ -146,31 +147,6 @@ class NNDataflow(object):
 
         # Always pick and keep top n at each layer.
         return sorted(nndf_tops, key=self.cmp_key)[:options.ntops]
-
-    def _gen_layer_ifmap_layout(self, layer_name, prev_nndf_tops):
-        '''
-        Generate all choices of ifmap layout for the layer, based on the given
-        previous top NNDataflowScheme instances in `prev_nndf_tops`.
-
-        Return the ifmap layout, and the corresponding NNDataflowScheme.
-        '''
-        prevs = self.network.prevs(layer_name)
-        assert prevs
-
-        def _ofmap_layout(nndf, prev_layer_name):
-            return nndf[prev_layer_name].ofmap_layout if prev_layer_name \
-                    else nndf.input_layout
-
-        for nndf in prev_nndf_tops:
-            # Merge all previous layer ofmap layouts to get the ifmap layout.
-            ifmap_layout = DataLayout.concat(*[_ofmap_layout(nndf, p)
-                                               for p in prevs])
-
-            # We already checked the ofmap layout dimension in Scheduling, and
-            # the prev/next layer dimensions in Network, so ifmap_layout ==
-            # layer == prev_layers == ofmap_layout.
-
-            yield ifmap_layout, nndf
 
     def _gen_input_layout(self, options):
         '''

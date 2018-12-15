@@ -210,6 +210,29 @@ class TestNNDataflowScheme(unittest.TestCase):
         for layer_name in df:
             self.assertEqual(id(df[layer_name]), id(df2[layer_name]))
 
+    def test_fmap_layout(self):
+        ''' fmap_layout. '''
+        flayout = self.dtfl.fmap_layout(('c1',))
+        frng = flayout.complete_fmap_range()
+        self.assertTrue(flayout.is_in(self.c1res.ofmap_layout.regions[0]))
+        self.assertEqual(frng, self.c1res.ofmap_layout.frngs[0])
+
+        flayout = self.dtfl.fmap_layout((None,))
+        frng = flayout.complete_fmap_range()
+        self.assertTrue(flayout.is_in(self.input_layout.regions[0]))
+        self.assertEqual(frng, self.input_layout.frngs[0])
+
+        flayout = self.dtfl.fmap_layout(('p1', 'p2'))
+        frng = flayout.complete_fmap_range()
+        self.assertEqual(frng.size('n'),
+                         self.network['p1'].nofm + self.network['p2'].nofm)
+
+        flayout = self.dtfl.fmap_layout((None, 'c1'))
+        frng = flayout.complete_fmap_range()
+        self.assertEqual(frng.size('n'),
+                         self.network.input_layer().nofm
+                         + self.network['c1'].nofm)
+
     def test_properties(self):
         ''' Property accessors. '''
         self.assertAlmostEqual(self.dtfl.total_cost, 1.5 + 0.6 * 2)
