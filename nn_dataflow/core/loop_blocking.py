@@ -107,11 +107,11 @@ def skip_conv(bl_ts, bl_ords):
 
 def _loop_blocking_cmp_key(options, cost):
     if options.opt_goal == 'ed':
-        return lambda lbs: lbs.get_cost(cost) * lbs.time
+        return lambda lbs: lbs.get_access_cost(cost) * lbs.time
     elif options.opt_goal == 'd':
-        return lambda lbs: (lbs.time, lbs.get_cost(cost))
+        return lambda lbs: (lbs.time, lbs.get_access_cost(cost))
     assert options.opt_goal == 'e'
-    return lambda lbs: (lbs.get_cost(cost), lbs.time)
+    return lambda lbs: (lbs.get_access_cost(cost), lbs.time)
 
 
 def _gen_loopblocking_perprocess(

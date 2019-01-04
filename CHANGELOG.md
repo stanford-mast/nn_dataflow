@@ -54,6 +54,8 @@ List of major changes and improvements
 
 - Software models.
 
+  - `Scheduling` breaks loop/part cost into op/access/noc/static cost.
+
   - `Scheduling` breaks cost tie using time, using a compare key function of
     `SchedulingResult`.
 

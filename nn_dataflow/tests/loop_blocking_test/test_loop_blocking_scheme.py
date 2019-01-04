@@ -234,7 +234,7 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
         lbs = self._lbs(self._make_bl_ts((0, 1, 1), (0, 1, 1), (1, 1, 0)),
                         rsrckey='SM')
         self.assertFalse(lbs.is_valid())
-        self.assertIsNone(lbs.get_access())
+        self.assertTrue(math.isinf(sum([sum(a) for a in lbs.get_access()])))
 
     def test_top_level_fetch(self):
         ''' get_top_level_fetch. '''
@@ -297,8 +297,8 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
         self.assertFalse(lbs.is_valid())
         self.assertIsNone(lbs.get_top_level_fetch())
 
-    def test_cost(self):
-        ''' get_cost. '''
+    def test_access_cost(self):
+        ''' get_access_cost. '''
 
         for bl_ts, bl_ords in self._gen_loopblocking_all():
 
@@ -308,35 +308,29 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
                 continue
 
             access = [sum(a) for a in lbs.get_access()]
-            ops = lbs.ops
-            nhops = 0
-            time = lbs.time
 
-            cost = lbs.get_cost(self.cost)
+            cost = lbs.get_access_cost(self.cost)
             self.assertAlmostEqual(
                 cost,
-                ops * self.cost.mac_op
-                + sum(a * c for a, c in zip(access, self.cost.mem_hier))
-                + nhops * self.cost.noc_hop
-                + time * self.cost.unit_static)
+                + sum(a * c for a, c in zip(access, self.cost.mem_hier)))
 
-    def test_cost_same_lbs(self):
-        ''' get_cost same lbs. '''
+    def test_access_cost_same_lbs(self):
+        ''' get_access_cost same lbs. '''
         lbs = self._lbs(self._make_bl_ts((0, 1, 1), (1, 0, 1), (1, 1, 0)),
                         rsrckey='LG')
         self.assertTrue(lbs.is_valid())
-        c1 = lbs.get_cost(Cost(mac_op=1, mem_hier=(200, 6, 2, 1),
-                               noc_hop=50, unit_static=50))
-        c2 = lbs.get_cost(Cost(mac_op=-1, mem_hier=(-200, -6, -2, -1),
-                               noc_hop=-50, unit_static=-50))
+        c1 = lbs.get_access_cost(Cost(mac_op=1, mem_hier=(200, 6, 2, 1),
+                                      noc_hop=50, unit_static=50))
+        c2 = lbs.get_access_cost(Cost(mac_op=-1, mem_hier=(-200, -6, -2, -1),
+                                      noc_hop=-50, unit_static=-50))
         self.assertAlmostEqual(c1, -c2)
 
-    def test_cost_invalid(self):
-        ''' get_cost invalid. '''
+    def test_access_cost_invalid(self):
+        ''' get_access_cost invalid. '''
         lbs = self._lbs(self._make_bl_ts((0, 1, 1), (0, 1, 1), (1, 1, 0)),
                         rsrckey='SM')
         self.assertFalse(lbs.is_valid())
-        self.assertTrue(math.isinf(lbs.get_cost(self.cost)))
+        self.assertTrue(math.isinf(lbs.get_access_cost(self.cost)))
 
     def test_ordered_loops(self):
         ''' Get ordered_loops. '''

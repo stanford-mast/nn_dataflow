@@ -135,8 +135,10 @@ class TestScheduling(unittest.TestCase):
             # Combination of loop blocking and partitioning.
             for r in res:
                 self.assertAlmostEqual(r.total_cost,
-                                       r.scheme['cost_loop']
-                                       + r.scheme['cost_part'])
+                                       r.scheme['cost_op']
+                                       + r.scheme['cost_access']
+                                       + r.scheme['cost_noc']
+                                       + r.scheme['cost_static'])
                 self.assertEqual(r.total_ops, layer.total_ops(self.batch_size))
                 self.assertSequenceEqual(r.scheme['total_nhops'],
                                          [nh * f for nh, f

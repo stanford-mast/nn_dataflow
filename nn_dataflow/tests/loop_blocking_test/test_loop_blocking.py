@@ -47,8 +47,8 @@ class TestLoopBlocking(TestLoopBlockingFixture):
             self.assertFalse(loop_blocking.skip_conv(*reg_sch),
                              'test_skip_not_reg: regularized {} is skipped.'
                              .format(reg_sch))
-            self.assertAlmostEqual(lbs.get_cost(self.cost),
-                                   reg_lbs.get_cost(self.cost),
+            self.assertAlmostEqual(lbs.get_access_cost(self.cost),
+                                   reg_lbs.get_access_cost(self.cost),
                                    msg=('test_skip_not_reg: cost mismatch. '
                                         'orig {}, reg {}.'
                                         .format(sch, reg_sch)))
@@ -132,13 +132,14 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         for lbs in self._gen_loopblocking(rsrckey='LG', skip_invalid=True):
 
-            cost_curr = lbs.get_cost(self.cost)
+            cost_curr = lbs.get_access_cost(self.cost)
             self.assertLessEqual(cost_prev, cost_curr)
             cost_prev = cost_curr
 
             if tops:
                 top_lbs = tops.pop(0)
-                self.assertAlmostEqual(cost_curr, top_lbs.get_cost(self.cost))
+                self.assertAlmostEqual(cost_curr,
+                                       top_lbs.get_access_cost(self.cost))
 
     def test_gen_loopblocking_byp_sol(self):
         ''' gen_loopblocking using bypass solvers. '''
