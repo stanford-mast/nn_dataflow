@@ -163,7 +163,7 @@ class NNDataflowScheme(MutableMapping):
                 / sched_result.total_proc_time / sched_result.num_nodes
 
     @staticmethod
-    def total_dram_bandwidth(sched_result):
+    def dram_bandwidth(sched_result):
         ''' Layer total DRAM bandwidth in elements per cycle. '''
         return 1. * sched_result.total_accesses[me.DRAM] \
                 / sched_result.total_time

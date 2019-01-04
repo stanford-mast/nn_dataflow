@@ -261,9 +261,9 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.assertAlmostEqual(stats['p1'], 1)
         self.assertAlmostEqual(stats['p2'], 1)
 
-    def test_stats_total_dram_bw(self):
-        ''' Per-layer stats: total DRAM bandwidth. '''
-        stats = self.dtfl.perlayer_stats('total_dram_bandwidth')
+    def test_stats_dram_bandwidth(self):
+        ''' Per-layer stats: DRAM bandwidth. '''
+        stats = self.dtfl.perlayer_stats('dram_bandwidth')
         self.assertEqual(len(stats), len(self.dtfl))
         self.assertAlmostEqual(stats['c1'], (7 + 8 + 9) / 2.)
         self.assertAlmostEqual(stats['p1'], (.7 + .8 + .9) / 0.05)
