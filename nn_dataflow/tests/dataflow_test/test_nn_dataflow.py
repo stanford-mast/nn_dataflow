@@ -65,7 +65,7 @@ class TestNNDataflow(unittest.TestCase):
         self.cost = Cost(mac_op=1,
                          mem_hier=(200, 6, 2, 1),
                          noc_hop=0,
-                         unit_static=0)
+                         idl_unit=0)
 
         self.options = Option()
 
@@ -335,7 +335,7 @@ class TestNNDataflow(unittest.TestCase):
         cost = Cost(mac_op=2e-12,
                     mem_hier=(460e-12, 15e-12, 4e-12, 1e-12),  # pJ/16-b
                     noc_hop=0,
-                    unit_static=30e-3 / 200e6)  # 30 mW GBUF + REGF
+                    idl_unit=30e-3 / 200e6)  # 30 mW GBUF + REGF
 
         nnd = NNDataflow(network, batch_size, resource, cost,
                          self.map_strategy)
@@ -431,7 +431,7 @@ class TestNNDataflow(unittest.TestCase):
         cost = Cost(mac_op=2e-12,
                     mem_hier=(240e-12, 28e-12, 4e-12, 1e-12),  # pJ/16-b
                     noc_hop=0,
-                    unit_static=320e-12)
+                    idl_unit=320e-12)
 
         nnd = NNDataflow(network, batch_size, resource, cost,
                          self.map_strategy)
@@ -463,7 +463,7 @@ class TestNNDataflow(unittest.TestCase):
         cost = Cost(mac_op=2e-12,
                     mem_hier=(80e-12, 14e-12, 4e-12, 0.6e-12),  # pJ/16-b
                     noc_hop=40e-12,
-                    unit_static=200e-12)
+                    idl_unit=200e-12)
 
         options = Option(sw_gbuf_bypass=(True, True, True),
                          sw_solve_loopblocking=True,

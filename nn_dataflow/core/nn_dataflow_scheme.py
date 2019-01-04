@@ -135,11 +135,6 @@ class NNDataflowScheme(MutableMapping):
         ''' Get the total NoC hops. '''
         return sum(sr.total_noc_hops for sr in self.values())
 
-    def total_static_cost(self, unit_static):
-        ''' Get the total static cost. '''
-        return unit_static * sum(sr.total_time * sr.num_nodes
-                                 for sr in self.values())
-
     def perlayer_stats(self, stats_name):
         '''
         Get a dict of per-layer stats. Valid stats must be a static method.

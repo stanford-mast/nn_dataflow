@@ -279,7 +279,7 @@ class Scheduling(object):
 
         cost_op = self.cost.mac_op * lbs.ops
 
-        cost_static = self.cost.unit_static * lbs.time * lbs.num_nodes
+        cost_static = self.cost.idl_unit * lbs.time
 
         assert not math.isnan(cost_op + cost_access + cost_noc + cost_static)
 

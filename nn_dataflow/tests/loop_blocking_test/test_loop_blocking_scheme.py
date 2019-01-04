@@ -320,9 +320,9 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
                         rsrckey='LG')
         self.assertTrue(lbs.is_valid())
         c1 = lbs.get_access_cost(Cost(mac_op=1, mem_hier=(200, 6, 2, 1),
-                                      noc_hop=50, unit_static=50))
+                                      noc_hop=50, idl_unit=50))
         c2 = lbs.get_access_cost(Cost(mac_op=-1, mem_hier=(-200, -6, -2, -1),
-                                      noc_hop=-50, unit_static=-50))
+                                      noc_hop=-50, idl_unit=-50))
         self.assertAlmostEqual(c1, -c2)
 
     def test_access_cost_invalid(self):

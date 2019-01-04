@@ -56,8 +56,8 @@ You can specify NN batch size and word size, PE array dimensions, number of
 tile nodes, register file and global buffer capacity, and the energy cost of
 all components. Note that, the energy cost of array bus should be the average
 energy of transferring the data from the buffer to one PE, *not* local neighbor
-transfer; the unit static energy cost should be the static energy of *one* node
-in one clock cycle.
+transfer; the unit static energy cost should be the static energy of *all*
+nodes in one clock cycle.
 
 Other options include:
 

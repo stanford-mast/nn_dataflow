@@ -136,7 +136,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
 
         # Cost.
         self.cost = Cost(mac_op=1, mem_hier=(200, 6, 2, 1),
-                         noc_hop=50, unit_static=50)
+                         noc_hop=50, idl_unit=50)
 
 
     def _lbs(self, bl_ts, bl_ords=None, wlkey='BASE', rsrckey='BASE',

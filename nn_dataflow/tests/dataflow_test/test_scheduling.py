@@ -47,7 +47,7 @@ class TestScheduling(unittest.TestCase):
         self.batch_size = 4
 
         self.cost = Cost(mac_op=1, mem_hier=(200, 6, 2, 1),
-                         noc_hop=50, unit_static=50)
+                         noc_hop=50, idl_unit=50)
 
         self.resource = Resource(
             proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),

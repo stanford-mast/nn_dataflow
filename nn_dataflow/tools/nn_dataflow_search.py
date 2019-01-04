@@ -61,7 +61,7 @@ def stats_dict(dfsch, cost):
     total_access_cost = sum(a * c for a, c
                             in zip(dfsch.total_accesses, cost.mem_hier))
     total_noc_cost = dfsch.total_noc_hops * cost.noc_hop
-    total_static_cost = dfsch.total_static_cost(cost.unit_static)
+    total_static_cost = dfsch.total_time * cost.idl_unit
 
     sum_cost = total_op_cost + total_access_cost + total_noc_cost \
             + total_static_cost
@@ -145,7 +145,7 @@ def do_scheduling(args):
     cost = Cost(mac_op=args.op_cost,
                 mem_hier=tuple(hier_cost),
                 noc_hop=args.hop_cost,
-                unit_static=args.unit_static_cost)
+                idl_unit=args.unit_idle_cost)
 
     ## Options.
 
@@ -239,8 +239,8 @@ def argparser():
                     help='cost of access to memory hierarchy')
     ap.add_argument('--hop-cost', type=float, default=10,
                     help='cost of access through one NoC hop')
-    ap.add_argument('--unit-static-cost', type=float, default=0,
-                    help='static cost for unit execution time')
+    ap.add_argument('--unit-idle-cost', type=float, default=0,
+                    help='static cost over all nodes for unit execution time')
 
     ap.add_argument('--mem-type', default='2D', choices=['2D', '3D'],
                     help='memory type. "2D" has memory only on edge nodes; '
