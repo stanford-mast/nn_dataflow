@@ -33,6 +33,7 @@ class TestOption(unittest.TestCase):
                          partition_batch=False,
                          partition_ifmaps=False,
                          partition_interlayer=False,
+                         opt_goal='ed',
                          ntops=10,
                          nprocesses=16,
                          verbose=False
@@ -49,6 +50,7 @@ class TestOption(unittest.TestCase):
                          'partition_ifmaps')
         self.assertEqual(options.partition_interlayer, False,
                          'partition_interlayer')
+        self.assertEqual(options.opt_goal, 'ed', 'opt_goal')
         self.assertEqual(options.ntops, 10, 'ntops')
         self.assertEqual(options.nprocesses, 16, 'nprocesses')
         self.assertEqual(options.verbose, False, 'verbose')
@@ -69,6 +71,7 @@ class TestOption(unittest.TestCase):
         self.assertEqual(options.partition_hybrid, False)
         self.assertEqual(options.partition_batch, False)
         self.assertEqual(options.partition_ifmaps, False)
+        self.assertEqual(options.opt_goal, 'e')
         self.assertEqual(options.ntops, 1)
         self.assertEqual(options.nprocesses, 1)
         self.assertEqual(options.verbose, False)
@@ -131,6 +134,13 @@ class TestOption(unittest.TestCase):
         with self.assertRaisesRegexp(ValueError,
                                      'Option: .*layer_pipeline_max_degree.*'):
             _ = Option(layer_pipeline_max_degree=-1)
+
+    def test_invalid_opt_goal(self):
+        ''' Invalid opt_goal. '''
+        with self.assertRaisesRegexp(ValueError, 'Option: .*opt_goal.*'):
+            _ = Option(opt_goal='o')
+        with self.assertRaisesRegexp(ValueError, 'Option: .*opt_goal.*'):
+            _ = Option(opt_goal='E')
 
     def test_option_list(self):
         ''' Accessor option_list. '''

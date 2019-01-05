@@ -26,13 +26,13 @@ OPTION_LIST = ['sw_gbuf_bypass',
                'sw_solve_loopblocking',
                'hw_gbuf_save_writeback',
                'partition_hybrid',
-               'partition_dimensional',
                'partition_batch',
                'partition_ifmaps',
                'partition_interlayer',
                'layer_pipeline_time_ovhd',
                'layer_pipeline_max_degree',
                'layer_pipeline_opt',
+               'opt_goal',
                'ntops',
                'nprocesses',
                'verbose',
@@ -67,13 +67,13 @@ class Option(namedtuple('Option', OPTION_LIST)):
         kwdict.setdefault('sw_solve_loopblocking', False)
         kwdict.setdefault('hw_gbuf_save_writeback', False)
         kwdict.setdefault('partition_hybrid', False)
-        kwdict.setdefault('partition_dimensional', False)
         kwdict.setdefault('partition_batch', False)
         kwdict.setdefault('partition_ifmaps', False)
         kwdict.setdefault('partition_interlayer', False)
         kwdict.setdefault('layer_pipeline_time_ovhd', float('inf'))
         kwdict.setdefault('layer_pipeline_max_degree', float('inf'))
         kwdict.setdefault('layer_pipeline_opt', True)
+        kwdict.setdefault('opt_goal', 'e')
         kwdict.setdefault('ntops', 1)
         kwdict.setdefault('nprocesses', 1)
         kwdict.setdefault('verbose', False)
@@ -110,6 +110,10 @@ class Option(namedtuple('Option', OPTION_LIST)):
         if ntp.layer_pipeline_max_degree < 0:
             raise ValueError('Option: layer_pipeline_max_degree must be '
                              'positive.')
+
+        if ntp.opt_goal not in ['e', 'd', 'ed']:
+            raise ValueError('Option: opt_goal is invalid, must be one of '
+                             '\'e\', \'d\', and \'ed\'.')
 
         return ntp
 

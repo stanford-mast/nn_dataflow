@@ -84,15 +84,14 @@ class TestLoopBlockingSolver(TestLoopBlockingFixture):
                               if lbs.stored_in_gbuf[dce]]
             # Only look at the cases with one or none reside data category.
             if not all_reside_dce:
-                reside_dce = None
+                min_sch = min_sch_dict.get(None, None)
+                if not min_sch or _cost(lbs) < min_sch:
+                    min_sch_dict[None] = _cost(lbs)
             elif len(all_reside_dce) == 1:
-                reside_dce = all_reside_dce[0]
-            else:
-                continue
-
-            min_sch = min_sch_dict.get(reside_dce, None)
-            if not min_sch or _cost(lbs) < min_sch:
-                min_sch_dict[reside_dce] = _cost(lbs)
+                dce, = all_reside_dce
+                min_sch = min_sch_dict.get(dce, None)
+                if not min_sch or _cost(lbs) < min_sch:
+                    min_sch_dict[dce] = _cost(lbs)
 
         # Solve each reside data category.
         for reside_dce in range(de.NUM):

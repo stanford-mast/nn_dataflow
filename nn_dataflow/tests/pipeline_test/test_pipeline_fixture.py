@@ -223,8 +223,6 @@ class TestPipelineFixture(unittest.TestCase):
         scheme['cost'] = 1.234 + 9.876
         scheme['time'] = max(time, dram_time)
         scheme['num_nodes'] = num_nodes
-        scheme['cost_loop'] = 1.234
-        scheme['cost_part'] = 9.876
         scheme['proc_time'] = time
         scheme['bus_time'] = 0
         scheme['dram_time'] = dram_time

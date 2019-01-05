@@ -47,7 +47,7 @@ List of major changes and improvements
     pipelining.
 
 
-## [v1.5 -- v1.6] -- 2018-07-26
+## [v1.5 -- v1.6] -- 2018-01-04
 
 ### Added
 
@@ -70,12 +70,13 @@ List of major changes and improvements
 
   - Consider DRAM access time due to bandwidth limit.
 
+- Software models.
+
+  - Add choices for optimization goal: E(nergy), D(elay), or ED.
+
 - Software engineering.
 
   - Record search time.
-
-  - Add dimensional partitioning option, i.e., each partitioning can only be
-    along one dimension unless it is the only partitioning.
 
   - Add utility `IntRange` for integer ranges.
 
@@ -95,6 +96,10 @@ List of major changes and improvements
   - Limit to single source/destination data regions in `Resource`.
 
 - Software models.
+
+  - `Cost` uses static/idle unit cost for all nodes instead of one node.
+
+  - `Scheduling` breaks loop/part cost into op/access/noc/static cost.
 
   - `Scheduling` breaks cost tie using time, using a compare key function of
     `SchedulingResult`.
@@ -118,6 +123,9 @@ List of major changes and improvements
 
   - `SchedulingResult` uses a combined `OrderedDict` to replace `dict_loop` and
     `dict_part`.
+
+  - In partitioning schemes, each partitioning must fully utilize one dimension
+    before starting the other, except for fmap partitioning.
 
 - Software engineering.
 
@@ -143,6 +151,10 @@ List of major changes and improvements
 - `FmapRange` comparison.
 
 - Unit nhops calculation for filter data uses DRAM region.
+
+- Unit nhops calculation considers nodes with both non-empty ifmaps and ofmaps.
+
+- Replication size when underutilizing PE arrays.
 
 
 ## [v1.4 -- v1.5] -- 2017-08-18

@@ -19,6 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from collections import OrderedDict, namedtuple
+import math
 import fastcache
 
 from . import data_category_enum as de
@@ -139,10 +140,6 @@ class SchedulingResult(namedtuple('SchedulingResult',
         ''' Get the number of processing nodes. '''
         return self.scheme['num_nodes']
 
-    def cmp_key(self):
-        ''' Key function for comparison. '''
-        return self.total_cost, self.total_time
-
 
 class Scheduling(object):
     '''
@@ -165,11 +162,22 @@ class Scheduling(object):
         self.cost = cost
         self.map_strategy_class = map_strategy_class
 
+        # Default compare key function.
+        self.cmp_key = lambda res: (res.total_cost, res.total_time)
+
     @fastcache.clru_cache(maxsize=1024)
     def schedule_search(self, condition, options):
         '''
         Search the best scheduling results.
         '''
+        # Set key function.
+        if options.opt_goal == 'ed':
+            self.cmp_key = lambda res: res.total_cost * res.total_time
+        elif options.opt_goal == 'd':
+            self.cmp_key = lambda res: (res.total_time, res.total_cost)
+        else:
+            assert options.opt_goal == 'e'
+
         tops = []
 
         resource = condition.resource
@@ -224,7 +232,7 @@ class Scheduling(object):
                      for lbs in lbs_tops]
 
         # Pick the top n.
-        tops = sorted(tops, key=SchedulingResult.cmp_key)[:options.ntops]
+        tops = sorted(tops, key=self.cmp_key)[:options.ntops]
 
         # Check total op count.
         total_layer_ops = self.layer.total_ops(self.batch_size)
@@ -283,25 +291,35 @@ class Scheduling(object):
         '''
         Make the schedule result from loop blocking and partitioning.
         '''
-        total_nhops = [unh * f for unh, f
-                       in zip(unit_nhops, lbs.get_top_level_fetch())]
-        cost_loop = lbs.get_cost(self.cost)
-        cost_part = self.cost.noc_hop * sum(total_nhops)
-
         scheme = OrderedDict()
 
+        # Cost components.
+        cost_access = lbs.get_access_cost(self.cost)
+
+        total_nhops = [unh * f for unh, f
+                       in zip(unit_nhops, lbs.get_top_level_fetch())]
+        cost_noc = self.cost.noc_hop * sum(total_nhops)
+
+        cost_op = self.cost.mac_op * lbs.ops
+
+        cost_static = self.cost.idl_unit * lbs.time
+
+        assert not math.isnan(cost_op + cost_access + cost_noc + cost_static)
+
         # Overall stats.
-        scheme['cost'] = cost_loop + cost_part
+        scheme['cost'] = cost_op + cost_access + cost_noc + cost_static
         scheme['time'] = lbs.time
         scheme['ops'] = lbs.ops
-        scheme['num_nodes'] = part.size()
+        scheme['num_nodes'] = lbs.num_nodes
         scheme['is_dram'] = (lbs.src_is_dram, lbs.dst_is_dram)
-        scheme['cost_loop'] = cost_loop
-        scheme['cost_part'] = cost_part
+        scheme['cost_op'] = cost_op
+        scheme['cost_access'] = cost_access
+        scheme['cost_noc'] = cost_noc
+        scheme['cost_static'] = cost_static
         scheme['proc_time'] = lbs.proc_time
         scheme['bus_time'] = lbs.bus_time
         scheme['dram_time'] = lbs.dram_time
-        scheme['access'] = lbs.access
+        scheme['access'] = lbs.get_access()
         scheme['remote_gbuf_access'] = lbs.remote_gbuf_access
         scheme['total_nhops'] = total_nhops
         scheme['fetch'] = lbs.fetch

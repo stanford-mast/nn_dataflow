@@ -116,21 +116,6 @@ class TestGenPartition(TestPartitionFixture):
                              if part.size(pe.OFMP, pe.INPP) == 1)
         self.assertSetEqual(part_set, part_set_truth)
 
-    def test_dimensional_part(self):
-        ''' Dimensional partitioning. '''
-        def _constraint(part):
-            return sum(part.size(pae) > 1 for pae in range(pe.NUM)) == 1 \
-                    or all(part.dim(pae).h == 1 or part.dim(pae).w == 1
-                           for pae in range(pe.NUM))
-
-        part_set = set()
-        for part in self._gen_partition(optkey='DIMPART'):
-            self.assertTrue(_constraint(part))
-            part_set.add(part)
-        part_set_truth = set(part for part in self._gen_partition()
-                             if _constraint(part))
-        self.assertSetEqual(part_set, part_set_truth)
-
     def test_no_same(self):
         ''' No same scheme in generated PartitionScheme. '''
         for wlkey in self.layers:

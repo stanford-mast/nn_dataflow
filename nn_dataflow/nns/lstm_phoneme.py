@@ -34,7 +34,7 @@ NN = Network('PHONEME')
 NN.set_input_layer(InputLayer(26, 1))
 
 NN.add('init', FCLayer(26, 140))
-C = H = 'init'
+C = H = None
 
 # Unroll by the sequence length, assuming 10.
 for idx in range(10):
