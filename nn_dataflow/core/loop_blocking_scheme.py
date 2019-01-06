@@ -215,7 +215,7 @@ class LoopBlockingScheme(object):
         indexed by DataCategoryEnum.
         '''
         if not self.is_valid():
-            return None
+            return [[float('inf')] * de.NUM for _ in range(me.NUM)]
 
         if not self.finalized_stats:
             self._calc_stats()
@@ -246,9 +246,9 @@ class LoopBlockingScheme(object):
 
         return self.noc_access
 
-    def get_cost(self, cost):
+    def get_access_cost(self, cost):
         '''
-        Get the total cost of loop blocking.
+        Get the data access cost of loop blocking.
         '''
         if not self.is_valid():
             return float('inf')
@@ -256,18 +256,9 @@ class LoopBlockingScheme(object):
         if not self.finalized_stats:
             self._calc_stats()
 
-        c = 0
+        acc_cost = sum(c * sum(a) for c, a in zip(cost.mem_hier, self.access))
 
-        c += self.ops * cost.mac_op
-
-        access_total = [sum(acc) for acc in self.access]
-        c += sum(mc * ma for mc, ma in zip(cost.mem_hier, access_total))
-
-        c += sum(self.noc_access) * cost.noc_hop
-
-        c += self.time * cost.unit_static * self.num_nodes
-
-        return c
+        return acc_cost
 
     def gen_index(self):
         '''

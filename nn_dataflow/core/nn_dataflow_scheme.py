@@ -106,6 +106,17 @@ class NNDataflowScheme(MutableMapping):
         assert util.isclose(nndf.total_time, self.total_time, rel_tol=1e-5)
         return nndf
 
+    def fmap_layout(self, layers):
+        '''
+        Get a DataLayout instance that merges the ofmaps of all given layers.
+        '''
+        def _ofmap_layout(layer_name):
+            if layer_name is None:
+                return self.input_layout
+            return self.res_dict[layer_name].ofmap_layout
+
+        return DataLayout.concat(*[_ofmap_layout(l) for l in layers])
+
     @property
     def total_ops(self):
         ''' Get the total ops. '''
@@ -123,11 +134,6 @@ class NNDataflowScheme(MutableMapping):
     def total_noc_hops(self):
         ''' Get the total NoC hops. '''
         return sum(sr.total_noc_hops for sr in self.values())
-
-    def total_static_cost(self, unit_static):
-        ''' Get the total static cost. '''
-        return unit_static * sum(sr.total_time * sr.num_nodes
-                                 for sr in self.values())
 
     def perlayer_stats(self, stats_name):
         '''
@@ -152,12 +158,8 @@ class NNDataflowScheme(MutableMapping):
                 / sched_result.total_proc_time / sched_result.num_nodes
 
     @staticmethod
-    def total_dram_bandwidth(sched_result):
+    def dram_bandwidth(sched_result):
         ''' Layer total DRAM bandwidth in elements per cycle. '''
         return 1. * sched_result.total_accesses[me.DRAM] \
                 / sched_result.total_time
-
-    def cmp_key(self):
-        ''' Key function for comparison. '''
-        return self.total_cost, self.total_time
 

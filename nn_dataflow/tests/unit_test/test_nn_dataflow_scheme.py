@@ -62,7 +62,8 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.c1res = SchedulingResult(
             scheme=OrderedDict([('cost', 1.5), ('time', 2.), ('ops', 4.),
                                 ('num_nodes', 4),
-                                ('cost_loop', 1.), ('cost_part', 0.5),
+                                ('cost_op', 0.5), ('cost_access', 1.),
+                                ('cost_noc', 0), ('cost_static', 0),
                                 ('proc_time', 2), ('bus_time', 0),
                                 ('dram_time', 0),
                                 ('access', [[7, 8, 9]] * me.NUM),
@@ -84,7 +85,8 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.p1res = SchedulingResult(
             scheme=OrderedDict([('cost', 0.6), ('time', 0.05), ('ops', 0.1),
                                 ('num_nodes', 2),
-                                ('cost_loop', 0.1), ('cost_part', 0.5),
+                                ('cost_op', 0.1), ('cost_access', 0.5),
+                                ('cost_noc', 0), ('cost_static', 0),
                                 ('proc_time', 0.05), ('bus_time', 0),
                                 ('dram_time', 0),
                                 ('access', [[.7, .8, .9]] * me.NUM),
@@ -210,6 +212,29 @@ class TestNNDataflowScheme(unittest.TestCase):
         for layer_name in df:
             self.assertEqual(id(df[layer_name]), id(df2[layer_name]))
 
+    def test_fmap_layout(self):
+        ''' fmap_layout. '''
+        flayout = self.dtfl.fmap_layout(('c1',))
+        frng = flayout.complete_fmap_range()
+        self.assertTrue(flayout.is_in(self.c1res.ofmap_layout.regions[0]))
+        self.assertEqual(frng, self.c1res.ofmap_layout.frngs[0])
+
+        flayout = self.dtfl.fmap_layout((None,))
+        frng = flayout.complete_fmap_range()
+        self.assertTrue(flayout.is_in(self.input_layout.regions[0]))
+        self.assertEqual(frng, self.input_layout.frngs[0])
+
+        flayout = self.dtfl.fmap_layout(('p1', 'p2'))
+        frng = flayout.complete_fmap_range()
+        self.assertEqual(frng.size('n'),
+                         self.network['p1'].nofm + self.network['p2'].nofm)
+
+        flayout = self.dtfl.fmap_layout((None, 'c1'))
+        frng = flayout.complete_fmap_range()
+        self.assertEqual(frng.size('n'),
+                         self.network.input_layer().nofm
+                         + self.network['c1'].nofm)
+
     def test_properties(self):
         ''' Property accessors. '''
         self.assertAlmostEqual(self.dtfl.total_cost, 1.5 + 0.6 * 2)
@@ -221,13 +246,6 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.assertAlmostEqual(self.dtfl.total_noc_hops,
                                (4 + 5 + 6) + (.4 + .5 + .6) * 2)
 
-    def test_total_static_cost(self):
-        ''' Static cost. '''
-        self.assertAlmostEqual(self.dtfl.total_static_cost(1),
-                               2 * 4 + 0.05 * 2 * 2)
-        self.assertAlmostEqual(self.dtfl.total_static_cost(2),
-                               2 * self.dtfl.total_static_cost(1))
-
     def test_stats_active_node_pes(self):
         ''' Per-layer stats: active node PEs. '''
         stats = self.dtfl.perlayer_stats('active_node_pes')
@@ -236,9 +254,9 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.assertAlmostEqual(stats['p1'], 1)
         self.assertAlmostEqual(stats['p2'], 1)
 
-    def test_stats_total_dram_bw(self):
-        ''' Per-layer stats: total DRAM bandwidth. '''
-        stats = self.dtfl.perlayer_stats('total_dram_bandwidth')
+    def test_stats_dram_bandwidth(self):
+        ''' Per-layer stats: DRAM bandwidth. '''
+        stats = self.dtfl.perlayer_stats('dram_bandwidth')
         self.assertEqual(len(stats), len(self.dtfl))
         self.assertAlmostEqual(stats['c1'], (7 + 8 + 9) / 2.)
         self.assertAlmostEqual(stats['p1'], (.7 + .8 + .9) / 0.05)
@@ -249,40 +267,4 @@ class TestNNDataflowScheme(unittest.TestCase):
         with self.assertRaisesRegexp(AttributeError,
                                      'NNDataflowScheme: .*not_supported.*'):
             _ = self.dtfl.perlayer_stats('not_supported')
-
-    def test_cmp_key(self):
-        ''' Get cmp_key. '''
-        f1_layer = self.network['f1']
-        f1res = SchedulingResult(
-            scheme=OrderedDict([('cost', 1.5), ('time', 2.), ('ops', 4.),
-                                ('num_nodes', 4),
-                                ('cost_loop', 1.), ('cost_part', 0.5),
-                                ('proc_time', 2), ('bus_time', 0),
-                                ('dram_time', 0),
-                                ('access', [[7, 8, 9]] * me.NUM),
-                                ('total_nhops', [4, 5, 6]),
-                                ('fetch', [[1, 1, 1], [2, 2, 2]])]),
-            ofmap_layout=DataLayout(
-                frngs=(FmapRange((0, 0, 0, 0),
-                                 FmapPosition(b=self.batch_size,
-                                              n=f1_layer.nofm,
-                                              h=f1_layer.hofm,
-                                              w=f1_layer.wofm)),),
-                regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
-                                    type=NodeRegion.DRAM),),
-                parts=(PartitionScheme(order=range(pe.NUM),
-                                       pdims=[(1, 1)] * pe.NUM),)))
-
-        nndf1 = self.dtfl.copy()
-        nndf1['f1'] = f1res
-
-        scheme = f1res.scheme
-        scheme['cost'] = 2.
-        f1res2 = SchedulingResult(scheme=scheme,
-                                  ofmap_layout=f1res.ofmap_layout)
-
-        nndf2 = self.dtfl.copy()
-        nndf2['f1'] = f1res2
-
-        self.assertGreater(nndf2.cmp_key(), nndf1.cmp_key())
 

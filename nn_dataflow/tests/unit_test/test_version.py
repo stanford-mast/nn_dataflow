@@ -18,45 +18,16 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from nn_dataflow.core import Network
-from nn_dataflow.core import InputLayer, EltwiseLayer
+import unittest
 
-from nn_dataflow.nns import add_lstm_cell
+from nn_dataflow import version
 
-'''
-LSTM from GNMT.
+class TestVersion(unittest.TestCase):
+    ''' Tests for version. '''
 
-Sutskever, Vinyals, Le, Google, NIPS 2014
-'''
-
-NN = Network('GNMT')
-
-NN.set_input_layer(InputLayer(1000, 1))
-
-NL = 4
-CL = [None] * NL
-HL = [None] * NL
-
-# Unroll by the sequence length, assuming 10.
-for idx in range(10):
-
-    new_CL = []
-    new_HL = []
-
-    we = 'We_{}'.format(idx)
-    NN.add(we, EltwiseLayer(1000, 1, 1), prevs=(NN.INPUT_LAYER_KEY,))
-    x = we
-
-    for l in range(NL):
-        cell = 'cell_l{}_{}'.format(l, idx)
-        C, H = add_lstm_cell(NN, cell, 1000, x, CL[l], HL[l])
-        new_CL.append(C)
-        new_HL.append(H)
-        x = H
-
-    wd = 'Wd_{}'.format(idx)
-    NN.add(wd, EltwiseLayer(1000, 1, 1), prevs=(x,))
-
-    CL = new_CL
-    HL = new_HL
+    def test_get_version(self):
+        ''' get_version. '''
+        ver_raw = version.get_version()
+        ver_lcl = version.get_version(with_local=True)
+        self.assertIn(ver_raw, ver_lcl)
 

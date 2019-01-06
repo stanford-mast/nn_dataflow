@@ -41,7 +41,7 @@ def get_version(with_local=False):
                            stderr=subprocess.STDOUT,
                            stdout=open(os.devnull, 'w')) != 0:
             # Not in git repo.
-            return version
+            return version  # pragma: no cover
 
         # Dirty summary.
         short_stat = _command_output(['git', 'diff', 'HEAD', '--shortstat'],

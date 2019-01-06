@@ -31,12 +31,12 @@ class TestCost(unittest.TestCase):
         cost = Cost(mac_op=1,
                     mem_hier=(200, 6, 2, 1),
                     noc_hop=10,
-                    unit_static=0,
+                    idl_unit=0,
                    )
         self.assertEqual(cost.mac_op, 1, 'mac_op')
         self.assertEqual(cost.mem_hier, (200, 6, 2, 1), 'mem_hier')
         self.assertEqual(cost.noc_hop, 10, 'noc_hop')
-        self.assertEqual(cost.unit_static, 0, 'unit_static')
+        self.assertEqual(cost.idl_unit, 0, 'idl_unit')
 
     def test_invalid_mac_op(self):
         ''' Invalid mac_op. '''
@@ -44,7 +44,7 @@ class TestCost(unittest.TestCase):
             _ = Cost(mac_op=(1, 2),
                      mem_hier=(200, 6, 2, 1),
                      noc_hop=10,
-                     unit_static=0,
+                     idl_unit=0,
                     )
 
     def test_invalid_mem_hier_type(self):
@@ -53,13 +53,13 @@ class TestCost(unittest.TestCase):
             _ = Cost(mac_op=1,
                      mem_hier=200,
                      noc_hop=10,
-                     unit_static=0,
+                     idl_unit=0,
                     )
         with self.assertRaisesRegexp(TypeError, 'Cost: .*mem_hier.*'):
             _ = Cost(mac_op=1,
                      mem_hier=[200, 6, 2, 1],
                      noc_hop=10,
-                     unit_static=0,
+                     idl_unit=0,
                     )
 
     def test_invalid_mem_hier_len(self):
@@ -68,7 +68,7 @@ class TestCost(unittest.TestCase):
             _ = Cost(mac_op=1,
                      mem_hier=(200, 6),
                      noc_hop=10,
-                     unit_static=0,
+                     idl_unit=0,
                     )
 
     def test_invalid_noc_hop(self):
@@ -77,16 +77,16 @@ class TestCost(unittest.TestCase):
             _ = Cost(mac_op=1,
                      mem_hier=(200, 6, 2, 1),
                      noc_hop=[10, 10],
-                     unit_static=0,
+                     idl_unit=0,
                     )
 
-    def test_invalid_unit_static(self):
-        ''' Invalid unit_static. '''
-        with self.assertRaisesRegexp(TypeError, 'Cost: .*unit_static.*'):
+    def test_invalid_idl_unit(self):
+        ''' Invalid idl_unit. '''
+        with self.assertRaisesRegexp(TypeError, 'Cost: .*idl_unit.*'):
             _ = Cost(mac_op=1,
                      mem_hier=(200, 6, 2, 1),
                      noc_hop=10,
-                     unit_static=set([1, 2]),
+                     idl_unit=set([1, 2]),
                     )
 
     def test_mem_hier_at(self):
@@ -94,7 +94,7 @@ class TestCost(unittest.TestCase):
         cost = Cost(mac_op=1,
                     mem_hier=(200, 6, 2, 1),
                     noc_hop=10,
-                    unit_static=0,
+                    idl_unit=0,
                    )
         self.assertEqual(cost.mem_hier_at(me.DRAM), 200, 'mem_hier: DRAM')
         self.assertEqual(cost.mem_hier_at(me.GBUF), 6, 'mem_hier: GBUF')
@@ -106,7 +106,7 @@ class TestCost(unittest.TestCase):
         cost = Cost(mac_op=1,
                     mem_hier=(200, 6, 2, 1),
                     noc_hop=10,
-                    unit_static=0,
+                    idl_unit=0,
                    )
         self.assertIsNone(cost.mem_hier_at(me.NUM))
         self.assertIsNone(cost.mem_hier_at(None))

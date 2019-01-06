@@ -19,7 +19,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from nn_dataflow.core import Network
-from nn_dataflow.core import InputLayer, FCLayer
+from nn_dataflow.core import InputLayer, EltwiseLayer
 
 from nn_dataflow.nns import add_lstm_cell
 
@@ -31,18 +31,22 @@ Vinyals et al., Google, CVPR 2015
 
 NN = Network('ShowTell')
 
-NN.set_input_layer(InputLayer(12000, 1))
+NN.set_input_layer(InputLayer(512, 1))
 
-NN.add('init', FCLayer(12000, 512))
-C = H = 'init'
+C = H = None
 
 # Unroll by the sequence length, assuming 10.
 for idx in range(10):
-    we = 'We_{}'.format(idx)
-    cell = 'cell_{}'.format(idx)
-    wd = 'Wd_{}'.format(idx)
 
-    NN.add(we, FCLayer(12000, 512), prevs=(NN.INPUT_LAYER_KEY,))
+    # Word embedding is a simple lookup.
+    we = 'We_{}'.format(idx)
+    NN.add(we, EltwiseLayer(512, 1, 1), prevs=(NN.INPUT_LAYER_KEY,))
+
+    # LSTM.
+    cell = 'cell_{}'.format(idx)
     C, H = add_lstm_cell(NN, cell, 512, we, C, H)
-    NN.add(wd, FCLayer(512, 12000), prevs=(H,))
+
+    # log(p), softmax.
+    wd = 'Wd_{}'.format(idx)
+    NN.add(wd, EltwiseLayer(512, 1, 1), prevs=(H,))
 

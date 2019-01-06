@@ -27,9 +27,9 @@ OPTION_LIST = ['sw_gbuf_bypass',
                'hw_access_forwarding',
                'hw_gbuf_sharing',
                'partition_hybrid',
-               'partition_dimensional',
                'partition_batch',
                'partition_ifmaps',
+               'opt_goal',
                'ntops',
                'nprocesses',
                'verbose',
@@ -65,9 +65,9 @@ class Option(namedtuple('Option', OPTION_LIST)):
         kwdict.setdefault('hw_access_forwarding', False)
         kwdict.setdefault('hw_gbuf_sharing', False)
         kwdict.setdefault('partition_hybrid', False)
-        kwdict.setdefault('partition_dimensional', False)
         kwdict.setdefault('partition_batch', False)
         kwdict.setdefault('partition_ifmaps', False)
+        kwdict.setdefault('opt_goal', 'e')
         kwdict.setdefault('ntops', 1)
         kwdict.setdefault('nprocesses', 1)
         kwdict.setdefault('verbose', False)
@@ -94,6 +94,10 @@ class Option(namedtuple('Option', OPTION_LIST)):
         if ntp.partition_ifmaps and not ntp.partition_hybrid:
             raise ValueError('Option: partition_ifmaps requires '
                              'partition_hybrid to be set.')
+
+        if ntp.opt_goal not in ['e', 'd', 'ed']:
+            raise ValueError('Option: opt_goal is invalid, must be one of '
+                             '\'e\', \'d\', and \'ed\'.')
 
         return ntp
 

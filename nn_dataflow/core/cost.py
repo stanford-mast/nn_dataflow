@@ -25,13 +25,13 @@ from . import mem_hier_enum as me
 COST_LIST = ['mac_op',
              'mem_hier',
              'noc_hop',
-             'unit_static'
+             'idl_unit',
             ]
 
 class Cost(namedtuple('Cost', COST_LIST)):
     '''
     Cost specification, including MAC operation cost, memory hierarchy cost,
-    NoC hop cost, and unit-time static cost.
+    NoC hop cost, and idle unit-time cost.
     '''
 
     def __new__(cls, *args, **kwargs):
@@ -46,8 +46,8 @@ class Cost(namedtuple('Cost', COST_LIST)):
                              .format(me.NUM))
         if hasattr(ntp.noc_hop, '__len__'):
             raise TypeError('Cost: noc_hop must be a scalar')
-        if hasattr(ntp.unit_static, '__len__'):
-            raise TypeError('Cost: unit_static must be a scalar')
+        if hasattr(ntp.idl_unit, '__len__'):
+            raise TypeError('Cost: idl_unit must be a scalar')
 
         return ntp
 

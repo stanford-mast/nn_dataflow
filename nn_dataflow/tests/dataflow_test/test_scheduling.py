@@ -47,7 +47,7 @@ class TestScheduling(unittest.TestCase):
         self.batch_size = 4
 
         self.cost = Cost(mac_op=1, mem_hier=(200, 6, 2, 1),
-                         noc_hop=50, unit_static=50)
+                         noc_hop=50, idl_unit=50)
 
         self.resource = Resource(
             proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
@@ -135,8 +135,10 @@ class TestScheduling(unittest.TestCase):
             # Combination of loop blocking and partitioning.
             for r in res:
                 self.assertAlmostEqual(r.total_cost,
-                                       r.scheme['cost_loop']
-                                       + r.scheme['cost_part'])
+                                       r.scheme['cost_op']
+                                       + r.scheme['cost_access']
+                                       + r.scheme['cost_noc']
+                                       + r.scheme['cost_static'])
                 self.assertEqual(r.total_ops, layer.total_ops(self.batch_size))
                 self.assertSequenceEqual(r.scheme['total_nhops'],
                                          [nh * f for nh, f
@@ -249,7 +251,7 @@ class TestScheduling(unittest.TestCase):
         self.assertNotEqual(id(opts), id(self.options))
 
         part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
-                               pdims=((2, 2), (2, 2), (1, 1), (1, 1)))
+                               pdims=((2, 4), (2, 1), (1, 1), (1, 1)))
 
         _ = schd.schedule_search_per_node(part, rsrc, opts)
 

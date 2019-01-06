@@ -61,7 +61,7 @@ def stats_dict(dfsch, cost):
     total_access_cost = sum(a * c for a, c
                             in zip(dfsch.total_accesses, cost.mem_hier))
     total_noc_cost = dfsch.total_noc_hops * cost.noc_hop
-    total_static_cost = dfsch.total_static_cost(cost.unit_static)
+    total_static_cost = dfsch.total_time * cost.idl_unit
 
     sum_cost = total_op_cost + total_access_cost + total_noc_cost \
             + total_static_cost
@@ -75,7 +75,8 @@ def stats_dict(dfsch, cost):
     ## Other stats.
 
     stats['active_node_pes'] = dfsch.perlayer_stats('active_node_pes')
-    stats['total_dram_bandwidth'] = dfsch.perlayer_stats('total_dram_bandwidth')
+    stats['dram_bandwidth'] = dfsch.perlayer_stats('dram_bandwidth')
+    stats['input_layout'] = dfsch.input_layout
     stats['schedules'] = dfsch.res_dict
 
     return stats
@@ -144,7 +145,7 @@ def do_scheduling(args):
     cost = Cost(mac_op=args.op_cost,
                 mem_hier=tuple(hier_cost),
                 noc_hop=args.hop_cost,
-                unit_static=args.unit_static_cost)
+                idl_unit=args.unit_idle_cost)
 
     ## Options.
 
@@ -157,9 +158,9 @@ def do_scheduling(args):
                      hw_access_forwarding=args.enable_access_forwarding,
                      hw_gbuf_sharing=args.enable_gbuf_sharing,
                      partition_hybrid=args.hybrid_partition,
-                     partition_dimensional=args.dimensional_partition,
                      partition_batch=args.batch_partition,
                      partition_ifmaps=args.ifmaps_partition,
+                     opt_goal=args.goal.lower(),
                      ntops=args.top,
                      nprocesses=args.processes,
                      verbose=args.verbose)
@@ -240,8 +241,8 @@ def argparser():
                     help='cost of access to memory hierarchy')
     ap.add_argument('--hop-cost', type=float, default=10,
                     help='cost of access through one NoC hop')
-    ap.add_argument('--unit-static-cost', type=float, default=0,
-                    help='static cost for unit execution time')
+    ap.add_argument('--unit-idle-cost', type=float, default=0,
+                    help='static cost over all nodes for unit execution time')
 
     ap.add_argument('--mem-type', default='2D', choices=['2D', '3D'],
                     help='memory type. "2D" has memory only on edge nodes; '
@@ -265,10 +266,6 @@ def argparser():
                     action='store_true',
                     help='Use hybrid partition for layer for node mapping. '
                          'Otherwise use naive method based on layer type.')
-    ap.add_argument('--dimensional-partition', action='store_true',
-                    help='Restrict dimensional partitioning, i.e., each '
-                         'partitioning can only be along one dimension '
-                         'unless it is the only partitioning.')
     ap.add_argument('--batch-partition', action='store_true',
                     help='Allow partitioning batch, i.e., consider data '
                          'parallelism.')
@@ -277,6 +274,9 @@ def argparser():
                     help='Allow partitioning ifmap channel dimension, which '
                          'requires extra data synchronization.')
 
+    ap.add_argument('-g', '--goal', default='e',
+                    choices=['e', 'd', 'ed', 'E', 'D', 'ED'],
+                    help='Goal of optimization: E(nergy), D(elay), or ED.')
     ap.add_argument('-t', '--top', type=int, default=1,
                     help='Number of top schedules to keep during search.')
     ap.add_argument('-p', '--processes', type=int,
@@ -291,10 +291,10 @@ def argparser():
 def main():
     ''' Main function. '''
     args = argparser().parse_args()
-    json.dump(do_scheduling(args), sys.stdout, indent=2,
-              default=lambda _: None)
+    res = do_scheduling(args)
+    json.dump(res, sys.stdout, indent=2, default=lambda _: None)
     sys.stdout.write('\n')
-    return 0
+    return 0 if res else 2
 
 
 if __name__ == '__main__':
