@@ -188,7 +188,8 @@ class TestPipelineFixture(unittest.TestCase):
             dst_data_region=NodeRegion(origin=PhyDim2(0, 4), dim=PhyDim2(8, 4),
                                        type=NodeRegion.DRAM),
             dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64,
-            array_bus_width=float('inf'), dram_bandwidth=float('inf'))
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'),
+            no_time_mux=False)
 
         part = PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM)
         self.ofmap_layout = DataLayout(

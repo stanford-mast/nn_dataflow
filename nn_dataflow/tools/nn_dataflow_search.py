@@ -135,7 +135,8 @@ def do_scheduling(args):
                         size_gbuf=size_gbuf,
                         size_regf=size_regf,
                         array_bus_width=array_bus_width,
-                        dram_bandwidth=dram_bandwidth)
+                        dram_bandwidth=dram_bandwidth,
+                        no_time_mux=False)
 
     ## Cost.
 

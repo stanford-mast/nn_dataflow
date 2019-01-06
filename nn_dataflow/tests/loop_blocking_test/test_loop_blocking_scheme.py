@@ -465,3 +465,19 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
         self.assertAlmostEqual(lbs.remote_gbuf_access[de.OFM],
                                lbs_norm.access[me.DRAM][de.OFM])
 
+    def test_fil_pinning(self):
+        ''' Filter pinning. '''
+
+        bl_ts = self._make_bl_ts((1, 0, 1), (1, 0, 1), (0, 1, 1))
+        bl_ords = [range(le.NUM) for _ in range(2)]
+
+        lbs_norm = self._lbs(bl_ts, bl_ords)
+        self.assertTrue(lbs_norm.is_valid())
+        self.assertGreater(lbs_norm.fetch[0][de.FIL], 0)
+        self.assertGreater(lbs_norm.get_access()[0][de.FIL], 0)
+
+        lbs = self._lbs(bl_ts, bl_ords, rsrckey='FILPIN')
+        self.assertTrue(lbs.is_valid())
+        self.assertEqual(lbs.fetch[0][de.FIL], 0)
+        self.assertEqual(lbs.get_access()[0][de.FIL], 0)
+

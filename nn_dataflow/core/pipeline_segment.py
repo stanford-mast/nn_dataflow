@@ -383,6 +383,15 @@ class PipelineSegment(object):
         if not subregions:
             return False
 
+        no_time_mux = len(self.network) == sum(len(ltpl) for ltpl in self.seg)
+        # All layers that have model filters must be spatially scheduled.
+        if no_time_mux:
+            for ltpl in self.seg:
+                if len([l for l in ltpl
+                        if isinstance(self.network[l], ConvLayer)]) > 1:
+                    no_time_mux = False
+                    break
+
         for sp_idx, ltpl in enumerate(self.seg):
 
             # Resource for the subregion.
@@ -438,7 +447,8 @@ class PipelineSegment(object):
                 rtpl += (self.resource._replace(
                     proc_region=proc_region,
                     src_data_region=src_data_region,
-                    dst_data_region=dst_data_region),)
+                    dst_data_region=dst_data_region,
+                    no_time_mux=no_time_mux),)
 
             assert len(rtpl) == len(ltpl)
             self.alloc += (rtpl,)

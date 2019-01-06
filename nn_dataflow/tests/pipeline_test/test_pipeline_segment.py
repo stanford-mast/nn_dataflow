@@ -357,6 +357,28 @@ class TestPipelineSegment(TestPipelineFixture):
 
                 self._validate_allocation(segment, alloc)
 
+    def test_allocation_no_time_mux(self):
+        ''' allocation() no_time_mux. '''
+        net = self.net['net2']
+
+        segment = self._make_segment(tuple(range(16)), net)
+        self.assertTrue(segment.valid)
+
+        alloc = segment.allocation()
+        self.assertTrue(all(r.no_time_mux for rtpl in alloc for r in rtpl))
+
+        segment = self._make_segment(tuple(range(8)), net)
+        self.assertTrue(segment.valid)
+
+        alloc = segment.allocation()
+        self.assertFalse(any(r.no_time_mux for rtpl in alloc for r in rtpl))
+
+        segment = self._make_segment(tuple(range(16)), net, temporal=True)
+        self.assertTrue(segment.valid)
+
+        alloc = segment.allocation()
+        self.assertFalse(any(r.no_time_mux for rtpl in alloc for r in rtpl))
+
     def test_allocation_invalid(self):
         ''' allocation() for invalid segment. '''
         segment = self._make_segment((0, 1), self.net['net3'], temporal=True)

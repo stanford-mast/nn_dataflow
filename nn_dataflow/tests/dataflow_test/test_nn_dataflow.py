@@ -81,6 +81,7 @@ class TestNNDataflow(unittest.TestCase):
                                  size_regf=512 // 2,  # 512 B
                                  array_bus_width=float('inf'),
                                  dram_bandwidth=float('inf'),
+                                 no_time_mux=False,
                                 )
 
         self.cost = Cost(mac_op=1,
@@ -365,6 +366,7 @@ class TestNNDataflow(unittest.TestCase):
                                  size_regf=2,
                                  array_bus_width=float('inf'),
                                  dram_bandwidth=float('inf'),
+                                 no_time_mux=False,
                                 )
 
         nnd = NNDataflow(self.alex_net, 4, self.resource, self.cost,
@@ -496,6 +498,7 @@ class TestNNDataflow(unittest.TestCase):
                             size_regf=261,  # 225 + 12 + 24
                             array_bus_width=float('inf'),
                             dram_bandwidth=float('inf'),
+                            no_time_mux=False,
                            )
 
         cost = Cost(mac_op=2e-12,
@@ -592,6 +595,7 @@ class TestNNDataflow(unittest.TestCase):
                             size_regf=1024 // 2,  # 1 kB
                             array_bus_width=float('inf'),
                             dram_bandwidth=float('inf'),
+                            no_time_mux=False,
                            )
 
         cost = Cost(mac_op=2e-12,
@@ -624,6 +628,7 @@ class TestNNDataflow(unittest.TestCase):
                             size_regf=512 // 2,  # 512 B
                             array_bus_width=float('inf'),
                             dram_bandwidth=float('inf'),
+                            no_time_mux=False,
                            )
 
         cost = Cost(mac_op=2e-12,
