@@ -290,6 +290,57 @@ class TestNNDataflowScheme(unittest.TestCase):
         dtfl['f1'] = self.c1res._replace(sched_seq=(0, 3, 0))
         self.assertEqual(dtfl.total_time, 200)
 
+    def test_static_cost_adjust(self):
+        ''' Adjust static cost portion. '''
+
+        # Add static cost.
+        idl_unit_cost = 1e-3
+
+        c1scheme = self.c1res.scheme
+        c1static = c1scheme['time'] * idl_unit_cost
+        c1scheme['cost_static'] += c1static
+        c1scheme['cost_access'] -= c1static
+
+        p1scheme = self.p1res.scheme
+        p1static = p1scheme['time'] * idl_unit_cost
+        p1scheme['cost_static'] += p1static
+        p1scheme['cost_access'] -= p1static
+
+        # No adjust.
+        dtfl = NNDataflowScheme(self.network, self.input_layout)
+        dtfl['c1'] = self.c1res._replace(scheme=c1scheme)
+        dtfl['p1'] = self.p1res._replace(scheme=p1scheme, sched_seq=(1, 0, 0))
+        dtfl['p2'] = self.p2res._replace(scheme=p1scheme, sched_seq=(2, 0, 0))
+        dtfl['f1'] = self.c1res._replace(scheme=c1scheme, sched_seq=(3, 0, 0))
+
+        sum_cost = 1.5 + 0.6 + 0.6 + 1.5
+        sum_time = 200 + 5 + 5 + 200
+
+        self.assertAlmostEqual(dtfl.total_cost, sum_cost)
+        self.assertAlmostEqual(dtfl.total_time, sum_time)
+
+        # With adjust.
+        dtfl = NNDataflowScheme(self.network, self.input_layout)
+        dtfl['c1'] = self.c1res._replace(scheme=c1scheme)
+        dtfl['p1'] = self.p1res._replace(scheme=p1scheme, sched_seq=(0, 1, 0))
+        dtfl['p2'] = self.p2res._replace(scheme=p1scheme, sched_seq=(0, 2, 0))
+        dtfl['f1'] = self.c1res._replace(scheme=c1scheme, sched_seq=(1, 0, 0))
+
+        diff = (sum_time - dtfl.total_time) * idl_unit_cost
+        self.assertGreater(diff, 0)
+        self.assertAlmostEqual(dtfl.total_cost, sum_cost -diff)
+
+        # All in one segment.
+        dtfl = NNDataflowScheme(self.network, self.input_layout)
+        dtfl['c1'] = self.c1res._replace(scheme=c1scheme)
+        dtfl['p1'] = self.p1res._replace(scheme=p1scheme, sched_seq=(0, 1, 0))
+        dtfl['p2'] = self.p2res._replace(scheme=p1scheme, sched_seq=(0, 2, 0))
+        dtfl['f1'] = self.c1res._replace(scheme=c1scheme, sched_seq=(0, 3, 0))
+
+        diff = (sum_time - dtfl.total_time) * idl_unit_cost
+        self.assertGreater(diff, 0)
+        self.assertAlmostEqual(dtfl.total_cost, sum_cost -diff)
+
     def test_segment_time_list(self):
         ''' segment_time_list(). '''
         dtfl = NNDataflowScheme(self.network, self.input_layout)

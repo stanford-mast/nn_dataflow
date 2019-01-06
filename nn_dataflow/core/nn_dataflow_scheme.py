@@ -47,7 +47,11 @@ class NNDataflowScheme(MutableMapping):
 
         self.res_dict = OrderedDict()
 
-        self.total_cost = 0
+        # Naive sum of all layer cost.
+        self.sum_cost = 0
+        self.sum_static_cost = 0
+        # Naive sum of all layer time, used to adjust cost.
+        self.sum_time = 0
 
         # A list of segment schedule timing information.
         self.segment_timing_list = []
@@ -82,7 +86,9 @@ class NNDataflowScheme(MutableMapping):
 
         self.res_dict[layer_name] = sched_result
 
-        self.total_cost += sched_result.total_cost
+        self.sum_cost += sched_result.total_cost
+        self.sum_static_cost += sched_result.scheme['cost_static']
+        self.sum_time += sched_result.total_time
 
         seg_idx = sched_result.sched_seq[0]
         if seg_idx == self.last_seg_idx + 1:
@@ -134,6 +140,15 @@ class NNDataflowScheme(MutableMapping):
             return self.res_dict[layer_name].ofmap_layout
 
         return DataLayout.concat(*[_ofmap_layout(l) for l in layers])
+
+    @property
+    def total_cost(self):
+        ''' Get the total cost. '''
+        if self.sum_time == 0:
+            return self.sum_cost
+        overcounted_static_cost = (self.sum_static_cost
+                                   * (1 - 1. * self.total_time / self.sum_time))
+        return self.sum_cost - overcounted_static_cost
 
     @property
     def total_time(self):
