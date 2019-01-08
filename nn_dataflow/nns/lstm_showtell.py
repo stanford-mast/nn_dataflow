@@ -33,20 +33,13 @@ NN = Network('ShowTell')
 
 NN.set_input_layer(InputLayer(512, 1))
 
-C = H = None
+# Word embedding is a simple lookup.
+# Exclude or ignore embedding processing.
+WE = NN.INPUT_LAYER_KEY
 
-# Unroll by the sequence length, assuming 10.
-for idx in range(10):
+# LSTM.
+C, H = add_lstm_cell(NN, 'cell', 512, WE)
 
-    # Word embedding is a simple lookup.
-    we = 'We_{}'.format(idx)
-    NN.add(we, EltwiseLayer(512, 1, 1), prevs=(NN.INPUT_LAYER_KEY,))
-
-    # LSTM.
-    cell = 'cell_{}'.format(idx)
-    C, H = add_lstm_cell(NN, cell, 512, we, C, H)
-
-    # log(p), softmax.
-    wd = 'Wd_{}'.format(idx)
-    NN.add(wd, EltwiseLayer(512, 1, 1), prevs=(H,))
+# log(p), softmax.
+NN.add('Wd', EltwiseLayer(512, 1, 1), prevs=(H,))
 

@@ -50,12 +50,19 @@ def add_lstm_cell(network, name, size, xin, cin=None, hin=None):
     h_{t-1}, respectively. Return the layers' names whose outputs are C_t, h_t.
     '''
     from nn_dataflow.core import Network
-    from nn_dataflow.core import FCLayer, EltwiseLayer
+    from nn_dataflow.core import InputLayer, FCLayer, EltwiseLayer
 
     if not isinstance(network, Network):
         raise TypeError('add_lstm_cell: network must be a Network instance.')
-    if (cin and cin not in network) or (hin and hin not in network) \
-            or (xin not in network):
+
+    if cin is None:
+        cin = '{}_cinit'.format(name)
+        network.add_ext(cin, InputLayer(size, 1))
+    if hin is None:
+        hin = '{}_hinit'.format(name)
+        network.add_ext(hin, InputLayer(size, 1))
+
+    if (cin not in network) or (hin not in network) or (xin not in network):
         raise ValueError('add_lstm_cell: cin {}, hin {}, xin {} must all be '
                          'in the network.'.format(cin, hin, xin))
 

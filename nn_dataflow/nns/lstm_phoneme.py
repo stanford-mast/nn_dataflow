@@ -33,16 +33,12 @@ NN = Network('PHONEME')
 
 NN.set_input_layer(InputLayer(26, 1))
 
-NN.add('init', FCLayer(26, 140))
-C = H = None
+# Input.
+NN.add('We', FCLayer(26, 140), prevs=(NN.INPUT_LAYER_KEY,))
 
-# Unroll by the sequence length, assuming 10.
-for idx in range(10):
-    we = 'We_{}'.format(idx)
-    cell = 'cell_{}'.format(idx)
-    wd = 'Wd_{}'.format(idx)
+# LSTM.
+C, H = add_lstm_cell(NN, 'cell', 140, 'We')
 
-    NN.add(we, FCLayer(26, 140), prevs=(NN.INPUT_LAYER_KEY,))
-    C, H = add_lstm_cell(NN, cell, 140, we, C, H)
-    NN.add(wd, FCLayer(140, 61), prevs=(H,))
+# Output.
+NN.add('Wd', FCLayer(140, 61), prevs=(H,))
 

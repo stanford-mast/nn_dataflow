@@ -34,29 +34,18 @@ NN = Network('GNMT')
 NN.set_input_layer(InputLayer(1000, 1))
 
 NL = 4
-CL = [None] * NL
-HL = [None] * NL
 
-# Unroll by the sequence length, assuming 10.
-for idx in range(10):
+# Word embedding is a simple lookup.
+# Exclude or ignore embedding processing.
+WE = NN.INPUT_LAYER_KEY
 
-    new_CL = []
-    new_HL = []
+# layered LSTM.
+X = WE
+for l in range(NL):
+    cell = 'cell_l{}'.format(l)
+    C, H = add_lstm_cell(NN, cell, 1000, X)
+    X = H
 
-    we = 'We_{}'.format(idx)
-    NN.add(we, EltwiseLayer(1000, 1, 1), prevs=(NN.INPUT_LAYER_KEY,))
-    x = we
-
-    for l in range(NL):
-        cell = 'cell_l{}_{}'.format(l, idx)
-        C, H = add_lstm_cell(NN, cell, 1000, x, CL[l], HL[l])
-        new_CL.append(C)
-        new_HL.append(H)
-        x = H
-
-    wd = 'Wd_{}'.format(idx)
-    NN.add(wd, EltwiseLayer(1000, 1, 1), prevs=(x,))
-
-    CL = new_CL
-    HL = new_HL
+# log(p), softmax.
+NN.add('Wd', EltwiseLayer(1000, 1, 1), prevs=(X,))
 
