@@ -148,7 +148,12 @@ class TestInterLayerPipeline(TestPipelineFixture):
                 # Next layers of the current vertex.
                 next_layers = set()
                 if vidx < 0:
-                    next_layers = set(net.firsts())
+                    # Go through all layers and add those with input layer as
+                    # previous.
+                    for l in net:
+                        prevs = set(net.prevs(l))
+                        if None in prevs:
+                            next_layers.add(l)
                 else:
                     v = ilp.dag_vertex_list[vidx]
                     for l in v:

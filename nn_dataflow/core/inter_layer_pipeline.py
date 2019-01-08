@@ -264,8 +264,8 @@ class InterLayerPipeline(object):
                 self.dag_vertex_dict[layer_name] = vidx
 
         # Add the input layer.
-        self.dag_vertex_dict[self.dag_input_vertex] = \
-                self.network.INPUT_LAYER_KEY
+        self.dag_vertex_dict[self.network.INPUT_LAYER_KEY] = \
+                self.dag_input_vertex
 
         # The previous and next relationship of the DAG vertices.
         self.dag_prev_dict = dict((vidx, set()) for vidx
