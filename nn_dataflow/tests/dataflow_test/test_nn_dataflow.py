@@ -23,6 +23,7 @@ import sys
 import StringIO
 
 from nn_dataflow.core import Cost
+from nn_dataflow.core import InputLayer, FCLayer
 from nn_dataflow.core import MapStrategy, MapStrategyEyeriss
 from nn_dataflow.core import MemHierEnum as me
 from nn_dataflow.core import NodeRegion
@@ -184,6 +185,26 @@ class TestNNDataflow(unittest.TestCase):
                         tops_e[0].total_cost * tops_e[0].total_time * 1.05)
         self.assertLess(tops_ed[0].total_cost * tops_ed[0].total_time,
                         tops_d[0].total_cost * tops_d[0].total_time * 1.05)
+
+    def test_ext_layer(self):
+        ''' With external layers. '''
+        network = self.alex_net
+
+        network.add_ext('e0', InputLayer(4, 1))
+        network.add('l1', FCLayer(1000, 4))
+        network.add('l2', FCLayer(8, 4), prevs=('e0', 'l1'))
+
+        batch_size = 16
+
+        options = Option(sw_gbuf_bypass=(True, True, True),
+                         sw_solve_loopblocking=True)
+
+        nnd = NNDataflow(network, batch_size, self.resource, self.cost,
+                         self.map_strategy)
+
+        tops, _ = nnd.schedule_search(options)
+
+        self.assertTrue(tops)
 
     def test_no_valid_dataflow(self):
         ''' No valid dataflow is found. '''

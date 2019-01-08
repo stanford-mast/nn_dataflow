@@ -133,6 +133,41 @@ class TestNetwork(unittest.TestCase):
             network.add('p1', PoolingLayer(128, 7, 32), prevs=('c1', 'c2'))
         self.assertEqual(len(network), 2)
 
+    def test_add_ext(self):
+        ''' Modifier add_ext. '''
+        self.assertEqual(len(self.network), 3)
+
+        self.network.add_ext('e0', InputLayer(3, 24))
+        self.assertIsInstance(self.network['e0'], InputLayer)
+        self.assertEqual(self.network['e0'].nofm, 3)
+        self.assertEqual(self.network['e0'].hofm, 24)
+        self.assertEqual(self.network['e0'].wofm, 24)
+
+        self.network.add_ext('e1', InputLayer(5, (16, 20)))
+        self.assertIsInstance(self.network['e1'], InputLayer)
+        self.assertEqual(self.network['e1'].nofm, 5)
+        self.assertEqual(self.network['e1'].hofm, 16)
+        self.assertEqual(self.network['e1'].wofm, 20)
+
+        self.assertEqual(len(self.network), 3)
+
+    def test_add_ext_same_key(self):
+        ''' Modifier add_ext same key. '''
+        network = Network('test_net')
+
+        network.add_ext('e0', InputLayer(3, 24))
+        with self.assertRaisesRegexp(KeyError, 'Network: .*ext.*'):
+            network.add_ext('e0', InputLayer(3, 24))
+
+    def test_add_ext_invalid_type(self):
+        ''' Modifier add_ext invalid type. '''
+        network = Network('test_net')
+
+        with self.assertRaisesRegexp(TypeError, 'Network: .*external layer.*'):
+            network.add_ext('e0', Layer(3, 24))
+        with self.assertRaisesRegexp(TypeError, 'Network: .*external layer.*'):
+            network.add_ext('e0', ConvLayer(3, 8, 24, 3))
+
     def test_prevs(self):
         ''' Get prevs. '''
         self.network.add('f2', FCLayer(64, 2000, 7), prevs='p1')
@@ -161,6 +196,22 @@ class TestNetwork(unittest.TestCase):
         ''' Get prevs input layer. '''
         with self.assertRaisesRegexp(ValueError, 'Network: .*input.*'):
             _ = self.network.prevs(self.network.INPUT_LAYER_KEY)
+
+    def test_prevs_ext_next(self):
+        ''' Get prevs next layer of an external layer. '''
+        self.network.add_ext('e0', InputLayer(3, 224))
+
+        self.network.add('n', ConvLayer(6, 3, 224, 1),
+                         prevs=(self.network.INPUT_LAYER_KEY, 'e0'))
+
+        prevs = self.network.prevs('n')
+        self.assertTupleEqual(prevs, (None, 'e0'))
+
+    def test_prevs_ext(self):
+        ''' Get prevs external layer. '''
+        self.network.add_ext('e0', InputLayer(3, 3))
+        with self.assertRaisesRegexp(ValueError, 'Network: .*ext.*'):
+            _ = self.network.prevs('e0')
 
     def test_nexts(self):
         ''' Get nexts. '''
@@ -220,6 +271,20 @@ class TestNetwork(unittest.TestCase):
         self.assertIn('c1', firsts)
         self.assertNotIn('c3', firsts)
 
+    def test_firsts_ext(self):
+        ''' Get firsts with external layers. '''
+        self.network.add_ext('e0', InputLayer(3, 224))
+
+        self.network.add('c2', ConvLayer(3, 3, 224, 1), prevs=('e0',))
+        self.network.add('c3', ConvLayer(67, 3, 224, 1), prevs=('e0', 'c1'))
+        self.network.add('c4', ConvLayer(6, 3, 224, 1),
+                         prevs=(self.network.INPUT_LAYER_KEY, 'e0',))
+
+        firsts = self.network.firsts()
+        self.assertIn('c2', firsts)
+        self.assertNotIn('c3', firsts)
+        self.assertIn('c4', firsts)
+
     def test_lasts(self):
         ''' Get lasts. '''
         lasts = self.network.lasts()
@@ -229,6 +294,16 @@ class TestNetwork(unittest.TestCase):
 
         lasts = self.network.lasts()
         self.assertTupleEqual(lasts, ('f1', 'f2'))
+
+    def test_ext_layers(self):
+        ''' Get external layers. '''
+        self.assertTupleEqual(self.network.ext_layers(), tuple())
+
+        self.network.add_ext('e0', InputLayer(3, 224))
+        self.assertTupleEqual(self.network.ext_layers(), ('e0',))
+
+        self.network.add_ext('e1', InputLayer(3, 224))
+        self.assertTupleEqual(self.network.ext_layers(), ('e0', 'e1'))
 
     def test_contains(self):
         ''' Whether contains. '''
@@ -273,6 +348,24 @@ class TestNetwork(unittest.TestCase):
         network.set_input_layer(InputLayer(3, 224))
         with self.assertRaises(StopIteration):
             _ = next(iter(network))
+
+    def test_contains_ext(self):
+        ''' Whether contains external layer. '''
+        self.assertNotIn('e0', self.network)
+        self.network.add_ext('e0', InputLayer(3, 224))
+        self.assertIn('e0', self.network)
+
+    def test_len_ext(self):
+        ''' Accessor len external layer. '''
+        self.assertEqual(len(self.network), 3)
+        self.network.add_ext('e0', InputLayer(3, 224))
+        self.assertEqual(len(self.network), 3)
+
+    def test_iter_ext(self):
+        ''' Accessor iter external layer. '''
+        self.network.add_ext('e0', InputLayer(3, 224))
+        for layer in self.network:
+            self.assertNotEqual(layer, 'e0')
 
     def test_getitem(self):
         ''' Accessor getitem. '''

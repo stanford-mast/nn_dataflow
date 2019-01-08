@@ -18,6 +18,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+import itertools
 import sys
 
 from . import partition
@@ -86,8 +87,8 @@ class NNDataflow(object):
         nndf_tops = []
 
         # Initial input layout.
-        for input_layout in self._gen_input_layout(options):
-            nndf = NNDataflowScheme(self.network, input_layout)
+        for input_layout, ext_layout_dict in self._gen_input_layout(options):
+            nndf = NNDataflowScheme(self.network, input_layout, ext_layout_dict)
             nndf_tops.append(nndf)
 
         # Schedule layers.
@@ -159,7 +160,18 @@ class NNDataflow(object):
                                             h=input_layer.hofm,
                                             w=input_layer.wofm))
 
-        input_region = self.resource.src_data_region
+        ext_layer_names = self.network.ext_layers()
+        ext_layers = [self.network[l] for l in ext_layer_names]
+        ext_frngs = [FmapRange(FmapPosition(b=0, n=0, h=0, w=0),
+                               FmapPosition(b=self.batch_size,
+                                            n=ext_layer.nofm,
+                                            h=ext_layer.hofm,
+                                            w=ext_layer.wofm))
+                     for ext_layer in ext_layers]
+
+        # Input and external layers share the same region.
+
+        input_region = ext_region = self.resource.src_data_region
 
         for part in partition.gen_partition(input_layer, self.batch_size,
                                             input_region.dim, options,
@@ -169,5 +181,23 @@ class NNDataflow(object):
                 regions=(input_region,),
                 parts=(part.projection(input_region, appl2frng=True),))
 
-            yield input_layout
+            if ext_layers:
+                for ext_parts in itertools.product(
+                        *[partition.gen_partition(ext_layer, self.batch_size,
+                                                  ext_region.dim, options,
+                                                  guaranteed=True)
+                          for ext_layer in ext_layers]):
+                    ext_layout_dict = dict(zip(
+                        ext_layer_names,
+                        [DataLayout(
+                            frngs=(ext_frng,),
+                            regions=(ext_region,),
+                            parts=(ext_part.projection(ext_region,
+                                                       appl2frng=True),))
+                         for ext_part, ext_frng in zip(ext_parts, ext_frngs)]))
+
+                    yield input_layout, ext_layout_dict
+
+            else:
+                yield input_layout, None
 

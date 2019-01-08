@@ -34,6 +34,7 @@ class Network(object):
         self.layer_dict = OrderedDict()
         self.prevs_dict = {}
         self.nexts_dict = {}
+        self.ext_dict = OrderedDict()
 
     def set_input_layer(self, input_layer):
         '''
@@ -80,7 +81,9 @@ class Network(object):
                 prevs = tuple(prevs)
             # Ensure previous layers are already added.
             for p in prevs:
-                if p not in self.layer_dict:
+                try:
+                    self.__getitem__(p)
+                except KeyError:
                     raise KeyError('Network: given previous layer {} '
                                    'has not been added to the network'.
                                    format(p))
@@ -101,6 +104,20 @@ class Network(object):
         for p in prevs:
             self.nexts_dict.setdefault(p, []).append(layer_name)
 
+    def add_ext(self, layer_name, layer):
+        '''
+        Add a named external layer.
+        '''
+        if layer_name in self.ext_dict:
+            raise KeyError('Network: external layer {} already exists.'
+                           .format(layer_name))
+
+        if not isinstance(layer, InputLayer):
+            raise TypeError('Network: external layer must be an InputLayer '
+                            'instance.')
+
+        self.ext_dict[layer_name] = layer
+
     def prevs(self, layer_name):
         '''
         Get the previous layers of the given layer name.
@@ -111,6 +128,9 @@ class Network(object):
         if layer_name == self.INPUT_LAYER_KEY:
             raise ValueError('Network: cannot get previous layers for '
                              'input layer.')
+        if layer_name in self.ext_dict:
+            raise ValueError('Network: cannot get previous layers for '
+                             'external layers.')
 
         prevs = tuple(None if p == self.INPUT_LAYER_KEY else p
                       for p in self.prevs_dict[layer_name])
@@ -137,15 +157,16 @@ class Network(object):
     def firsts(self):
         '''
         Get a tuple of the first layers, i.e., those with only the input layer
-        as their previous layers.
+        or external layers as their previous layers.
 
-        If a layer has other layers and the input layer as its previous layers,
-        it does not count as a first layer.
+        If a layer has other layers besides the input/external layers as its
+        previous layers, it does not count as a first layer.
         '''
+        input_ext_layers = set([None]).union(self.ext_layers())
         firsts = []
         for layer_name in self:
             prevs = self.prevs(layer_name)
-            if prevs == (None,):
+            if input_ext_layers.issuperset(prevs):
                 firsts.append(layer_name)
         return tuple(firsts)
 
@@ -159,6 +180,12 @@ class Network(object):
             if nexts == (None,):
                 lasts.append(layer_name)
         return tuple(lasts)
+
+    def ext_layers(self):
+        '''
+        Get a tuple of the external layers.
+        '''
+        return tuple(self.ext_dict.keys())
 
     def _check_prevs(self, layer_name):
         '''
@@ -174,7 +201,7 @@ class Network(object):
         sum_nfmaps = 0
 
         for p in prevs:
-            pl = self.layer_dict[p]
+            pl = self.__getitem__(p)
 
             # Ensure fmap sizes match. Allow padding.
             if not layer.is_valid_padding_sifm((pl.hofm, pl.wofm)):
@@ -192,7 +219,7 @@ class Network(object):
 
     def __contains__(self, layer_name):
         ''' Whether the network contains a layer. '''
-        return layer_name in self.layer_dict
+        return layer_name in self.layer_dict or layer_name in self.ext_dict
 
     def __len__(self):
         ''' Number of layers in the network. '''
@@ -212,8 +239,11 @@ class Network(object):
         ''' Get the layer by name. '''
         try:
             return self.layer_dict[layer_name]
-        except KeyError as e:
-            raise KeyError('Network: {} layer not found.'.format(str(e)))
+        except KeyError:
+            try:
+                return self.ext_dict[layer_name]
+            except KeyError as e:
+                raise KeyError('Network: {} layer not found.'.format(str(e)))
 
     def __str__(self):
         str_ = 'Network: {}\n'.format(self.net_name)

@@ -36,6 +36,8 @@ from nn_dataflow.core import SchedulingResult
 class TestNNDataflowScheme(unittest.TestCase):
     ''' Tests for NNDataflowScheme. '''
 
+    # pylint: disable=too-many-public-methods
+
     def setUp(self):
         self.network = Network('test_net')
         self.network.set_input_layer(InputLayer(3, 224))
@@ -115,6 +117,7 @@ class TestNNDataflowScheme(unittest.TestCase):
 
         self.assertEqual(df.network, self.network)
         self.assertEqual(df.input_layout, self.input_layout)
+        self.assertDictEqual(df.ext_layout_dict, {})
 
         self.assertEqual(df.total_cost, 0)
         self.assertEqual(df.total_time, 0)
@@ -124,6 +127,38 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.assertEqual(df.total_ops, 0)
         self.assertSequenceEqual(df.total_accesses, [0] * me.NUM)
         self.assertEqual(df.total_noc_hops, 0)
+
+    def test_init_ext(self):
+        ''' Initial with external layers. '''
+        self.network.add_ext('e0', InputLayer(3, 224))
+        self.network.add_ext('e1', InputLayer(6, 224))
+
+        e0_layout = DataLayout(
+            frngs=(FmapRange((0, 0, 0, 0),
+                             FmapPosition(b=self.batch_size,
+                                          n=self.network['e0'].nofm,
+                                          h=self.network['e0'].hofm,
+                                          w=self.network['e0'].wofm)),),
+            regions=self.input_layout.regions,
+            parts=self.input_layout.parts)
+        e1_layout = DataLayout(
+            frngs=(FmapRange((0, 0, 0, 0),
+                             FmapPosition(b=self.batch_size,
+                                          n=self.network['e1'].nofm,
+                                          h=self.network['e1'].hofm,
+                                          w=self.network['e1'].wofm)),),
+            regions=self.input_layout.regions,
+            parts=self.input_layout.parts)
+
+        ext_layout_dict = {'e0': e0_layout, 'e1': e1_layout}
+
+        df = NNDataflowScheme(self.network, self.input_layout,
+                              ext_layout_dict)
+
+        self.assertIn('e0', df.ext_layout_dict)
+        self.assertIn('e1', df.ext_layout_dict)
+        self.assertEqual(df.ext_layout_dict['e0'], e0_layout)
+        self.assertEqual(df.ext_layout_dict['e1'], e1_layout)
 
     def test_init_invalid_network(self):
         ''' Invalid network. '''
@@ -136,6 +171,29 @@ class TestNNDataflowScheme(unittest.TestCase):
         with self.assertRaisesRegexp(TypeError,
                                      'NNDataflowScheme: .*input_layout*'):
             _ = NNDataflowScheme(self.network, self.input_layout.frngs)
+
+    def test_init_invalid_eld_keys(self):
+        ''' Invalid ext_layout_dict keys. '''
+        with self.assertRaisesRegexp(ValueError,
+                                     'NNDataflowScheme: .*ext_layout_dict*'):
+            _ = NNDataflowScheme(self.network, self.input_layout,
+                                 {'e0': self.input_layout})
+
+        self.network.add_ext('e0', InputLayer(3, 224))
+        with self.assertRaisesRegexp(ValueError,
+                                     'NNDataflowScheme: .*ext_layout_dict*'):
+            _ = NNDataflowScheme(self.network, self.input_layout)
+
+    def test_init_invalid_eld_type(self):
+        ''' Invalid ext_layout_dict value type. '''
+        self.network.add_ext('e0', InputLayer(3, 224))
+        self.network.add_ext('e1', InputLayer(3, 224))
+
+        with self.assertRaisesRegexp(TypeError,
+                                     'NNDataflowScheme: .*ext_layout*'):
+            _ = NNDataflowScheme(self.network, self.input_layout,
+                                 {'e0': self.input_layout,
+                                  'e1': self.input_layout.frngs})
 
     def test_setgetitem(self):
         ''' __set/getitem__. '''
@@ -175,11 +233,24 @@ class TestNNDataflowScheme(unittest.TestCase):
             df['c1'] = self.c1res
 
     def test_setitem_prev_not_in(self):
-        ''' __setitem__ already exists. '''
+        ''' __setitem__ previous not existing. '''
         df = NNDataflowScheme(self.network, self.input_layout)
 
         with self.assertRaisesRegexp(KeyError, 'NNDataflowScheme: .*p1*'):
             df['p1'] = self.p1res
+
+    def test_setitem_prev_input_ext(self):
+        ''' __setitem__ previous is input or external. '''
+        df = NNDataflowScheme(self.network, self.input_layout)
+        df['c1'] = self.c1res
+        self.assertAlmostEqual(df.total_cost, self.c1res.total_cost)
+
+        self.network.add_ext('e0', InputLayer(3, 224))
+        self.network.add('c2', self.network['c1'], prevs=('e0',))
+        df = NNDataflowScheme(self.network, self.input_layout,
+                              {'e0': self.input_layout})
+        df['c2'] = self.c1res
+        self.assertAlmostEqual(df.total_cost, self.c1res.total_cost)
 
     def test_delitem(self):
         ''' __delitem__. '''
@@ -212,6 +283,25 @@ class TestNNDataflowScheme(unittest.TestCase):
         for layer_name in df:
             self.assertEqual(id(df[layer_name]), id(df2[layer_name]))
 
+    def test_copy_ext(self):
+        ''' copy external layers. '''
+        self.network.add_ext('e0', self.network.input_layer())
+        self.network.add_ext('e1', self.network.input_layer())
+
+        df1 = NNDataflowScheme(self.network, self.input_layout,
+                               {'e0': self.input_layout,
+                                'e1': self.input_layout})
+        df1['c1'] = self.c1res
+        df1['p1'] = self.p1res
+        df1['p2'] = self.p1res
+
+        df2 = df1.copy()
+
+        self.assertAlmostEqual(df1.total_cost, df2.total_cost)
+        self.assertAlmostEqual(df1.total_time, df2.total_time)
+        self.assertDictEqual(df1.res_dict, df2.res_dict)
+        self.assertDictEqual(df1.ext_layout_dict, df2.ext_layout_dict)
+
     def test_fmap_layout(self):
         ''' fmap_layout. '''
         flayout = self.dtfl.fmap_layout(('c1',))
@@ -234,6 +324,28 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.assertEqual(frng.size('n'),
                          self.network.input_layer().nofm
                          + self.network['c1'].nofm)
+
+    def test_fmap_layout_ext(self):
+        ''' fmap_layout external layers. '''
+        self.network.add_ext('e0', self.network.input_layer())
+        self.network.add_ext('e1', self.network.input_layer())
+
+        df = NNDataflowScheme(self.network, self.input_layout,
+                              {'e0': self.input_layout,
+                               'e1': self.input_layout})
+        df['c1'] = self.c1res
+        df['p1'] = self.p1res
+        df['p2'] = self.p1res
+
+        flayout = df.fmap_layout(('e0',))
+        self.assertEqual(flayout, self.input_layout)
+
+        flayout = df.fmap_layout(('e1', None))
+        self.assertTrue(flayout.is_in(self.input_layout.regions[0]))
+        frng = flayout.complete_fmap_range()
+        self.assertEqual(frng.size('n'),
+                         self.network['e1'].nofm
+                         + self.network.input_layer().nofm)
 
     def test_properties(self):
         ''' Property accessors. '''

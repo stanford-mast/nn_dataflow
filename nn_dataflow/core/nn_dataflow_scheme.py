@@ -32,7 +32,7 @@ class NNDataflowScheme(MutableMapping):
     scheduling results.
     '''
 
-    def __init__(self, network, input_layout):
+    def __init__(self, network, input_layout, ext_layout_dict=None):
         # pylint: disable=super-init-not-called
 
         if not isinstance(network, Network):
@@ -41,8 +41,20 @@ class NNDataflowScheme(MutableMapping):
         if not isinstance(input_layout, DataLayout):
             raise TypeError('NNDataflowScheme: input_layout must be a '
                             'DataLayout instance.')
+
+        if ext_layout_dict is None:
+            ext_layout_dict = {}
+        if set(ext_layout_dict.keys()) != set(network.ext_layers()):
+            raise ValueError('NNDataflowScheme: ext_layout_dict keys do '
+                             'not match network.')
+        for ext_layout in ext_layout_dict.values():
+            if not isinstance(ext_layout, DataLayout):
+                raise TypeError('NNDataflowScheme: ext_layout must be a '
+                                'DataLayout instance.')
+
         self.network = network
         self.input_layout = input_layout
+        self.ext_layout_dict = ext_layout_dict
 
         self.res_dict = OrderedDict()
 
@@ -68,7 +80,7 @@ class NNDataflowScheme(MutableMapping):
 
         prevs = self.network.prevs(layer_name)
         for p in prevs:
-            if p is None:
+            if p is None or p in self.network.ext_layers():
                 continue
             if p not in self.res_dict:
                 raise KeyError('NNDataflowScheme: layer {} has its previous '
@@ -100,7 +112,8 @@ class NNDataflowScheme(MutableMapping):
         Shallow copy of layer SchedulingResult is sufficient, since they are
         read-only.
         '''
-        nndf = NNDataflowScheme(self.network, self.input_layout)
+        nndf = NNDataflowScheme(self.network, self.input_layout,
+                                self.ext_layout_dict)
         nndf.update(self)
         assert util.isclose(nndf.total_cost, self.total_cost, rel_tol=1e-5)
         assert util.isclose(nndf.total_time, self.total_time, rel_tol=1e-5)
@@ -113,6 +126,10 @@ class NNDataflowScheme(MutableMapping):
         def _ofmap_layout(layer_name):
             if layer_name is None:
                 return self.input_layout
+            try:
+                return self.ext_layout_dict[layer_name]
+            except KeyError:
+                pass
             return self.res_dict[layer_name].ofmap_layout
 
         return DataLayout.concat(*[_ofmap_layout(l) for l in layers])
