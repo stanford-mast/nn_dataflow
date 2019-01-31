@@ -44,8 +44,9 @@ Install
 
 ``nn_dataflow`` requires Python 2.7 and is not yet Python 3 compatible.
 
-``nn_dataflow`` can be directly used without installation. See the Usage
-section below for details.
+``nn_dataflow`` can be directly used without installation if you have first
+defined the environment variable ``PYTHONPATH`` to include the top directory path.
+See the Usage section below for details.
 
 ``nn_dataflow`` has been registered on `PyPI
 <//pypi.org/project/nn-dataflow>`_, so it can be installed through
