@@ -15,6 +15,8 @@ List of major changes and improvements
   - Allow only concatenation of layers; summation of layers turns into an
     additional `EltwiseLayer`.
 
+  - Add external layers to networks, which is external directly input data.
+
   - Add various LSTMs.
 
   - Add `data_loops` attribute with type `DataDimLoops` to each type of layer.
