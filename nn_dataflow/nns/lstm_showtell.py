@@ -13,11 +13,28 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from nn_dataflow.core import Network
+from nn_dataflow.core import InputLayer, EltwiseLayer
+
+from nn_dataflow.nns import add_lstm_cell
+
 '''
-Enum for loop types.
+LSTM from Show and Tell.
+
+Vinyals et al., Google, CVPR 2015
 '''
-IFM = 0
-OFM = 1
-BAT = 2
-NUM = 3
+
+NN = Network('ShowTell')
+
+NN.set_input_layer(InputLayer(512, 1))
+
+# Word embedding is a simple lookup.
+# Exclude or ignore embedding processing.
+WE = NN.INPUT_LAYER_KEY
+
+# LSTM.
+C, H = add_lstm_cell(NN, 'cell', 512, WE)
+
+# log(p), softmax.
+NN.add('Wd', EltwiseLayer(512, 1, 1), prevs=(H,))
 

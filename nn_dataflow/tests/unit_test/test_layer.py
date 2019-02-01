@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -23,7 +18,10 @@ import unittest
 from nn_dataflow.core import Layer
 from nn_dataflow.core import InputLayer
 from nn_dataflow.core import ConvLayer, FCLayer
-from nn_dataflow.core import LocalRegionLayer, PoolingLayer
+from nn_dataflow.core import LocalRegionLayer, PoolingLayer, EltwiseLayer
+from nn_dataflow.core import DataCategoryEnum as de
+from nn_dataflow.core import LoopEnum as le
+from nn_dataflow.core import DataDimLoops
 
 class TestLayer(unittest.TestCase):
     ''' Tests for Layer. '''
@@ -116,6 +114,14 @@ class TestLayer(unittest.TestCase):
                          ((28 - 1) * 2 + 3) ** 2 * 64 * 2,
                          'LocalRegionLayer: total_ifmap_size')
 
+    def test_data_loops(self):
+        ''' Get data_loops. '''
+        with self.assertRaises(NotImplementedError):
+            _ = Layer.data_loops()
+        layer = Layer(64, 28)
+        with self.assertRaises(NotImplementedError):
+            _ = layer.data_loops()
+
     def test_input_layer(self):
         ''' Get input layer. '''
         layer = Layer(64, 28)
@@ -178,6 +184,7 @@ class TestLayer(unittest.TestCase):
         l1 = Layer(4, 12)
         l2 = Layer(4, 13)
         self.assertNotEqual(l1, l2)
+        self.assertNotEqual(l1, (4, 12))
 
     def test_hash(self):
         ''' Get hash. '''
@@ -205,6 +212,15 @@ class TestLayer(unittest.TestCase):
 class TestInputLayer(unittest.TestCase):
     ''' Tests for InputLayer. '''
 
+    def test_data_loops(self):
+        ''' Get data_loops. '''
+        dls = InputLayer.data_loops()
+        ilayer = InputLayer(3, 227)
+        self.assertTupleEqual(ilayer.data_loops(), dls)
+        self.assertEqual(dls[de.FIL], DataDimLoops())
+        self.assertEqual(dls[de.IFM], DataDimLoops())
+        self.assertEqual(dls[de.OFM], DataDimLoops(le.OFM, le.BAT))
+
     def test_input_layer(self):
         ''' Get input layer. '''
         ilayer = InputLayer(3, 227)
@@ -229,6 +245,19 @@ class TestInputLayer(unittest.TestCase):
 
 class TestConvLayer(unittest.TestCase):
     ''' Tests for ConvLayer. '''
+
+    def test_data_loops(self):
+        ''' Get data_loops. '''
+        dls = ConvLayer.data_loops()
+        self.assertEqual(dls[de.FIL], DataDimLoops(le.IFM, le.OFM))
+        self.assertEqual(dls[de.IFM], DataDimLoops(le.IFM, le.BAT))
+        self.assertEqual(dls[de.OFM], DataDimLoops(le.OFM, le.BAT))
+
+        clayer = ConvLayer(3, 64, [28, 14], 3, strd=2)
+        flayer = FCLayer(2048, 4096, sfil=2)
+        self.assertTupleEqual(FCLayer.data_loops(), dls)
+        self.assertTupleEqual(clayer.data_loops(), dls)
+        self.assertTupleEqual(flayer.data_loops(), dls)
 
     def test_input_layer(self):
         ''' Get input layer. '''
@@ -292,6 +321,19 @@ class TestConvLayer(unittest.TestCase):
 class TestLocalRegionLayer(unittest.TestCase):
     ''' Tests for LocalRegionLayer. '''
 
+    def test_data_loops(self):
+        ''' Get data_loops. '''
+        dls = LocalRegionLayer.data_loops()
+        self.assertEqual(dls[de.FIL], DataDimLoops())
+        self.assertEqual(dls[de.IFM], DataDimLoops(le.OFM, le.BAT))
+        self.assertEqual(dls[de.OFM], DataDimLoops(le.OFM, le.BAT))
+
+        llayer = LocalRegionLayer(64, 28, 2, 1)
+        player = PoolingLayer(64, 28, 2)
+        self.assertTupleEqual(PoolingLayer.data_loops(), dls)
+        self.assertTupleEqual(llayer.data_loops(), dls)
+        self.assertTupleEqual(player.data_loops(), dls)
+
     def test_ops(self):
         ''' Get ops. '''
         llayer = LocalRegionLayer(64, 28, 2, 1)
@@ -325,6 +367,13 @@ class TestLocalRegionLayer(unittest.TestCase):
         player = PoolingLayer(64, 28, 3, strd=2)
         self.assertEqual(player.ops_per_neuron(), 9)
 
+    def test_eltwiselayer(self):
+        ''' EltwiseLayer init. '''
+        elayer = EltwiseLayer(64, 28, 3)
+        self.assertEqual(elayer.ops_per_neuron(), 3)
+        self.assertEqual(elayer.nifm, 3 * elayer.nofm)
+        self.assertEqual(elayer.ifmap_size(), elayer.ofmap_size())
+
     def test_repr(self):
         ''' __repr__. '''
         # pylint: disable=eval-used
@@ -339,5 +388,10 @@ class TestLocalRegionLayer(unittest.TestCase):
                   PoolingLayer(64, 28, 3, strd=2),
                   PoolingLayer(64, [28, 14], [3, 4], strd=[2, 3])]:
             self.assertIn('PoolingLayer', repr(l))
+            self.assertEqual(eval(repr(l)), l)
+
+        for l in [EltwiseLayer(64, 32, 3),
+                  EltwiseLayer(64, 28, 4)]:
+            self.assertIn('EltwiseLayer', repr(l))
             self.assertEqual(eval(repr(l)), l)
 

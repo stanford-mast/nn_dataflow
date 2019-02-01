@@ -13,11 +13,34 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from nn_dataflow.core import Network
+from nn_dataflow.core import InputLayer, EltwiseLayer
+
+from nn_dataflow.nns import add_lstm_cell
+
 '''
-Enum for loop types.
+LSTM from GNMT.
+
+Sutskever, Vinyals, Le, Google, NIPS 2014
 '''
-IFM = 0
-OFM = 1
-BAT = 2
-NUM = 3
+
+NN = Network('GNMT')
+
+NN.set_input_layer(InputLayer(1000, 1))
+
+NL = 4
+
+# Word embedding is a simple lookup.
+# Exclude or ignore embedding processing.
+WE = NN.INPUT_LAYER_KEY
+
+# layered LSTM.
+X = WE
+for l in range(NL):
+    cell = 'cell_l{}'.format(l)
+    C, H = add_lstm_cell(NN, cell, 1000, X)
+    X = H
+
+# log(p), softmax.
+NN.add('Wd', EltwiseLayer(1000, 1, 1), prevs=(X,))
 

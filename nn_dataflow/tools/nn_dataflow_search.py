@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -22,6 +17,7 @@ import argparse
 import json
 import multiprocessing
 import sys
+import time
 from collections import OrderedDict
 
 from nn_dataflow.core import NNDataflow
@@ -60,7 +56,7 @@ def stats_dict(dfsch, cost):
     total_access_cost = sum(a * c for a, c
                             in zip(dfsch.total_accesses, cost.mem_hier))
     total_noc_cost = dfsch.total_noc_hops * cost.noc_hop
-    total_static_cost = dfsch.total_node_time * cost.unit_static
+    total_static_cost = dfsch.total_time * cost.idl_unit
 
     sum_cost = total_op_cost + total_access_cost + total_noc_cost \
             + total_static_cost
@@ -74,7 +70,9 @@ def stats_dict(dfsch, cost):
     ## Other stats.
 
     stats['active_node_pes'] = dfsch.perlayer_stats('active_node_pes')
-    stats['total_dram_bandwidth'] = dfsch.perlayer_stats('total_dram_bandwidth')
+    stats['dram_bandwidth'] = dfsch.perlayer_stats('dram_bandwidth')
+    stats['input_layout'] = dfsch.input_layout
+    stats['ext_layout_dict'] = dfsch.ext_layout_dict
     stats['schedules'] = dfsch.res_dict
 
     return stats
@@ -100,29 +98,38 @@ def do_scheduling(args):
     size_gbuf = args.gbuf / word
     size_regf = args.regf / word
 
+    array_bus_width = args.bus_width // args.word
+    if not array_bus_width:
+        array_bus_width = float('inf')
+    dram_bandwidth = args.dram_bw / word
+
     proc_region = NodeRegion(dim=dim_nodes,
                              origin=PhyDim2(0, 0),
                              type=NodeRegion.PROC)
 
     if args.mem_type == '2D':
         # Memory nodes are on two sides.
-        data_regions = (NodeRegion(dim=PhyDim2(h=dim_nodes.h, w=1),
-                                   origin=PhyDim2(h=0, w=0),
-                                   type=NodeRegion.DATA),
-                        NodeRegion(dim=PhyDim2(h=dim_nodes.h, w=1),
-                                   origin=PhyDim2(h=0, w=dim_nodes.w - 1),
-                                   type=NodeRegion.DATA))
+        data_region = NodeRegion(dim=PhyDim2(2, 2),
+                                 origin=PhyDim2(0, 0),
+                                 dist=dim_nodes - PhyDim2(1, 1),
+                                 type=NodeRegion.DRAM)
+        assert data_region.rel2abs(PhyDim2(1, 1)) + PhyDim2(1, 1) \
+                == proc_region.dim
     elif args.mem_type == '3D':
-        # All nodes have memory.
-        data_regions = (NodeRegion(dim=dim_nodes,
-                                   origin=PhyDim2(0, 0),
-                                   type=NodeRegion.DATA),)
+        # Memory nodes are on the top.
+        data_region = NodeRegion(dim=dim_nodes,
+                                 origin=PhyDim2(0, 0),
+                                 type=NodeRegion.DRAM)
 
     resource = Resource(proc_region=proc_region,
-                        data_regions=data_regions,
+                        dram_region=data_region,
+                        src_data_region=data_region,
+                        dst_data_region=data_region,
                         dim_array=dim_array,
                         size_gbuf=size_gbuf,
-                        size_regf=size_regf)
+                        size_regf=size_regf,
+                        array_bus_width=array_bus_width,
+                        dram_bandwidth=dram_bandwidth)
 
     ## Cost.
 
@@ -134,7 +141,7 @@ def do_scheduling(args):
     cost = Cost(mac_op=args.op_cost,
                 mem_hier=tuple(hier_cost),
                 noc_hop=args.hop_cost,
-                unit_static=args.unit_static_cost)
+                idl_unit=args.unit_idle_cost)
 
     ## Options.
 
@@ -147,6 +154,7 @@ def do_scheduling(args):
                      partition_hybrid=args.hybrid_partition,
                      partition_batch=args.batch_partition,
                      partition_ifmaps=args.ifmaps_partition,
+                     opt_goal=args.goal.lower(),
                      ntops=args.top,
                      nprocesses=args.processes,
                      verbose=args.verbose)
@@ -154,7 +162,10 @@ def do_scheduling(args):
     ## Search schedules.
 
     nnd = NNDataflow(network, batch_size, resource, cost, MapStrategyEyeriss)
+    tbeg = time.time()
     tops, cache_stats = nnd.schedule_search(options)
+    tend = time.time()
+    telapsed = tend - tbeg
 
     if not tops:
         sys.stderr.write('No valid dataflow found.\n')
@@ -176,6 +187,7 @@ def do_scheduling(args):
     res_map['options'] = options._asdict()
 
     res_map['cache_stats'] = cache_stats
+    res_map['elapsed'] = telapsed
 
     stats = stats_dict(top, cost)
     for key, val in stats.items():
@@ -210,6 +222,11 @@ def argparser():
     ap.add_argument('--gbuf', type=int, required=True,
                     help='global buffer size in bytes')
 
+    ap.add_argument('--bus-width', type=int, default=0,
+                    help='array bus width in bits. set 0 to ignore')
+    ap.add_argument('--dram-bw', type=float, default='inf',
+                    help='total DRAM bandwidth in bytes per cycle.')
+
     ap.add_argument('--op-cost', type=float, default=1,
                     help='cost of arithmetic operation')
     ap.add_argument('--hier-cost', type=float, nargs=4, default=[200, 6, 2, 1],
@@ -218,8 +235,8 @@ def argparser():
                     help='cost of access to memory hierarchy')
     ap.add_argument('--hop-cost', type=float, default=10,
                     help='cost of access through one NoC hop')
-    ap.add_argument('--unit-static-cost', type=float, default=0,
-                    help='static cost for unit execution time')
+    ap.add_argument('--unit-idle-cost', type=float, default=0,
+                    help='static cost over all nodes for unit execution time')
 
     ap.add_argument('--mem-type', default='2D', choices=['2D', '3D'],
                     help='memory type. "2D" has memory only on edge nodes; '
@@ -246,6 +263,9 @@ def argparser():
                     help='Allow partitioning ifmap channel dimension, which '
                          'requires extra data synchronization.')
 
+    ap.add_argument('-g', '--goal', default='e',
+                    choices=['e', 'd', 'ed', 'E', 'D', 'ED'],
+                    help='Goal of optimization: E(nergy), D(elay), or ED.')
     ap.add_argument('-t', '--top', type=int, default=1,
                     help='Number of top schedules to keep during search.')
     ap.add_argument('-p', '--processes', type=int,
@@ -260,10 +280,10 @@ def argparser():
 def main():
     ''' Main function. '''
     args = argparser().parse_args()
-    json.dump(do_scheduling(args), sys.stdout, indent=2,
-              default=lambda _: None)
+    res = do_scheduling(args)
+    json.dump(res, sys.stdout, indent=2, default=lambda _: None)
     sys.stdout.write('\n')
-    return 0
+    return 0 if res else 2
 
 
 if __name__ == '__main__':

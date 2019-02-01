@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -19,15 +14,20 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from collections import namedtuple
+import math
 
 from .node_region import NodeRegion
 from .phy_dim2 import PhyDim2
 
 RESOURCE_LIST = ['proc_region',
-                 'data_regions',
+                 'dram_region',
+                 'src_data_region',
+                 'dst_data_region',
                  'dim_array',
                  'size_gbuf',
                  'size_regf',
+                 'array_bus_width',
+                 'dram_bandwidth',
                 ]
 
 class Resource(namedtuple('Resource', RESOURCE_LIST)):
@@ -46,21 +46,18 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
         if ntp.proc_region.type != NodeRegion.PROC:
             raise ValueError('Resource: proc_region must have type PROC.')
 
-        if not isinstance(ntp.data_regions, tuple):
-            raise TypeError('Resource: data_regions must be a tuple.')
-        for dr in ntp.data_regions:
-            if not isinstance(dr, NodeRegion):
-                raise TypeError('Resource: element in data_regions must be '
-                                'a NodeRegion instance.')
-            if dr.type != NodeRegion.DATA:
-                raise ValueError('Resource: element in data_regions must have '
-                                 'type DATA.')
-        # Data regions can be used as either data source or data destination.
-        # If a single region is provided, it is both the source and
-        # destination; if two regions are provided, the first is the source and
-        # the second is the destination.
-        if len(ntp.data_regions) > 2:
-            raise ValueError('Resource: can have at most 2 data_regions.')
+        if not isinstance(ntp.dram_region, NodeRegion):
+            raise TypeError('Resource: dram_region must be '
+                            'a NodeRegion instance.')
+        if ntp.dram_region.type != NodeRegion.DRAM:
+            raise ValueError('Resource: dram_region must have type DRAM.')
+
+        if not isinstance(ntp.src_data_region, NodeRegion):
+            raise TypeError('Resource: src_data_region must be '
+                            'a NodeRegion instance.')
+        if not isinstance(ntp.dst_data_region, NodeRegion):
+            raise TypeError('Resource: dst_data_region must be '
+                            'a NodeRegion instance.')
 
         if not isinstance(ntp.dim_array, PhyDim2):
             raise TypeError('Resource: dim_array must be a PhyDim2 object.')
@@ -70,13 +67,17 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
         if hasattr(ntp.size_regf, '__len__'):
             raise TypeError('Resource: size_regf must be a scalar')
 
+        if not isinstance(ntp.array_bus_width, int) \
+                and not math.isinf(ntp.array_bus_width):
+            raise TypeError('Resource: array_bus_width must be an integer '
+                            'or infinity.')
+        if ntp.array_bus_width <= 0:
+            raise ValueError('Resource: array_bus_width must be positive.')
+
+        if not isinstance(ntp.dram_bandwidth, (float, int)):
+            raise TypeError('Resource: dram_bandwidth must be a number')
+        if ntp.dram_bandwidth <= 0:
+            raise ValueError('Resource: dram_bandwidth must be positive.')
+
         return ntp
-
-    def src_data_region(self):
-        ''' Get the source data region. '''
-        return self.data_regions[0]
-
-    def dst_data_region(self):
-        ''' Get the destination data region. '''
-        return self.data_regions[-1]
 

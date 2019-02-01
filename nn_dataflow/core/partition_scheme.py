@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -23,12 +18,15 @@ from collections import namedtuple
 
 from . import parallel_enum as pe
 from .. import util
+from .fmap_range import FmapPosition, FmapRange
 from .layer import ConvLayer, LocalRegionLayer
 from .phy_dim2 import PhyDim2
 
 PARTITION_SCHEME_LIST = ['order',
                          'pdims',
                         ]
+
+PARA_ENUM_APPL2FRNG = [pe.BATP, pe.OUTP, pe.OFMP]
 
 class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
     '''
@@ -108,10 +106,44 @@ class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
                      in zip(coord, self.pdims[penum], pidx[penum])]
         return node_region.rel2abs(PhyDim2(*coord))
 
+    def fmap_range(self, frng, pidx):
+        '''
+        Get the partitioned fmap range for the given partition index.
+        '''
+        fp_beg = frng.fp_beg
+        fp_end = frng.fp_end
+
+        # Batch partition.
+        idx_bat = pidx[pe.BATP].h * self.pdims[pe.BATP].w + pidx[pe.BATP].w
+        b_beg, b_end = util.get_ith_range((fp_beg.b, fp_end.b), idx_bat,
+                                          self.pdims[pe.BATP].size())
+
+        # Ofmap channel partition.
+        idx_ofm = pidx[pe.OUTP].h * self.pdims[pe.OUTP].w + pidx[pe.OUTP].w
+        n_beg, n_end = util.get_ith_range((fp_beg.n, fp_end.n), idx_ofm,
+                                          self.pdims[pe.OUTP].size())
+
+        # Fmap height tiling.
+        h_beg, h_end = util.get_ith_range((fp_beg.h, fp_end.h), pidx[pe.OFMP].h,
+                                          self.pdims[pe.OFMP].h)
+
+        # Fmap width tiling.
+        w_beg, w_end = util.get_ith_range((fp_beg.w, fp_end.w), pidx[pe.OFMP].w,
+                                          self.pdims[pe.OFMP].w)
+
+        return FmapRange(FmapPosition(b=b_beg, n=n_beg, h=h_beg, w=w_beg),
+                         FmapPosition(b=b_end, n=n_end, h=h_end, w=w_end))
+
+    def is_applicable_to_fmap_range(self):
+        '''
+        Whether this partitioning scheme is applicable to fmap ranges.
+        '''
+        return self.size() == self.size(*PARA_ENUM_APPL2FRNG)
+
     def part_layer(self, layer, batch_size):
         '''
         Get the partitioned layer structure and batch size. Return partitioned
-        layer, partitioned batch size, and partitioning op occupation.
+        layer, partitioned batch size, and partitioning op occupancy.
         '''
 
         p_nifm = util.idivc(layer.nifm, self.pdims[pe.INPP].size())
@@ -140,4 +172,64 @@ class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
         assert p_occ <= 1 + 1e-6
 
         return p_layer, p_batch_size, p_occ
+
+    def projection(self, region, appl2frng=False):
+        '''
+        Get the projection of the partitioning scheme onto a new NodeRegion
+        `region`.
+
+        If `appl2frng` is True, the projection must be applicable to fmap
+        ranges.
+        '''
+        if region.dim.size() == 0:
+            raise ValueError('PartitionScheme: '
+                             'cannot project onto an empty node region.')
+
+        order = self.order
+        pdims = list(self.pdims)
+
+        if appl2frng:
+            # Shrink the partitioning not applicable to fmap ranges.
+            for pae in range(pe.NUM):
+                if pae not in PARA_ENUM_APPL2FRNG:
+                    pdims[pae] = PhyDim2(1, 1)
+
+        part_dim = util.prod(pdims)
+        region_dim = region.dim
+
+        # Keep the same order, and adjust each dimension.
+        pdims = [list(pd) for pd in pdims]
+
+        for di in range(2):
+            pd = part_dim[di]
+            rd = region_dim[di]
+
+            if rd > pd:
+                # New region dimension is larger. Extend.
+                ext = rd // pd
+                # Apply the extension to the top level.
+                top_pae = PARA_ENUM_APPL2FRNG[0]
+                pdims[top_pae][di] *= ext
+            else:
+                # Otherwise shrink.
+                # Go from bottom to top. Keep bottom (first) levels unchanged,
+                # and shrink top (latter) levels.
+                for pae in reversed(order):
+                    if rd >= pdims[pae][di]:
+                        # Remaining size in region dimension is enough for
+                        # current level. Use it to keep the current level the
+                        # same size.
+                        rd //= pdims[pae][di]
+                    else:
+                        # Remaining size in region dimension is not enough.
+                        # Shrink current level to be whatever remains.
+                        pdims[pae][di] = rd
+                        rd = 1
+
+        part = PartitionScheme(order=order, pdims=pdims)
+
+        assert all(pd <= rd for pd, rd in zip(part.dim(), region_dim))
+        assert not appl2frng or part.is_applicable_to_fmap_range()
+
+        return part
 

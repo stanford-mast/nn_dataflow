@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -22,11 +17,10 @@ import heapq
 import itertools
 from multiprocessing import Pool
 
-from . import data_category_enum as de
 from . import loop_blocking_solver
 from . import loop_enum as le
 from .. import util
-from .data_dim_loops import DataDimLoops
+from .layer import ConvLayer
 from .loop_blocking_scheme import LoopBlockingScheme
 
 '''
@@ -106,16 +100,17 @@ def skip_conv(bl_ts, bl_ords):
     return False
 
 
-def _is_conv_loops(nested_loop_desc):
-    return (nested_loop_desc.data_loops[de.FIL] == DataDimLoops(le.IFM, le.OFM)
-            and nested_loop_desc.data_loops[de.IFM] \
-                    == DataDimLoops(le.IFM, le.BAT)
-            and nested_loop_desc.data_loops[de.OFM] \
-                    == DataDimLoops(le.OFM, le.BAT))
+def _loop_blocking_cmp_key(options, cost):
+    if options.opt_goal == 'ed':
+        return lambda lbs: lbs.get_access_cost(cost) * lbs.time
+    elif options.opt_goal == 'd':
+        return lambda lbs: (lbs.time, lbs.get_access_cost(cost))
+    assert options.opt_goal == 'e'
+    return lambda lbs: (lbs.get_access_cost(cost), lbs.time)
 
 
 def _gen_loopblocking_perprocess(
-        nested_loop_desc, resource, cost, part_occ, options,
+        nested_loop_desc, resource, cost, options,
         gen_tifm, gen_tofm, gen_tbat, gen_ords):
 
     def _gen_bl_ts():
@@ -134,30 +129,31 @@ def _gen_loopblocking_perprocess(
 
     def _sweep():
         ''' Sweep all. '''
-        is_conv_loops = _is_conv_loops(nested_loop_desc)
+        is_conv_loops = (nested_loop_desc.data_loops == ConvLayer.data_loops())
         for bl_ts, bl_ords in itertools.product(_gen_bl_ts(), gen_ords):
             if is_conv_loops and skip_conv(bl_ts, bl_ords):
                 continue
             lbs = LoopBlockingScheme(
-                nested_loop_desc, bl_ts, bl_ords, resource, part_occ, options)
+                nested_loop_desc, bl_ts, bl_ords, resource, options)
             yield lbs
 
     return heapq.nsmallest(options.ntops, _sweep(),
-                           key=lambda lbs: lbs.get_cost(cost))
+                           key=_loop_blocking_cmp_key(options, cost))
 
 
-def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
+def gen_loopblocking(nested_loop_desc, resource, cost, options):
     '''
     Generator for loop blocking.
     '''
 
     # Solver only works for CONV layer.
-    if options.sw_solve_loopblocking and _is_conv_loops(nested_loop_desc):
+    if options.sw_solve_loopblocking \
+            and nested_loop_desc.data_loops == ConvLayer.data_loops():
         gen = loop_blocking_solver.gen_loopblocking_gbuf_reside
 
         for bl_ts, bl_ords in gen(nested_loop_desc, resource, options):
             lbs = LoopBlockingScheme(nested_loop_desc, bl_ts, bl_ords,
-                                     resource, part_occ, options)
+                                     resource, options)
             yield lbs
         return
 
@@ -203,12 +199,12 @@ def gen_loopblocking(nested_loop_desc, resource, cost, part_occ, options):
     list_ords = list(gen_ords)
     for tifm, tofm in itertools.product(gen_tifm, gen_tofm):
         r = apply_func(_gen_loopblocking_perprocess,
-                       (nested_loop_desc, resource, cost, part_occ, options,
+                       (nested_loop_desc, resource, cost, options,
                         [tifm], [tofm], list_tbat, list_ords))
         results.append(r)
 
     for lbs in heapq.nsmallest(options.ntops, retrieve_func,
-                               key=lambda lbs: lbs.get_cost(cost)):
+                               key=_loop_blocking_cmp_key(options, cost)):
         yield lbs
 
     if pool is not None:

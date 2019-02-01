@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -22,6 +17,71 @@ import math
 import unittest
 
 from nn_dataflow import util
+
+class TestUtilHashableDict(unittest.TestCase):
+    ''' Tests for util.HashableDict. '''
+
+    def test_fromdict(self):
+        ''' fromdict. '''
+        d = {'k': 1, 3: 'a'}
+
+        hd1 = util.HashableDict.fromdict(d)
+        self.assertSetEqual(set(d.items()), set(hd1.items()))
+
+        hd2 = util.HashableDict.fromdict(d)
+        self.assertNotEqual(id(hd1), id(hd2))
+        self.assertEqual(hd1, hd2)
+        self.assertEqual(hash(hd1), hash(hd2))
+
+        hd3 = util.HashableDict.fromdict(
+            d, keyfunc=str, valfunc=lambda x: frozenset([x]))
+        self.assertNotEqual(hd1, hd3)
+
+    def test_fromdict_error(self):
+        ''' fromdict error. '''
+        with self.assertRaisesRegexp(TypeError, 'HashableDict: .*dict.*'):
+            _ = util.HashableDict.fromdict([1, 2])
+
+    def test_eq(self):
+        ''' __eq__ and __ne__. '''
+        hd = util.HashableDict([('k', 1), (3, 'a')])
+        lst = ['k', 3]
+        self.assertEqual(hd, hd.copy())
+        self.assertNotEqual(hd, lst)
+
+    def test_copy(self):
+        ''' copy. '''
+        hd = util.HashableDict([('k', 1), (3, 'a')])
+        self.assertNotEqual(id(hd), id(hd.copy()))
+        self.assertEqual(hd, hd.copy())
+        self.assertEqual(hash(hd), hash(hd.copy()))
+
+    def test_setitem_delitem(self):
+        ''' __setitem__ and __delitem__. '''
+        hd = util.HashableDict([('k', 1), (3, 'a')])
+
+        self.assertIn('k', hd)
+        self.assertEqual(hd[3], 'a')
+        self.assertEqual(len(hd), 2)
+
+        with self.assertRaises(KeyError):
+            hd[2] = 'b'
+        with self.assertRaises(KeyError):
+            hd[3] = 'b'
+        with self.assertRaises(KeyError):
+            hd.update([(2, 'b')])
+        with self.assertRaises(KeyError):
+            hd.setdefault(2, [])
+
+        with self.assertRaises(KeyError):
+            del hd[3]
+        with self.assertRaises(KeyError):
+            hd.pop(3)
+        with self.assertRaises(KeyError):
+            hd.popitem()
+        with self.assertRaises(KeyError):
+            hd.clear()
+
 
 class TestUtilIdivc(unittest.TestCase):
     ''' Tests for util.idivc. '''
@@ -50,6 +110,12 @@ class TestUtilIdivc(unittest.TestCase):
         self.assertAlmostEqual(util.idivc(4.3, 3), 2)
         self.assertAlmostEqual(util.idivc(34.3, 3), 12)
         self.assertAlmostEqual(util.idivc(34, 3.), 12)
+
+    def test_inf(self):
+        ''' Inf. '''
+        self.assertEqual(util.idivc(3, float('inf')), 0, 'idivc: inf')
+        self.assertTrue(math.isnan(util.idivc(float('inf'), float('inf'))),
+                        'idivc: inf')
 
 
 class TestUtilProd(unittest.TestCase):
@@ -89,9 +155,13 @@ class TestUtilApproxDividable(unittest.TestCase):
         self.assertTrue(util.approx_dividable(24, 3, overhead=0))
         self.assertTrue(util.approx_dividable(24, 4, overhead=0))
 
-        self.assertTrue(util.approx_dividable(7, 2))
-        self.assertTrue(util.approx_dividable(19, 7))
-        self.assertFalse(util.approx_dividable(22, 7))
+        self.assertTrue(util.approx_dividable(11, 2))
+        self.assertFalse(util.approx_dividable(9, 2))
+        self.assertTrue(util.approx_dividable(19, 5))
+
+        self.assertTrue(util.approx_dividable(7, 2, overhead=0.2))
+        self.assertTrue(util.approx_dividable(19, 7, overhead=0.2))
+        self.assertFalse(util.approx_dividable(22, 7, overhead=0.2))
 
         ovhd = util.idivc(19, 7) * 7 / 19. - 1
         self.assertFalse(util.approx_dividable(19, 7, overhead=ovhd - 0.01))
@@ -99,8 +169,8 @@ class TestUtilApproxDividable(unittest.TestCase):
 
     def test_float(self):
         ''' Float. '''
-        self.assertTrue(util.approx_dividable(18.4, 7))
-        self.assertTrue(util.approx_dividable(21.4, 7))
+        self.assertTrue(util.approx_dividable(18.4, 3))
+        self.assertTrue(util.approx_dividable(21.4, 3))
 
 
 class TestUtilFactorize(unittest.TestCase):

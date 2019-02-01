@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -32,6 +27,7 @@ class TestOption(unittest.TestCase):
                          partition_hybrid=True,
                          partition_batch=False,
                          partition_ifmaps=False,
+                         opt_goal='ed',
                          ntops=10,
                          nprocesses=16,
                          verbose=False
@@ -46,6 +42,7 @@ class TestOption(unittest.TestCase):
                          'partition_batch')
         self.assertEqual(options.partition_ifmaps, False,
                          'partition_ifmaps')
+        self.assertEqual(options.opt_goal, 'ed', 'opt_goal')
         self.assertEqual(options.ntops, 10, 'ntops')
         self.assertEqual(options.nprocesses, 16, 'nprocesses')
         self.assertEqual(options.verbose, False, 'verbose')
@@ -66,6 +63,7 @@ class TestOption(unittest.TestCase):
         self.assertEqual(options.partition_hybrid, False)
         self.assertEqual(options.partition_batch, False)
         self.assertEqual(options.partition_ifmaps, False)
+        self.assertEqual(options.opt_goal, 'e')
         self.assertEqual(options.ntops, 1)
         self.assertEqual(options.nprocesses, 1)
         self.assertEqual(options.verbose, False)
@@ -101,6 +99,13 @@ class TestOption(unittest.TestCase):
                                      'Option: .*partition_ifmaps.*'
                                      'partition_hybrid.*'):
             _ = Option(partition_hybrid=False, partition_ifmaps=True)
+
+    def test_invalid_opt_goal(self):
+        ''' Invalid opt_goal. '''
+        with self.assertRaisesRegexp(ValueError, 'Option: .*opt_goal.*'):
+            _ = Option(opt_goal='o')
+        with self.assertRaisesRegexp(ValueError, 'Option: .*opt_goal.*'):
+            _ = Option(opt_goal='E')
 
     def test_option_list(self):
         ''' Accessor option_list. '''

@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -18,6 +13,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+import math
 from operator import mul
 
 '''
@@ -38,10 +34,75 @@ class ContentHashClass(object):
         return NotImplemented
 
     def __ne__(self, other):
-        return not self == other
+        r = self.__eq__(other)
+        if r is NotImplemented:
+            # "not" NotImplemented will be True.
+            return r
+        return not r
 
     def __hash__(self):
-        return hash(tuple(sorted(self.__dict__.items())))
+        return hash(frozenset(self.__dict__.items()))
+
+
+class HashableDict(dict):
+    ''' Hashable dict. '''
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return (frozenset(self), frozenset(self.values())) \
+                    == (frozenset(other), frozenset(other.values()))
+        return NotImplemented
+
+    def __ne__(self, other):
+        r = self.__eq__(other)
+        if r is NotImplemented:
+            # "not" NotImplemented will be True.
+            return r
+        return not r
+
+    def __hash__(self):
+        return hash((frozenset(self), frozenset(self.values())))
+
+    def copy(self):
+        return self.__class__.fromdict(self)
+
+    def __setitem__(self, key, val):
+        raise KeyError('Cannot insert items to HashableDict.')
+
+    def __delitem__(self, key):
+        raise KeyError('Cannot delete items from HashableDict.')
+
+    def setdefault(self, key, default=None):
+        del key, default
+        raise KeyError('Cannot insert items to HashableDict.')
+
+    def update(self, other):
+        del other
+        raise KeyError('Cannot insert items to HashableDict.')
+
+    def pop(self, key, default=None):
+        del key, default
+        raise KeyError('Cannot delete items from HashableDict.')
+
+    def popitem(self):
+        raise KeyError('Cannot delete items from HashableDict.')
+
+    def clear(self):
+        raise KeyError('Cannot delete items from HashableDict.')
+
+    @classmethod
+    def fromdict(cls, other, keyfunc=None, valfunc=None):
+        '''
+        Construct a HashableDict from a normal dict instance.
+
+        The keys and values can be modified during the translation.
+        '''
+        if not isinstance(other, dict):
+            raise TypeError('HashableDict: fromdict expects a dict argument.')
+
+        keyfunc = keyfunc if keyfunc else lambda x: x
+        valfunc = valfunc if valfunc else lambda x: x
+
+        return cls((keyfunc(k), valfunc(v)) for k, v in other.items())
 
 
 def idivc(valx, valy):
@@ -50,6 +111,10 @@ def idivc(valx, valy):
 
     Return the min integer that is no less than `valx / valy`.
     '''
+    if math.isinf(valy):
+        if math.isinf(valx):
+            return float('nan')
+        return 0
     return (valx + valy - 1) // valy
 
 
@@ -58,7 +123,7 @@ def prod(lst):
     return reduce(mul, lst, 1)
 
 
-def approx_dividable(total, num, overhead=0.2):
+def approx_dividable(total, num, overhead=0.1):
     ''' Whether it is reasonable to divide `total` into `num` parts.
     `overhead` is the allowed max padding overhead.  '''
     return idivc(total, num) * num <= total * (1 + overhead)

@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -23,6 +18,7 @@ import sys
 import StringIO
 
 from nn_dataflow.core import Cost
+from nn_dataflow.core import InputLayer, FCLayer
 from nn_dataflow.core import MapStrategy, MapStrategyEyeriss
 from nn_dataflow.core import MemHierEnum as me
 from nn_dataflow.core import NodeRegion
@@ -46,19 +42,26 @@ class TestNNDataflow(unittest.TestCase):
         self.resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
                                                         dim=PhyDim2(1, 1),
                                                         type=NodeRegion.PROC),
-                                 data_regions=(NodeRegion(origin=PhyDim2(0, 0),
-                                                          dim=PhyDim2(1, 1),
-                                                          type=NodeRegion.DATA),
-                                              ),
+                                 dram_region=NodeRegion(
+                                     origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                     type=NodeRegion.DRAM),
+                                 src_data_region=NodeRegion(
+                                     origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                     type=NodeRegion.DRAM),
+                                 dst_data_region=NodeRegion(
+                                     origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                     type=NodeRegion.DRAM),
                                  dim_array=PhyDim2(16, 16),
                                  size_gbuf=128 * 1024 // 2,  # 128 kB
                                  size_regf=512 // 2,  # 512 B
+                                 array_bus_width=float('inf'),
+                                 dram_bandwidth=float('inf'),
                                 )
 
         self.cost = Cost(mac_op=1,
                          mem_hier=(200, 6, 2, 1),
                          noc_hop=0,
-                         unit_static=0)
+                         idl_unit=0)
 
         self.options = Option()
 
@@ -124,6 +127,80 @@ class TestNNDataflow(unittest.TestCase):
         for layer in network:
             self.assertIn(layer, stderr_value)
 
+    def test_opt_goal(self):
+        ''' Optimization goal. '''
+        network = self.alex_net
+
+        batch_size = 8
+
+        resource = self.resource._replace(
+            proc_region=NodeRegion(origin=PhyDim2(0, 0),
+                                   dim=PhyDim2(8, 8),
+                                   type=NodeRegion.PROC)
+        )
+
+        nnd = NNDataflow(network, batch_size, resource, self.cost,
+                         self.map_strategy)
+
+        options_e = Option(sw_gbuf_bypass=(True, True, True),
+                           sw_solve_loopblocking=True,
+                           partition_hybrid=True,
+                           partition_batch=True,
+                           opt_goal='e',
+                           ntops=16)
+        tops_e, _ = nnd.schedule_search(options_e)
+        self.assertTrue(tops_e)
+
+        options_d = Option(sw_gbuf_bypass=(True, True, True),
+                           sw_solve_loopblocking=True,
+                           partition_hybrid=True,
+                           partition_batch=True,
+                           opt_goal='d',
+                           ntops=16)
+        tops_d, _ = nnd.schedule_search(options_d)
+        self.assertTrue(tops_d)
+
+        options_ed = Option(sw_gbuf_bypass=(True, True, True),
+                            sw_solve_loopblocking=True,
+                            partition_hybrid=True,
+                            partition_batch=True,
+                            opt_goal='ed',
+                            ntops=16)
+        tops_ed, _ = nnd.schedule_search(options_ed)
+        self.assertTrue(tops_ed)
+
+        self.assertLess(tops_e[0].total_cost, tops_d[0].total_cost)
+        self.assertLess(tops_e[0].total_cost, tops_ed[0].total_cost)
+
+        self.assertLess(tops_d[0].total_time, tops_e[0].total_time)
+        self.assertLess(tops_d[0].total_time, tops_ed[0].total_time)
+
+        # Sum of the smallest ED may not be the smallest; allow for error.
+        self.assertLess(tops_ed[0].total_cost * tops_ed[0].total_time,
+                        tops_e[0].total_cost * tops_e[0].total_time * 1.05)
+        self.assertLess(tops_ed[0].total_cost * tops_ed[0].total_time,
+                        tops_d[0].total_cost * tops_d[0].total_time * 1.05)
+
+    def test_ext_layer(self):
+        ''' With external layers. '''
+        network = self.alex_net
+
+        network.add_ext('e0', InputLayer(4, 1))
+        network.add('l1', FCLayer(1000, 4))
+        network.add('l2', FCLayer(8, 4), prevs=('e0', 'l1'))
+
+        batch_size = 16
+
+        options = Option(sw_gbuf_bypass=(True, True, True),
+                         sw_solve_loopblocking=True)
+
+        nnd = NNDataflow(network, batch_size, self.resource, self.cost,
+                         self.map_strategy)
+
+        tops, _ = nnd.schedule_search(options)
+
+        self.assertTrue(tops)
+
     def test_no_valid_dataflow(self):
         ''' No valid dataflow is found. '''
 
@@ -131,13 +208,20 @@ class TestNNDataflow(unittest.TestCase):
         self.resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
                                                         dim=PhyDim2(1, 1),
                                                         type=NodeRegion.PROC),
-                                 data_regions=(NodeRegion(origin=PhyDim2(0, 0),
-                                                          dim=PhyDim2(1, 1),
-                                                          type=NodeRegion.DATA),
-                                              ),
+                                 dram_region=NodeRegion(
+                                     origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                     type=NodeRegion.DRAM),
+                                 src_data_region=NodeRegion(
+                                     origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                     type=NodeRegion.DRAM),
+                                 dst_data_region=NodeRegion(
+                                     origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                     type=NodeRegion.DRAM),
                                  dim_array=PhyDim2(16, 16),
                                  size_gbuf=128 * 1024 // 2,  # 128 kB
                                  size_regf=2,
+                                 array_bus_width=float('inf'),
+                                 dram_bandwidth=float('inf'),
                                 )
 
         nnd = NNDataflow(self.alex_net, 4, self.resource, self.cost,
@@ -248,18 +332,26 @@ class TestNNDataflow(unittest.TestCase):
         resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
                                                    dim=PhyDim2(1, 1),
                                                    type=NodeRegion.PROC),
-                            data_regions=(NodeRegion(origin=PhyDim2(0, 0),
-                                                     dim=PhyDim2(1, 1),
-                                                     type=NodeRegion.DATA),),
+                            dram_region=NodeRegion(
+                                origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                type=NodeRegion.DRAM),
+                            src_data_region=NodeRegion(
+                                origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                type=NodeRegion.DRAM),
+                            dst_data_region=NodeRegion(
+                                origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                type=NodeRegion.DRAM),
                             dim_array=PhyDim2(12, 14),
                             size_gbuf=108 * 1024 // 2,  # 108 kB
                             size_regf=261,  # 225 + 12 + 24
+                            array_bus_width=float('inf'),
+                            dram_bandwidth=float('inf'),
                            )
 
         cost = Cost(mac_op=2e-12,
                     mem_hier=(460e-12, 15e-12, 4e-12, 1e-12),  # pJ/16-b
                     noc_hop=0,
-                    unit_static=30e-3 / 200e6)  # 30 mW GBUF + REGF
+                    idl_unit=30e-3 / 200e6)  # 30 mW GBUF + REGF
 
         nnd = NNDataflow(network, batch_size, resource, cost,
                          self.map_strategy)
@@ -336,18 +428,26 @@ class TestNNDataflow(unittest.TestCase):
         resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
                                                    dim=PhyDim2(1, 1),
                                                    type=NodeRegion.PROC),
-                            data_regions=(NodeRegion(origin=PhyDim2(0, 0),
-                                                     dim=PhyDim2(1, 1),
-                                                     type=NodeRegion.DATA),),
+                            dram_region=NodeRegion(
+                                origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                type=NodeRegion.DRAM),
+                            src_data_region=NodeRegion(
+                                origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                type=NodeRegion.DRAM),
+                            dst_data_region=NodeRegion(
+                                origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                type=NodeRegion.DRAM),
                             dim_array=PhyDim2(16, 16),
                             size_gbuf=576056 // 2,  # 576 kB
                             size_regf=1024 // 2,  # 1 kB
+                            array_bus_width=float('inf'),
+                            dram_bandwidth=float('inf'),
                            )
 
         cost = Cost(mac_op=2e-12,
                     mem_hier=(240e-12, 28e-12, 4e-12, 1e-12),  # pJ/16-b
                     noc_hop=0,
-                    unit_static=320e-12)
+                    idl_unit=320e-12)
 
         nnd = NNDataflow(network, batch_size, resource, cost,
                          self.map_strategy)
@@ -360,18 +460,26 @@ class TestNNDataflow(unittest.TestCase):
         resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
                                                    dim=PhyDim2(4, 4),
                                                    type=NodeRegion.PROC),
-                            data_regions=(NodeRegion(origin=PhyDim2(0, 0),
-                                                     dim=PhyDim2(4, 4),
-                                                     type=NodeRegion.DATA),),
+                            dram_region=NodeRegion(
+                                origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
+                                type=NodeRegion.DRAM),
+                            src_data_region=NodeRegion(
+                                origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
+                                type=NodeRegion.DRAM),
+                            dst_data_region=NodeRegion(
+                                origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
+                                type=NodeRegion.DRAM),
                             dim_array=PhyDim2(14, 14),
                             size_gbuf=133032 // 2,  # 133 kB
                             size_regf=512 // 2,  # 512 B
+                            array_bus_width=float('inf'),
+                            dram_bandwidth=float('inf'),
                            )
 
         cost = Cost(mac_op=2e-12,
                     mem_hier=(80e-12, 14e-12, 4e-12, 0.6e-12),  # pJ/16-b
                     noc_hop=40e-12,
-                    unit_static=200e-12)
+                    idl_unit=200e-12)
 
         options = Option(sw_gbuf_bypass=(True, True, True),
                          sw_solve_loopblocking=True,
@@ -392,5 +500,7 @@ class TestNNDataflow(unittest.TestCase):
         self.assertLess(dfsch_t16.total_time,
                         1.2 * dfsch_l1.total_time * (16 * 16) / (14 * 14 * 16))
         # Energy reduced by > 30%.
-        self.assertLess(dfsch_t16.total_cost, dfsch_l1.total_cost * 0.7)
+        # self.assertLess(dfsch_t16.total_cost, dfsch_l1.total_cost * 0.7)
+        # With dimension restriction on partitioning, this is slightly violated.
+        self.assertLess(dfsch_t16.total_cost, dfsch_l1.total_cost * 0.72)
 

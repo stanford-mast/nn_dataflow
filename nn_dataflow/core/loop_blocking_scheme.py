@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -18,8 +13,8 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from collections import OrderedDict
 import itertools
+import math
 
 from . import data_category_enum as de
 from . import loop_enum as le
@@ -42,7 +37,7 @@ class LoopBlockingScheme(object):
         REGF = 1
         NUM = 2
 
-    def __init__(self, nested_loop_desc, bl_ts, bl_ords, resource, part_occ,
+    def __init__(self, nested_loop_desc, bl_ts, bl_ords, resource,
                  options):
         '''
         Given blocking factors `bl_ts` and the loop orders `bl_ords`, construct
@@ -74,8 +69,6 @@ class LoopBlockingScheme(object):
         `bl_ords` indicate the loop orders of all levels, indexed by BL. Each
         entry is a permutation tuple indexed by LoopEnum and gives the
         positions of the loops at this level. Smaller number means inner loop.
-
-        `part_occ` is the partitioning occupation.
         '''
 
         # pylint: disable=invalid-name
@@ -105,6 +98,9 @@ class LoopBlockingScheme(object):
                     .format(lpe, self.bl_ts, self.nld.loopcnt)
 
         self.lcnt = util.prod(bl_tp)
+
+        # Need to define time for invalid scheme.
+        self.time = float('inf')
 
         # Buffer data size for one unit.
         self.unit_size = [tuple() for _ in range(BL.NUM)]
@@ -151,16 +147,20 @@ class LoopBlockingScheme(object):
             self.valid = False
             return
 
+        # Array bus.
+        self.array_bus_width = resource.array_bus_width
+        # DRAM bandwidth.
+        self.dram_bandwidth = resource.dram_bandwidth
         # Parallel partitioning.
         self.num_nodes = resource.proc_region.dim.size()
-        # Occupation.
-        # Occupation only affects op counts and REGF accesses.
-        self.part_occ = part_occ
 
         # Stats: lazy evaluation.
         self.finalized_stats = False
         self.ops = float('nan')
         self.time = float('nan')
+        self.proc_time = float('nan')
+        self.bus_time = float('nan')
+        self.dram_time = float('nan')
         self.access = [[float('nan')] * de.NUM for _ in range(me.NUM)]
 
     def is_valid(self):
@@ -190,7 +190,7 @@ class LoopBlockingScheme(object):
         indexed by DataCategoryEnum.
         '''
         if not self.is_valid():
-            return None
+            return [[float('inf')] * de.NUM for _ in range(me.NUM)]
 
         if not self.finalized_stats:
             self._calc_stats()
@@ -209,9 +209,9 @@ class LoopBlockingScheme(object):
 
         return self.fetch[self.BL.GBUF]
 
-    def get_cost(self, cost):
+    def get_access_cost(self, cost):
         '''
-        Get the total cost of loop blocking.
+        Get the data access cost of loop blocking.
         '''
         if not self.is_valid():
             return float('inf')
@@ -219,46 +219,9 @@ class LoopBlockingScheme(object):
         if not self.finalized_stats:
             self._calc_stats()
 
-        c = 0
+        acc_cost = sum(c * sum(a) for c, a in zip(cost.mem_hier, self.access))
 
-        c += self.ops * cost.mac_op
-
-        access_total = [sum(acc) for acc in self.access]
-        c += sum(mc * ma for mc, ma in zip(cost.mem_hier, access_total))
-
-        c += self.time * cost.unit_static * self.num_nodes
-
-        return c
-
-    def get_scheme_dict(self, cost):
-        '''
-        Get an OrderedDict of scheme summary.
-        '''
-        if not self.is_valid():
-            return None
-
-        if not self.finalized_stats:
-            self._calc_stats()
-
-        size = [[self.data_size(bl, dce) for dce in range(de.NUM)]
-                for bl in range(self.BL.NUM)]
-
-        lp_ts = zip(*self.bl_ts)
-
-        return OrderedDict([('cost', self.get_cost(cost)),
-                            ('ops', self.ops),
-                            ('time', self.time),
-                            ('access', self.access),
-                            ('fetch', self.fetch),
-                            ('size', size),
-                            ('unit_size', self.unit_size),
-                            ('unit_cnt', self.unit_cnt),
-                            ('part_occ', self.part_occ),
-                            ('ti', tuple(lp_ts[le.IFM])),
-                            ('to', tuple(lp_ts[le.OFM])),
-                            ('tb', tuple(lp_ts[le.BAT])),
-                            ('orders', self.bl_ords),
-                           ])
+        return acc_cost
 
     def gen_index(self):
         '''
@@ -316,6 +279,25 @@ class LoopBlockingScheme(object):
             yield idx
 
         assert num == self.lcnt
+
+    @classmethod
+    def ordered_loops(cls, bl_t, bl_ord, lpe_only=False, reverse=False):
+        '''
+        Get the ordered loops from outermost to innermost according to the loop
+        blocking factors `bl_t` and the loop order `bl_ord`, both indexed by
+        LoopEnum. Trivial loops are ignored.
+
+        If `reverse` is True, ordering the loops from innermost to outermost.
+
+        Return a list of pairs of LoopEnum and blocking factor. If `lpe_only`
+        is True, return a list of LoopEnum only.
+        '''
+        ord_lpes = list(sorted([lpe for lpe in range(le.NUM) if bl_t[lpe] > 1],
+                               key=(lambda lpe: bl_ord[lpe]),
+                               reverse=not reverse))
+        if not lpe_only:
+            return [(lpe, bl_t[lpe]) for lpe in ord_lpes]
+        return ord_lpes
 
     def _set_unit_cnt(self):
         '''
@@ -407,14 +389,12 @@ class LoopBlockingScheme(object):
         Lazily calculate stats.
         '''
 
-        self.ops = self.nld.unit_ops * self.lcnt * self.num_nodes \
-                * self.part_occ
-        self.time = self.nld.unit_time * self.lcnt
+        self.ops = self.nld.unit_ops * self.lcnt * self.num_nodes
+        self.proc_time = self.nld.unit_time * self.lcnt
 
-        self.access[me.REGF] = [v * self.lcnt * t
-                                * self.num_nodes * self.part_occ for v, t
-                                in zip(self.nld.unit_access[me.REGF],
-                                       [1, 1, 2])]
+        self.access[me.REGF] = [v * self.lcnt * t * self.num_nodes
+                                for v, t in zip(self.nld.unit_access[me.REGF],
+                                                [1, 1, 2])]
 
         self.access[me.ITCN] = [self.nld.total_access_at_of(me.ITCN, dce)
                                 * self.fetch[self.BL.REGF][dce]
@@ -434,6 +414,20 @@ class LoopBlockingScheme(object):
                                 * self.num_nodes
                                 for dce in range(de.NUM)]
 
+        # DRAM access time.
+        self.dram_time = int(math.ceil(sum(self.access[me.DRAM])
+                                       / self.dram_bandwidth))
+
+        # Array multicast uses separate bus for each data category.
+        # Each data from GBUF takes one cycle to multicast to PEs.
+        self.bus_time = util.idivc(int(math.ceil(1. * max(self.access[me.GBUF])
+                                                 / self.num_nodes)),
+                                   self.array_bus_width)
+
+        # Optimistically assume processing, multicast, and DRAM access are well
+        # overlapped, and ignore ramp-up/down.
+        self.time = max(self.proc_time, self.bus_time, self.dram_time)
+
         self.finalized_stats = True
 
     def _bl_tp(self, bl_lvls):
@@ -450,7 +444,7 @@ class LoopBlockingScheme(object):
 
         `bl_t` are the loop blocking factors, indexed by LoopEnum.
         '''
-        return [self.nld.data_loops[dce].data_cnt(bl_t)
+        return [util.prod(self.nld.data_loops[dce].take(bl_t))
                 for dce in range(de.NUM)]
 
     def _innt_dim_loop(self, dce, bl_t, bl_ord):

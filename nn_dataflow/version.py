@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -25,8 +20,8 @@ import subprocess
 
 from . import __version__
 
-def _command_output(args):
-    with subprocess.Popen(args, stdout=subprocess.PIPE).stdout as fh:
+def _command_output(args, cwd):
+    with subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE).stdout as fh:
         return fh.read().strip()
 
 def get_version(with_local=False):
@@ -35,25 +30,29 @@ def get_version(with_local=False):
     version = __version__
 
     if with_local:
-        if subprocess.call(['git', 'rev-parse'],
+        cwd = os.path.dirname(os.path.abspath(__file__))
+
+        if subprocess.call(['git', 'rev-parse'], cwd=cwd,
                            stderr=subprocess.STDOUT,
                            stdout=open(os.devnull, 'w')) != 0:
             # Not in git repo.
-            return version
+            return version  # pragma: no cover
 
         # Dirty summary.
-        short_stat = _command_output(['git', 'diff', 'HEAD', '--shortstat']) \
+        short_stat = _command_output(['git', 'diff', 'HEAD', '--shortstat'],
+                                     cwd) \
                 .replace('files changed', 'fc').replace('file changed', 'fc') \
                 .replace('insertions(+)', 'a').replace(' insertion(+)', 'a') \
                 .replace('deletions(-)', 'd').replace(' deletion(-)', 'd') \
                 .replace(',', '').replace(' ', '')
-        diff_hash = hashlib.md5(_command_output(['git', 'diff', 'HEAD'])) \
+        diff_hash = hashlib.md5(_command_output(['git', 'diff', 'HEAD'], cwd)) \
                 .hexdigest()[:8]
         dirty = '' if not short_stat else '-' + short_stat + '-' + diff_hash
 
         # Git describe.
-        desc = _command_output(['git', 'describe', '--tags',
-                                '--dirty={}'.format(dirty)])
+        desc = _command_output(['git', 'describe', '--tags', '--always',
+                                '--dirty={}'.format(dirty)],
+                               cwd)
 
         version += '+' + desc
 

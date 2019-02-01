@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -18,10 +13,13 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+import itertools
 import sys
 
 from . import partition
 from .cost import Cost
+from .data_layout import DataLayout
+from .fmap_range import FmapPosition, FmapRange
 from .map_strategy import MapStrategy
 from .network import Network
 from .nn_dataflow_scheme import NNDataflowScheme
@@ -53,14 +51,8 @@ class NNDataflow(object):
 
         # Dict of layer Scheduling instances.
         self.layer_sched_dict = {}
-
-    def schedule_search(self, options):
-        '''
-        Search the optimized dataflows.
-        '''
-        # Scheduling instance dict. Use the same instance for all same layers
-        # in order to exploit its scheduling cache.
-        self.layer_sched_dict = {}
+        # Use the same instance for all same layers in order to exploit its
+        # scheduling cache.
         layer2sched = {}
         for layer_name in self.network:
             layer = self.network[layer_name]
@@ -71,118 +63,136 @@ class NNDataflow(object):
                 layer2sched[layer] = sched
             self.layer_sched_dict[layer_name] = sched
 
+        # Default compare key function.
+        self.cmp_key = lambda nndf: (nndf.total_cost, nndf.total_time)
+
+    def schedule_search(self, options):
+        '''
+        Search the optimized dataflows.
+        '''
+        # Set key function.
+        if options.opt_goal == 'ed':
+            self.cmp_key = lambda nndf: nndf.total_cost * nndf.total_time
+        elif options.opt_goal == 'd':
+            self.cmp_key = lambda nndf: (nndf.total_time, nndf.total_cost)
+        else:
+            assert options.opt_goal == 'e'
+
+        # Clear and reset.
+        nndf_tops = []
+
         # Initial input layout.
-        dfsch_list = []
-        for input_layout in self._gen_input_layout(options):
-            dfsch = NNDataflowScheme(self.network, input_layout)
-            dfsch_list.append(dfsch)
+        for input_layout, ext_layout_dict in self._gen_input_layout(options):
+            nndf = NNDataflowScheme(self.network, input_layout, ext_layout_dict)
+            nndf_tops.append(nndf)
 
         # Schedule layers.
         for layer_name in self.network:
             if options.verbose:
                 sys.stderr.write('-> {}\n'.format(layer_name))
                 sys.stderr.flush()
-            dfsch_list = self._layer_schedule_search(
-                layer_name, dfsch_list, options)
+
+            nndf_tops = self._layer_schedule_search(
+                layer_name, nndf_tops, options)
 
         # Cache stats.
         cache_hits = 0
         cache_misses = 0
-        for sched in layer2sched.values():
+        seen_scheds = set()
+        for sched in self.layer_sched_dict.values():
+            if sched in seen_scheds:
+                continue
+            seen_scheds.add(sched)
             h, m = sched.cache_stats()
             cache_hits += h
             cache_misses += m
 
-        return dfsch_list, (cache_hits, cache_misses)
+        return nndf_tops, (cache_hits, cache_misses)
 
-    def _layer_schedule_search(self, layer_name, dfsch_list, options):
+    def _layer_schedule_search(self, layer_name, prev_nndf_tops, options):
         '''
-        Schedule the given layer under the previous layer scheduling results.
-        `dfsch_list` contains up to top n NNDataflowScheme for the previous
-        layers.
+        Schedule the given layer under the given previous top NNDataflowScheme
+        instances in 'prev_nndf_tops`.
+
+        Return new top NNDataflowScheme instances that include this layer.
         '''
+        nndf_tops = []
 
         layer_sched = self.layer_sched_dict[layer_name]
 
-        new_dfsch_list = []
+        for prev_nndf in prev_nndf_tops:
 
-        for ifmap_layout, dfsch_idx in self._gen_layer_ifmap_layout(
-                layer_name, dfsch_list, options):
+            ifmap_layout = prev_nndf.fmap_layout(self.network.prevs(layer_name))
 
             condition = SchedulingCondition(resource=self.resource,
                                             ifmap_layout=ifmap_layout)
 
             try:
-                tops = layer_sched.schedule_search(condition, options)
+                sched_tops = layer_sched.schedule_search(condition, options)
             except Exception:
                 sys.stderr.write('Failed when scheduling layer {}.\n'
                                  .format(layer_name))
                 raise
 
-            if not tops:
-                sys.stderr.write('Layer {} has no valid schedule.\n'
-                                 .format(layer_name))
-
             # Append all the current layer top schedules to all the previous top
             # schedules with the matching fmap layout.
-            for t in tops:
-                dfsch = dfsch_list[dfsch_idx].copy()
-                dfsch[layer_name] = t
-                new_dfsch_list.append(dfsch)
+            for t in sched_tops:
+                nndf = prev_nndf.copy()
+                nndf[layer_name] = t
+                nndf_tops.append(nndf)
 
         # Always pick and keep top n at each layer.
-        return sorted(new_dfsch_list, key=lambda dfsch: dfsch.total_cost
-                     )[:options.ntops]
-
-    def _gen_layer_ifmap_layout(self, layer_name, dfsch_list, options):
-        '''
-        Generator to get all the choices of ifmap layout for the layer.
-
-        Return the ifmap layout, and the corresponding NNDataflowScheme index
-        in the list.
-        '''
-
-        del options
-
-        prev_layer_names, merge_symbol = self.network.prev_layers(layer_name)
-        assert prev_layer_names
-
-        def _ofmap_layout(dfsch, pl_name):
-            return dfsch[pl_name].ofmap_layout if pl_name is not None \
-                    else dfsch.input_layout
-
-        for idx, dfsch in enumerate(dfsch_list):
-            # Merge all previous layer ofmap layouts to get the ifmap layout.
-            ifmap_layout = _ofmap_layout(dfsch, prev_layer_names[0])
-            for pl_name in prev_layer_names[1:]:
-                ifmap_layout = ifmap_layout.merge(merge_symbol,
-                                                  _ofmap_layout(dfsch, pl_name))
-
-            # Remap dst memory to src memory.
-            origin_diff = self.resource.src_data_region().origin \
-                    - self.resource.dst_data_region().origin
-            ifmap_layout = ifmap_layout.view(origin_diff=origin_diff)
-
-            # We already checked the ofmap layout dimension in Scheduling, and
-            # the prev/next layer dimensions in Network, so ifmap_layout ==
-            # layer == prev_layers == ofmap_layout.
-
-            yield ifmap_layout, idx
+        return sorted(nndf_tops, key=self.cmp_key)[:options.ntops]
 
     def _gen_input_layout(self, options):
         '''
         Get the input layer layout choices.
         '''
-
         input_layer = self.network.input_layer()
+        input_frng = FmapRange(FmapPosition(b=0, n=0, h=0, w=0),
+                               FmapPosition(b=self.batch_size,
+                                            n=input_layer.nofm,
+                                            h=input_layer.hofm,
+                                            w=input_layer.wofm))
 
-        input_region = self.resource.dst_data_region()
+        ext_layer_names = self.network.ext_layers()
+        ext_layers = [self.network[l] for l in ext_layer_names]
+        ext_frngs = [FmapRange(FmapPosition(b=0, n=0, h=0, w=0),
+                               FmapPosition(b=self.batch_size,
+                                            n=ext_layer.nofm,
+                                            h=ext_layer.hofm,
+                                            w=ext_layer.wofm))
+                     for ext_layer in ext_layers]
+
+        # Input and external layers share the same region.
+
+        input_region = ext_region = self.resource.src_data_region
 
         for part in partition.gen_partition(input_layer, self.batch_size,
                                             input_region.dim, options,
                                             guaranteed=True):
-            input_layout = partition.get_ofmap_layout(
-                input_layer, self.batch_size, part, input_region)
+            input_layout = DataLayout(
+                frngs=(input_frng,),
+                regions=(input_region,),
+                parts=(part.projection(input_region, appl2frng=True),))
 
-            yield input_layout
+            if ext_layers:
+                for ext_parts in itertools.product(
+                        *[partition.gen_partition(ext_layer, self.batch_size,
+                                                  ext_region.dim, options,
+                                                  guaranteed=True)
+                          for ext_layer in ext_layers]):
+                    ext_layout_dict = dict(zip(
+                        ext_layer_names,
+                        [DataLayout(
+                            frngs=(ext_frng,),
+                            regions=(ext_region,),
+                            parts=(ext_part.projection(ext_region,
+                                                       appl2frng=True),))
+                         for ext_part, ext_frng in zip(ext_parts, ext_frngs)]))
+
+                    yield input_layout, ext_layout_dict
+
+            else:
+                yield input_layout, None
 

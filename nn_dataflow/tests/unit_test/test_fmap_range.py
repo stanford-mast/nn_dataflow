@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -49,11 +44,10 @@ class TestFmapRange(unittest.TestCase):
         fr = FmapRange((-11, -4, 3, 0), (3, 5, 7, 11))
 
         be = fr.beg_end('n')
-        self.assertEqual(len(be), 1, 'beg_end: n: len')
-        self.assertTupleEqual(be[0], (-4, 5), 'beg_end: n: val')
+        self.assertTupleEqual(be, (-4, 5), 'beg_end: n: val')
 
-        be_h, = fr.beg_end('h')
-        self.assertTupleEqual(be_h, (3, 7), 'beg_end: h: val')
+        be = fr.beg_end('h')
+        self.assertTupleEqual(be, (3, 7), 'beg_end: h: val')
 
         be_b, be_w = fr.beg_end('b', 'w')
         self.assertTupleEqual(be_b, (-11, 3), 'beg_end: b: val')
@@ -116,6 +110,25 @@ class TestFmapRange(unittest.TestCase):
         with self.assertRaisesRegexp(TypeError, 'FmapRange: .*'):
             fr1.overlap(((0,) * 4, (2,) * 4))
 
+    def test_overlap_size(self):
+        ''' Get overlap_size. '''
+        fr1 = FmapRange((-11, -4, 3, 0), (3, 5, 7, 11))
+        fr2 = FmapRange((0, 3, 3, -5), (3, 10, 4, 3))
+        self.assertEqual(fr1.overlap_size(fr2), 3 * 2 * 1 * 3)
+        self.assertEqual(fr2.overlap_size(fr1), 3 * 2 * 1 * 3)
+
+        fr3 = FmapRange((0, 7, 3, -5), (3, 10, 4, 3))
+        self.assertEqual(fr1.overlap_size(fr3), 0)
+
+        fr4 = FmapRange((-12, -12, -12, -12), (12, 12, 12, 12))
+        self.assertEqual(fr1.overlap_size(fr4), fr1.size())
+
+    def test_overlap_size_error(self):
+        ''' Get overlap_size error. '''
+        fr1 = FmapRange((-11, -4, 3, 0), (3, 5, 7, 11))
+        with self.assertRaisesRegexp(TypeError, 'FmapRange: .*'):
+            fr1.overlap_size(((0,) * 4, (2,) * 4))
+
     def test_contains(self):
         ''' Whether contains fmap point. '''
         fr = FmapRange((-11, -4, 3, 0), (3, 5, 7, 11))
@@ -160,6 +173,15 @@ class TestFmapRange(unittest.TestCase):
         self.assertLess(sort[0], sort[1])
         self.assertLess(sort[0], sort[2])
         self.assertLess(sort[1], sort[2])
+        self.assertGreaterEqual(sort[2], sort[1])
+        self.assertGreaterEqual(sort[2], sort[0])
+        self.assertGreaterEqual(sort[1], sort[0])
+        self.assertLessEqual(sort[0], sort[1])
+        self.assertLessEqual(sort[0], sort[2])
+        self.assertLessEqual(sort[1], sort[2])
+        self.assertNotEqual(sort[0], sort[1])
+        self.assertNotEqual(sort[0], sort[2])
+        self.assertNotEqual(sort[1], sort[2])
 
     def test_compare_overlap(self):
         ''' Comparison with overlapping FmapRange. '''
@@ -176,11 +198,26 @@ class TestFmapRange(unittest.TestCase):
         with self.assertRaisesRegexp(ValueError, 'FmapRange: .*overlap.*'):
             _ = fr1 < fr4
 
+    def test_compare_empty(self):
+        ''' Comparison with empty FmapRange. '''
+        fr1 = FmapRange((-11, -4, 3, 0), (3, 5, 7, 11))
+        fr2 = FmapRange((100, 1, 1, 1), (101, 2, 2, 2))
+        fr3 = FmapRange((1, 1, 1, 1), (1, 2, 2, 2))
+        fr4 = FmapRange((0, 0, 0, 0), (0, 0, 0, 0))
+        self.assertLess(fr1, fr2)
+        self.assertGreater(fr1, fr3)
+
+        self.assertTrue(fr3 == fr4 < fr1 < fr2)
+
     def test_eq(self):
         ''' Whether eq. '''
         fr1 = FmapRange((1, 2, 3, 4), (5, 7, 11, 13))
         fr2 = FmapRange((1, 2, 3, 4), (5, 7, 11, 13))
         self.assertEqual(fr1, fr2)
+
+        fr3 = FmapRange((1, 1, 1, 1), (1, 2, 2, 2))
+        fr4 = FmapRange((0, 0, 0, 0), (0, 0, 0, 0))
+        self.assertEqual(fr3, fr4)
 
         _ = fr1 == 4
 
@@ -188,7 +225,9 @@ class TestFmapRange(unittest.TestCase):
         ''' Whether ne. '''
         fr1 = FmapRange((1, 2, 3, 4), (5, 7, 11, 13))
         fr2 = FmapRange((1, 2, 3, 4), (5, 7, 11, 17))
+        fr3 = FmapRange((1, 2, 3, 17), (5, 7, 11, 20))
         self.assertNotEqual(fr1, fr2)
+        self.assertNotEqual(fr1, fr3)
 
     def test_hash(self):
         ''' Get hash. '''

@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -20,7 +15,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 from nn_dataflow.core import DataDimLoops
 from nn_dataflow.core import DataCategoryEnum as de
-from nn_dataflow.core import Layer, ConvLayer
+from nn_dataflow.core import Layer, ConvLayer, LocalRegionLayer
 from nn_dataflow.core import LoopEnum as le
 from nn_dataflow.core import MapStrategyEyeriss
 from nn_dataflow.core import MemHierEnum as me
@@ -40,17 +35,18 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
     def test_invalid_layer(self):
         ''' Constructor with invalid layer type. '''
         with self.assertRaisesRegexp(TypeError, 'MapEyeriss: .*type.*'):
-            _ = MapStrategyEyeriss(Layer(1, 1), 4, self.dim_array)
+            _ = MapStrategyEyeriss(Layer(1, 1), 4, 1, self.dim_array)
 
     def test_nested_loop_desc_sanity(self):
         ''' Generated nested loop description sanity check. '''
 
         batch_size = 4
+        occ = 1
 
         for layer in self.convlayers.values() + self.fclayers.values() \
                 + self.lrlayers.values() + self.fake_layers.values():
 
-            ms = MapStrategyEyeriss(layer, batch_size, self.dim_array)
+            ms = MapStrategyEyeriss(layer, batch_size, occ, self.dim_array)
 
             for nld in ms.gen_nested_loop_desc():
 
@@ -67,7 +63,7 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
                                        layer.total_ops(batch_size))
 
                 # Unit time and unit ops.
-                # The difference is due to the loop occupation, which is not
+                # The difference is due to the loop occupancy, which is not
                 # counted in utilization.
                 self.assertGreaterEqual(
                     nld.unit_time * ms.utilization() * self.dim_array.size(),
@@ -116,7 +112,7 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
                                      DataDimLoops(le.IFM, le.BAT))
                     self.assertEqual(nld.data_loops[de.OFM],
                                      DataDimLoops(le.OFM, le.BAT))
-                elif isinstance(layer, ConvLayer):
+                elif isinstance(layer, LocalRegionLayer):
                     self.assertEqual(nld.data_loops[de.FIL],
                                      DataDimLoops())
                     self.assertEqual(nld.data_loops[de.IFM],
@@ -124,13 +120,49 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
                     self.assertEqual(nld.data_loops[de.OFM],
                                      DataDimLoops(le.OFM, le.BAT))
 
+    def test_nested_loop_desc_occupancy(self):
+        ''' Nested loop description with occupancy. '''
+
+        batch_size = 4
+        occ0 = 1
+        occ1 = 0.8
+
+        for layer in self.convlayers.values() + self.fclayers.values() \
+                + self.lrlayers.values() + self.fake_layers.values():
+
+            ms0 = MapStrategyEyeriss(layer, batch_size, occ0, self.dim_array)
+            ms1 = MapStrategyEyeriss(layer, batch_size, occ1, self.dim_array)
+
+            for nld0, nld1 in zip(ms0.gen_nested_loop_desc(),
+                                  ms1.gen_nested_loop_desc()):
+
+                self.assertEqual(nld0.unit_time, nld1.unit_time)
+
+                self.assertTupleEqual(nld0.usize_gbuf, nld1.usize_gbuf)
+                self.assertTupleEqual(nld0.usize_regf, nld1.usize_regf)
+
+                self.assertAlmostEqual(nld0.unit_ops * occ1,
+                                       nld1.unit_ops * occ0)
+
+                for mhe in range(me.NUM):
+                    for dce in range(de.NUM):
+                        if mhe == me.REGF:
+                            self.assertAlmostEqual(
+                                nld0.unit_access_at_of(mhe, dce) * occ1,
+                                nld1.unit_access_at_of(mhe, dce) * occ0)
+                        else:
+                            self.assertAlmostEqual(
+                                nld0.unit_access_at_of(mhe, dce),
+                                nld1.unit_access_at_of(mhe, dce))
+
     def test_nested_loop_desc_fold_w(self):
         ''' Generated nested loop description when folding width. '''
 
         layer = self.convlayers['conv1']
         batch_size = 4
+        occ = 1
 
-        ms = MapStrategyEyeriss(layer, batch_size, self.dim_array)
+        ms = MapStrategyEyeriss(layer, batch_size, occ, self.dim_array)
 
         self.assertTupleEqual(ms.repl, (1, 1))
         self.assertEqual(ms.fold.h, 1)
@@ -170,8 +202,9 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
 
         layer = self.fake_layers['LGFIL']
         batch_size = 4
+        occ = 1
 
-        ms = MapStrategyEyeriss(layer, batch_size, self.dim_array)
+        ms = MapStrategyEyeriss(layer, batch_size, occ, self.dim_array)
 
         self.assertTupleEqual(ms.repl, (1, 1))
         self.assertGreater(ms.fold.h, 1)
@@ -227,10 +260,11 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
                            'conv5': 156}
 
         batch_size = 4
+        occ = 1
 
         for name, layer in self.convlayers.items():
 
-            ms = MapStrategyEyeriss(layer, batch_size, self.dim_array)
+            ms = MapStrategyEyeriss(layer, batch_size, occ, self.dim_array)
 
             # Two ways to calculate active PEs.
             # Physical PE set size. Max active PEs.

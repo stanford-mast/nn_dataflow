@@ -28,7 +28,8 @@ In software, we decouple the dataflow scheduling into three subproblems:
   analytical bypass solvers [Gao17]_.
 - Partitioning, which partitions the NN computations for parallel processing.
   We support batch partitioning, fmap partitioning, output partitioning, input
-  partitioning, and the combination between them (hybrid) [Gao17]_.
+  partitioning, and the combination between them (hybrid) [Gao17]_. We use
+  layer-wise greedy beam search.
 
 See the details in our ASPLOS'17 paper [Gao17]_.
 
@@ -78,14 +79,20 @@ You can specify NN batch size and word size, PE array dimensions, number of
 tile nodes, register file and global buffer capacity, and the energy cost of
 all components. Note that, the energy cost of array bus should be the average
 energy of transferring the data from the buffer to one PE, *not* local neighbor
-transfer; the unit static energy cost should be the static energy of *one* node
-in one clock cycle.
+transfer; the unit static energy cost should be the static energy of *all*
+nodes in one clock cycle.
 
 Other options include:
 
+- ``-g``, ``--goal``: ``E``, ``D``, or ``ED``. the optimization goal, e(nergy),
+  d(elay), or ED product.
 - ``--mem-type``: ``2D`` or ``3D``. With 2D memory, memory channels are only on
-  the left and right sides of the chip; with 3D memory, memory channels are on
-  the top of all tile nodes (one per each).
+  the four corners of the chip; with 3D memory, memory channels are on the top
+  of all tile nodes (one per each).
+- ``--bus-width``: the multicast bus bit width in the PE array for one data
+  type. Set to 0 to ignore multicast overheads.
+- ``--dram-bw``: ``float`` or ``inf``. Total DRAM bandwidth for all tile nodes,
+  in bytes per cycle.
 - ``--disable-bypass``: a combination of ``i``, ``o``, ``f``, whether to
   disallow global buffer bypass for ifmaps, ofmaps, and weights.
 - ``--solve-loopblocking``: whether to use analytical bypass solvers for loop

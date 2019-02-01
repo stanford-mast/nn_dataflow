@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -27,6 +22,7 @@ OPTION_LIST = ['sw_gbuf_bypass',
                'partition_hybrid',
                'partition_batch',
                'partition_ifmaps',
+               'opt_goal',
                'ntops',
                'nprocesses',
                'verbose',
@@ -62,6 +58,7 @@ class Option(namedtuple('Option', OPTION_LIST)):
         kwdict.setdefault('partition_hybrid', False)
         kwdict.setdefault('partition_batch', False)
         kwdict.setdefault('partition_ifmaps', False)
+        kwdict.setdefault('opt_goal', 'e')
         kwdict.setdefault('ntops', 1)
         kwdict.setdefault('nprocesses', 1)
         kwdict.setdefault('verbose', False)
@@ -79,6 +76,10 @@ class Option(namedtuple('Option', OPTION_LIST)):
         if ntp.partition_ifmaps and not ntp.partition_hybrid:
             raise ValueError('Option: partition_ifmaps requires '
                              'partition_hybrid to be set.')
+
+        if ntp.opt_goal not in ['e', 'd', 'ed']:
+            raise ValueError('Option: opt_goal is invalid, must be one of '
+                             '\'e\', \'d\', and \'ed\'.')
 
         return ntp
 

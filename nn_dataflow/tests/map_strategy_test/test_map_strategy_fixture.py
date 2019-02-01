@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -64,10 +59,12 @@ class TestMapStrategyFixture(unittest.TestCase):
         self.resource = {}
         proc_region = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                  type=NodeRegion.PROC)
-        data_regions = (NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
-                                   type=NodeRegion.DATA),)
+        data_region = NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                 type=NodeRegion.DRAM)
         # Eyeriss, ISSCC'16, JSSC'17.
         self.resource['BASE'] = Resource(
-            proc_region=proc_region, data_regions=data_regions,
-            dim_array=PhyDim2(12, 14), size_gbuf=108*1024, size_regf=520)
+            proc_region=proc_region, dram_region=data_region,
+            src_data_region=data_region, dst_data_region=data_region,
+            dim_array=PhyDim2(12, 14), size_gbuf=108*1024, size_regf=520,
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'))
 

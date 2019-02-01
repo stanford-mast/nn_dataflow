@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -19,6 +14,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from nn_dataflow.core import loop_blocking
+from nn_dataflow.core import DataCategoryEnum as de
 
 from . import TestLoopBlockingFixture
 
@@ -46,8 +42,8 @@ class TestLoopBlocking(TestLoopBlockingFixture):
             self.assertFalse(loop_blocking.skip_conv(*reg_sch),
                              'test_skip_not_reg: regularized {} is skipped.'
                              .format(reg_sch))
-            self.assertAlmostEqual(lbs.get_cost(self.cost),
-                                   reg_lbs.get_cost(self.cost),
+            self.assertAlmostEqual(lbs.get_access_cost(self.cost),
+                                   reg_lbs.get_access_cost(self.cost),
                                    msg=('test_skip_not_reg: cost mismatch. '
                                         'orig {}, reg {}.'
                                         .format(sch, reg_sch)))
@@ -55,8 +51,8 @@ class TestLoopBlocking(TestLoopBlockingFixture):
                                  msg=('test_skip_not_reg: access mismatch. '
                                       'orig {}, reg {}.'
                                       .format(sch, reg_sch)))
-            size = lbs.get_scheme_dict(self.cost)['size']
-            reg_size = reg_lbs.get_scheme_dict(self.cost)['size']
+            size = self._get_lbs_size(lbs)
+            reg_size = self._get_lbs_size(reg_lbs)
             self.assertTrue(all(all(ss1 >= ss2 for ss1, ss2 in zip(s1, s2))
                                 for s1, s2 in zip(size, reg_size)),
                             'test_skip_not_reg: reg size is larger than eqv.\n'
@@ -86,9 +82,7 @@ class TestLoopBlocking(TestLoopBlockingFixture):
             exp_cnt += 1 if not loop_blocking.skip_conv(bl_ts, bl_ords) else 0
 
         cnt = 0
-        for _ in loop_blocking.gen_loopblocking(
-                self.nld['BASE'], self.resource['LG'], self.cost, 1,
-                self.options['BASE']):
+        for _ in self._gen_loopblocking(rsrckey='LG'):
             cnt += 1
 
         self.assertEqual(cnt, exp_cnt)
@@ -97,15 +91,11 @@ class TestLoopBlocking(TestLoopBlockingFixture):
         ''' gen_loopblocking multiprocessing. '''
 
         cnt1 = 0
-        for _ in loop_blocking.gen_loopblocking(
-                self.nld['BASE'], self.resource['LG'], self.cost, 1,
-                self.options['BASE']):
+        for _ in self._gen_loopblocking(rsrckey='LG'):
             cnt1 += 1
 
         cnt8 = 0
-        for _ in loop_blocking.gen_loopblocking(
-                self.nld['BASE'], self.resource['LG'], self.cost, 1,
-                self.options['MP']):
+        for _ in self._gen_loopblocking(rsrckey='LG', optkey='MP'):
             cnt8 += 1
 
         self.assertEqual(cnt1, cnt8)
@@ -115,65 +105,63 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         acc_dict = {}
 
-        for lbs in loop_blocking.gen_loopblocking(
-                self.nld['BASE'], self.resource['LG'], self.cost, 1,
-                self.options['BASE']):
-
-            if not lbs.is_valid():
-                continue
-
-            sdict = lbs.get_scheme_dict(self.cost)
+        for lbs in self._gen_loopblocking(rsrckey='LG', skip_invalid=True):
 
             # Make the keys hashable (list -> tuple).
-            size = tuple(tuple(ss for ss in s) for s in sdict['size'])
-            access = tuple(tuple(int(aa) for aa in a) for a in sdict['access'])
+            size = tuple(tuple(ss for ss in s) for s in self._get_lbs_size(lbs))
+            access = tuple(tuple(int(aa) for aa in a) for a in lbs.access)
             keys = (size, access)
 
             self.assertNotIn(keys, acc_dict,
                              'test_gen_loopblocking_no_eqv: found equivalents. '
-                             'keys: access {} size {}\n  {}\n  {}'
-                             .format(access, size,
-                                     sdict,
-                                     acc_dict.get(keys)))
-            acc_dict[keys] = sdict
+                             'keys: access {} size {}'
+                             .format(access, size))
+            acc_dict[keys] = lbs
 
     def test_gen_loopblocking_ntops(self):
         ''' gen_loopblocking ntops. '''
 
-        tops = list(loop_blocking.gen_loopblocking(self.nld['BASE'],
-                                                   self.resource['LG'],
-                                                   self.cost, 1,
-                                                   self.options['NTOPS']))
+        tops = list(self._gen_loopblocking(rsrckey='LG', optkey='NTOPS'))
 
         cost_prev = -float('inf')
 
-        for lbs in loop_blocking.gen_loopblocking(
-                self.nld['BASE'], self.resource['LG'], self.cost, 1,
-                self.options['BASE']):
+        for lbs in self._gen_loopblocking(rsrckey='LG', skip_invalid=True):
 
-            if not lbs.is_valid():
-                continue
-
-            cost_curr = lbs.get_cost(self.cost)
+            cost_curr = lbs.get_access_cost(self.cost)
             self.assertLessEqual(cost_prev, cost_curr)
             cost_prev = cost_curr
 
             if tops:
                 top_lbs = tops.pop(0)
-                self.assertAlmostEqual(cost_curr, top_lbs.get_cost(self.cost))
+                self.assertAlmostEqual(cost_curr,
+                                       top_lbs.get_access_cost(self.cost))
 
     def test_gen_loopblocking_byp_sol(self):
         ''' gen_loopblocking using bypass solvers. '''
 
         cnt = 0
 
-        for lbs in loop_blocking.gen_loopblocking(
-                self.nld['BASE'], self.resource['BASE'], self.cost, 1,
-                self.options['BYPSOL']):
+        for lbs in self._gen_loopblocking(optkey='BYPSOL'):
 
             self.assertTrue(lbs.is_valid())
 
             cnt += 1
 
         self.assertLessEqual(cnt, 8)
+
+    def _gen_loopblocking(self, wlkey='BASE', rsrckey='BASE',
+                          optkey='BASE', skip_invalid=False):
+        ''' gen_loopblocking trampoline. '''
+        for lbs in loop_blocking.gen_loopblocking(
+                self.nld[wlkey], self.resource[rsrckey],
+                self.cost, self.options[optkey]):
+            if not skip_invalid or lbs.is_valid():
+                yield lbs
+
+    @staticmethod
+    def _get_lbs_size(lbs):
+        ''' Get the size info. '''
+        assert lbs.is_valid()
+        return [[lbs.data_size(bl, dce) for dce in range(de.NUM)]
+                for bl in range(lbs.BL.NUM)]
 

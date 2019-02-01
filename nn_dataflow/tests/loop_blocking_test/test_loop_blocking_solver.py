@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -84,15 +79,14 @@ class TestLoopBlockingSolver(TestLoopBlockingFixture):
                               if lbs.stored_in_gbuf[dce]]
             # Only look at the cases with one or none reside data category.
             if not all_reside_dce:
-                reside_dce = None
+                min_sch = min_sch_dict.get(None, None)
+                if not min_sch or _cost(lbs) < min_sch:
+                    min_sch_dict[None] = _cost(lbs)
             elif len(all_reside_dce) == 1:
-                reside_dce = all_reside_dce[0]
-            else:
-                continue
-
-            min_sch = min_sch_dict.get(reside_dce, None)
-            if not min_sch or _cost(lbs) < min_sch:
-                min_sch_dict[reside_dce] = _cost(lbs)
+                dce, = all_reside_dce
+                min_sch = min_sch_dict.get(dce, None)
+                if not min_sch or _cost(lbs) < min_sch:
+                    min_sch_dict[dce] = _cost(lbs)
 
         # Solve each reside data category.
         for reside_dce in range(de.NUM):

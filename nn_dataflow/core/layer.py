@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -18,7 +13,10 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from . import data_category_enum as de
+from . import loop_enum as le
 from .. import util
+from .data_dim_loops import DataDimLoops
 
 class Layer(util.ContentHashClass):
     '''
@@ -62,6 +60,11 @@ class Layer(util.ContentHashClass):
 
         self.htrd = htrd
         self.wtrd = wtrd
+
+    @staticmethod
+    def data_loops():
+        ''' Dimension loops of the data. '''
+        raise NotImplementedError
 
     def input_layer(self):
         ''' Get the input layer parameters. '''
@@ -154,6 +157,14 @@ class InputLayer(Layer):
     NN input layer parameters.
     '''
 
+    @staticmethod
+    def data_loops():
+        dls = [None] * de.NUM
+        dls[de.FIL] = DataDimLoops()
+        dls[de.IFM] = DataDimLoops()
+        dls[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+        return tuple(dls)
+
     def input_layer(self):
         return None
 
@@ -193,6 +204,14 @@ class ConvLayer(Layer):
         hifm = self.hfil + (self.hofm - 1) * self.htrd
         wifm = self.wfil + (self.wofm - 1) * self.wtrd
         self.inlayer = Layer(nifm, (hifm, wifm))
+
+    @staticmethod
+    def data_loops():
+        dls = [None] * de.NUM
+        dls[de.FIL] = DataDimLoops(le.IFM, le.OFM)
+        dls[de.IFM] = DataDimLoops(le.IFM, le.BAT)
+        dls[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+        return tuple(dls)
 
     def input_layer(self):
         return self.inlayer
@@ -255,12 +274,10 @@ class LocalRegionLayer(Layer):
     NN layer which computes on a local region. The layer has no or limited
     shared weights, whose impact can be ignored during scheduling.
 
-    Includes pooling layer and normalization layer.
-
-    nifm = nofm, sfil = 0
+    Includes pooling layer, normalization layer, and element-wise layer.
     '''
 
-    def __init__(self, nofm, sofm, nreg, sreg, strd=1):
+    def __init__(self, nofm, sofm, nreg, sreg, ntrd=1, strd=1):
         super(LocalRegionLayer, self).__init__(nofm, sofm, strd=strd)
 
         if isinstance(sreg, int):
@@ -280,11 +297,20 @@ class LocalRegionLayer(Layer):
         self.nreg = nreg
         self.hreg = hreg
         self.wreg = wreg
+        self.ntrd = ntrd
 
-        nifm = self.nofm
+        nifm = self.nofm * self.ntrd  # ignore all-zero padding channels.
         hifm = self.hreg + (self.hofm - 1) * self.htrd
         wifm = self.wreg + (self.wofm - 1) * self.wtrd
         self.inlayer = Layer(nifm, (hifm, wifm))
+
+    @staticmethod
+    def data_loops():
+        dls = [None] * de.NUM
+        dls[de.FIL] = DataDimLoops()
+        dls[de.IFM] = DataDimLoops(le.OFM, le.BAT)
+        dls[de.OFM] = DataDimLoops(le.OFM, le.BAT)
+        return tuple(dls)
 
     def input_layer(self):
         return self.inlayer
@@ -305,6 +331,7 @@ class LocalRegionLayer(Layer):
                 'sofm={}'.format(repr((self.hofm, self.wofm))),
                 'nreg={}'.format(repr(self.nreg)),
                 'sreg={}'.format(repr((self.hreg, self.wreg))),
+                'ntrd={}'.format(repr(self.ntrd)),
                 'strd={}'.format(repr((self.htrd, self.wtrd)))]))
 
 
@@ -314,14 +341,16 @@ class PoolingLayer(LocalRegionLayer):
 
     As a special case of LocalRegionLayer.
 
-    nreg = 1
+    nreg = ntrd = 1
     '''
 
     def __init__(self, nofm, sofm, sreg, strd=None):
         if strd is None:
             strd = sreg
-        super(PoolingLayer, self).__init__(nofm, sofm, 1, sreg, strd=strd)
+        super(PoolingLayer, self).__init__(nofm, sofm, 1, sreg,
+                                           ntrd=1, strd=strd)
         assert self.nreg == 1
+        assert self.ntrd == 1
 
     def __repr__(self):
         return '{}({})'.format(
@@ -331,4 +360,27 @@ class PoolingLayer(LocalRegionLayer):
                 'sofm={}'.format(repr((self.hofm, self.wofm))),
                 'sreg={}'.format(repr((self.hreg, self.wreg))),
                 'strd={}'.format(repr((self.htrd, self.wtrd)))]))
+
+
+class EltwiseLayer(LocalRegionLayer):
+    '''
+    NN element-wise layer parameters.
+
+    As a special case of LocalRegionLayer.
+
+    nreg = ntrd, sreg = 1
+    '''
+
+    def __init__(self, nofm, sofm, nreg):
+        super(EltwiseLayer, self).__init__(nofm, sofm, nreg, 1,
+                                           ntrd=nreg, strd=1)
+        assert self.hreg == self.wreg == 1
+
+    def __repr__(self):
+        return '{}({})'.format(
+            self.__class__.__name__,
+            ', '.join([
+                'nofm={}'.format(repr(self.nofm)),
+                'sofm={}'.format(repr((self.hofm, self.wofm))),
+                'nreg={}'.format(repr(self.nreg))]))
 

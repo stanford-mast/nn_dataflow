@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -18,15 +13,14 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-import copy
 import itertools
 import math
 
 from nn_dataflow.core import Cost
 from nn_dataflow.core import DataCategoryEnum as de
+from nn_dataflow.core import LoopBlockingScheme
 from nn_dataflow.core import LoopEnum as le
 from nn_dataflow.core import MemHierEnum as me
-from nn_dataflow import util
 
 from . import TestLoopBlockingFixture
 
@@ -54,6 +48,11 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
 
         # Valid.
         lbs = self._lbs(self._make_bl_ts((0, 1, 1), (0, 1, 1), (0, 1, 1)))
+        self.assertTrue(lbs.is_valid())
+        lbs = self._lbs(self._make_bl_ts(
+            (self.nld['BASE'].loopcnt[le.IFM], 1, 1),
+            (self.nld['BASE'].loopcnt[le.OFM], 1, 1),
+            (self.nld['BASE'].loopcnt[le.BAT], 1, 1)))
         self.assertTrue(lbs.is_valid())
 
     def test_data_size(self):
@@ -230,7 +229,7 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
         lbs = self._lbs(self._make_bl_ts((0, 1, 1), (0, 1, 1), (1, 1, 0)),
                         rsrckey='SM')
         self.assertFalse(lbs.is_valid())
-        self.assertIsNone(lbs.get_access())
+        self.assertTrue(math.isinf(sum([sum(a) for a in lbs.get_access()])))
 
     def test_top_level_fetch(self):
         ''' get_top_level_fetch. '''
@@ -293,8 +292,8 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
         self.assertFalse(lbs.is_valid())
         self.assertIsNone(lbs.get_top_level_fetch())
 
-    def test_cost(self):
-        ''' get_cost. '''
+    def test_access_cost(self):
+        ''' get_access_cost. '''
 
         for bl_ts, bl_ords in self._gen_loopblocking_all():
 
@@ -304,107 +303,81 @@ class TestLoopBlockingScheme(TestLoopBlockingFixture):
                 continue
 
             access = [sum(a) for a in lbs.get_access()]
-            ops = lbs.ops
-            nhops = 0
-            time = lbs.time
 
-            cost = lbs.get_cost(self.cost)
+            cost = lbs.get_access_cost(self.cost)
             self.assertAlmostEqual(
                 cost,
-                ops * self.cost.mac_op
-                + sum(a * c for a, c in zip(access, self.cost.mem_hier))
-                + nhops * self.cost.noc_hop
-                + time * self.cost.unit_static)
+                + sum(a * c for a, c in zip(access, self.cost.mem_hier)))
 
-    def test_cost_same_lbs(self):
-        ''' get_cost same lbs. '''
+    def test_access_cost_same_lbs(self):
+        ''' get_access_cost same lbs. '''
         lbs = self._lbs(self._make_bl_ts((0, 1, 1), (1, 0, 1), (1, 1, 0)),
                         rsrckey='LG')
         self.assertTrue(lbs.is_valid())
-        c1 = lbs.get_cost(Cost(mac_op=1, mem_hier=(200, 6, 2, 1),
-                               noc_hop=50, unit_static=50))
-        c2 = lbs.get_cost(Cost(mac_op=-1, mem_hier=(-200, -6, -2, -1),
-                               noc_hop=-50, unit_static=-50))
+        c1 = lbs.get_access_cost(Cost(mac_op=1, mem_hier=(200, 6, 2, 1),
+                                      noc_hop=50, idl_unit=50))
+        c2 = lbs.get_access_cost(Cost(mac_op=-1, mem_hier=(-200, -6, -2, -1),
+                                      noc_hop=-50, idl_unit=-50))
         self.assertAlmostEqual(c1, -c2)
 
-    def test_cost_invalid(self):
-        ''' get_cost invalid. '''
+    def test_access_cost_invalid(self):
+        ''' get_access_cost invalid. '''
         lbs = self._lbs(self._make_bl_ts((0, 1, 1), (0, 1, 1), (1, 1, 0)),
                         rsrckey='SM')
         self.assertFalse(lbs.is_valid())
-        self.assertTrue(math.isinf(lbs.get_cost(self.cost)))
+        self.assertTrue(math.isinf(lbs.get_access_cost(self.cost)))
 
-    def test_scheme_dict(self):
-        ''' get_scheme_dict. '''
+    def test_ordered_loops(self):
+        ''' Get ordered_loops. '''
+        assert list(range(le.NUM)) == [le.IFM, le.OFM, le.BAT]
 
-        for bl_ts, bl_ords in self._gen_loopblocking_all():
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((3, 5, 2), (2, 0, 1)),
+            [(le.IFM, 3), (le.BAT, 2), (le.OFM, 5)])
 
-            lbs = self._lbs(bl_ts, bl_ords, part_occ=self.part_occ)
+        # Trivial loops at different positions.
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((3, 5, 1), (0, 1, 2)),
+            [(le.OFM, 5), (le.IFM, 3)])
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((3, 5, 1), (1, 2, 0)),
+            [(le.OFM, 5), (le.IFM, 3)])
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((3, 5, 1), (0, 2, 1)),
+            [(le.OFM, 5), (le.IFM, 3)])
 
-            if not lbs.is_valid():
-                self.assertIsNone(lbs.get_scheme_dict(self.cost))
-                continue
+        # Different loops are trivial.
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((1, 5, 2), (0, 2, 1)),
+            [(le.OFM, 5), (le.BAT, 2)])
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((3, 1, 2), (0, 2, 1)),
+            [(le.BAT, 2), (le.IFM, 3)])
 
-            sdict = lbs.get_scheme_dict(self.cost)
+        # Multiple trivial loops.
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((1, 5, 1), (0, 1, 2)),
+            [(le.OFM, 5)])
+        self.assertListEqual(
+            LoopBlockingScheme.ordered_loops((1, 1, 1), (0, 1, 2)),
+            [])
 
-            self.assertAlmostEqual(sdict['cost'], lbs.get_cost(self.cost))
-            self.assertAlmostEqual(sdict['ops'], lbs.ops)
-            self.assertAlmostEqual(sdict['time'], lbs.time)
+        for bl_t, bl_ord in itertools.product(
+                itertools.product(*[range(1, 8)] * 3),
+                itertools.permutations(range(le.NUM))):
 
-            self.assertEqual(id(sdict['access']), id(lbs.get_access()))
-            for lvl in [0, 1]:
-                for dce in range(de.NUM):
-                    self.assertAlmostEqual(sdict['size'][lvl][dce],
-                                           lbs.data_size(lvl, dce))
+            ord_loops = LoopBlockingScheme.ordered_loops(bl_t, bl_ord)
+            self.assertTrue(all(len(tpl) == 2 for tpl in ord_loops))
+            self.assertFalse(any(tpl[1] <= 1 for tpl in ord_loops))
+            self.assertEqual(len(ord_loops), le.NUM - bl_t.count(1))
+            self.assertTrue(all(tpl[1] == bl_t[tpl[0]] for tpl in ord_loops))
 
-            self.assertAlmostEqual(sdict['part_occ'], self.part_occ)
-
-            self.assertEqual(util.prod(sdict['ti']),
-                             self.nld['BASE'].loopcnt[le.IFM])
-            self.assertEqual(util.prod(sdict['to']),
-                             self.nld['BASE'].loopcnt[le.OFM])
-            self.assertEqual(util.prod(sdict['tb']),
-                             self.nld['BASE'].loopcnt[le.BAT])
-
-    def test_scheme_dict_eval_order(self):
-        ''' get_scheme_dict eval order. '''
-
-        for bl_ts, bl_ords in self._gen_loopblocking_all():
-
-            lbs1 = self._lbs(bl_ts, bl_ords, rsrckey='LG')
-
-            lbs2 = copy.deepcopy(lbs1)
-
-            access1 = lbs1.get_access()
-            sdict1 = lbs1.get_scheme_dict(self.cost)
-
-            sdict2 = lbs2.get_scheme_dict(self.cost)
-            access2 = lbs2.get_access()
-
-            self.assertAlmostEqual(sdict1['cost'], sdict2['cost'])
-            for mhe in range(me.NUM):
-                for dce in range(de.NUM):
-                    self.assertAlmostEqual(access1[mhe][dce],
-                                           access2[mhe][dce])
-
-    def test_part_occ(self):
-        ''' Impact of part_occ. '''
-
-        for bl_ts, bl_ords in self._gen_loopblocking_all():
-
-            lbs = self._lbs(bl_ts, bl_ords, part_occ=1, rsrckey='LG')
-
-            lbs_ = copy.deepcopy(lbs)
-            ops = lbs_.get_scheme_dict(self.cost)['ops']
-            time = lbs_.get_scheme_dict(self.cost)['time']
-            del lbs_
-
-            for part_occ in [0.9, 0.8, 0.7]:
-                lbs_ = copy.deepcopy(lbs)
-                lbs_.part_occ = part_occ
-
-                self.assertAlmostEqual(lbs_.get_scheme_dict(self.cost)['ops'],
-                                       ops * part_occ)
-                self.assertAlmostEqual(lbs_.get_scheme_dict(self.cost)['time'],
-                                       time)
+            rev_loops = LoopBlockingScheme.ordered_loops(bl_t, bl_ord,
+                                                         reverse=True)
+            ord_lpes = LoopBlockingScheme.ordered_loops(bl_t, bl_ord,
+                                                        lpe_only=True)
+            self.assertEqual(len(rev_loops), len(ord_loops))
+            self.assertEqual(len(ord_lpes), len(ord_loops))
+            self.assertListEqual(list(reversed(rev_loops)), ord_loops)
+            self.assertListEqual([tpl[0] for tpl in ord_loops], ord_lpes)
 

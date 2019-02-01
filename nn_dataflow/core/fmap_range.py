@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -21,7 +16,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 from collections import namedtuple, Counter
 import itertools
 
-from .. import util
+from .int_range import IntRange
 
 _FMAP_POSITION_ATTRS = ['b', 'n', 'h', 'w']
 
@@ -31,18 +26,19 @@ A position in a batched fmap.
 FmapPosition = namedtuple('FmapPosition', _FMAP_POSITION_ATTRS)
 
 
-class FmapRange(util.ContentHashClass):
+class FmapRange(namedtuple('FmapRange', ['fp_beg', 'fp_end'])):
     '''
     A range of a batched fmap.
     '''
 
-    def __init__(self, fp_beg, fp_end):
+    def __new__(cls, fp_beg, fp_end):
         for b, e in zip(fp_beg, fp_end):
             if b > e:
                 raise ValueError('FmapRange: begin value > end value? '
                                  'beg: {}, end: {}'.format(fp_beg, fp_end))
-        self.fp_beg = FmapPosition(*fp_beg)
-        self.fp_end = FmapPosition(*fp_end)
+        ntp = super(FmapRange, cls).__new__(
+            cls, FmapPosition(*fp_beg), FmapPosition(*fp_end))
+        return ntp
 
     def _extract_attrs(self, *attrs):
         '''
@@ -60,11 +56,14 @@ class FmapRange(util.ContentHashClass):
     def beg_end(self, *attrs):
         '''
         Get the begin and end values for each of the given attributes. Return
-        in the form of a list with (beg, end) for each attribute. Not
-        specifying means all attributes.
+        in the form of a list of `IntRange` for each attribute, or simply an
+        `IntRange` if with only a single attribute. Not specifying means all
+        attributes.
         '''
         begs, ends = self._extract_attrs(*attrs)
-        return zip(begs, ends)
+        if len(begs) == 1:
+            return IntRange(begs[0], ends[0])
+        return [IntRange(b, e) for b, e in zip(begs, ends)]
 
     def range(self, *attrs):
         '''
@@ -85,9 +84,10 @@ class FmapRange(util.ContentHashClass):
         '''
         begs, ends = self._extract_attrs(*attrs)
 
-        lens = [e - b for b, e in zip(begs, ends)]
-
-        return util.prod(lens)
+        sz = 1
+        for b, e in zip(begs, ends):
+            sz *= e - b
+        return sz
 
     def overlap(self, other):
         '''
@@ -98,10 +98,10 @@ class FmapRange(util.ContentHashClass):
 
         begs = []
         ends = []
-        for srng, orng in zip(zip(self.fp_beg, self.fp_end),
-                              zip(other.fp_beg, other.fp_end)):
-            b = max(srng[0], orng[0])
-            e = min(srng[1], orng[1])
+        for sb, se, ob, oe in zip(self.fp_beg, self.fp_end,
+                                  other.fp_beg, other.fp_end):
+            b = max(sb, ob)
+            e = min(se, oe)
             if b >= e:
                 # No overlap, return 0 FmapRange.
                 return FmapRange([0]*len(_FMAP_POSITION_ATTRS),
@@ -109,6 +109,21 @@ class FmapRange(util.ContentHashClass):
             begs.append(b)
             ends.append(e)
         return FmapRange(begs, ends)
+
+    def overlap_size(self, other):
+        ''' Optimized routine for self.overlap(other).size(). '''
+        if not isinstance(other, FmapRange):
+            raise TypeError('FmapRange: an FmapRange object is required.')
+
+        sz = 1
+        for sb, se, ob, oe in zip(self.fp_beg, self.fp_end,
+                                  other.fp_beg, other.fp_end):
+            b = max(sb, ob)
+            e = min(se, oe)
+            if b >= e:
+                return 0
+            sz *= (e - b)
+        return sz
 
     def __contains__(self, fpos):
         '''
@@ -122,25 +137,29 @@ class FmapRange(util.ContentHashClass):
             return self._compare(other) < 0
         return NotImplemented
 
-    def __le__(self, other):
-        return self < other or self == other
-
-    def __gt__(self, other):
+    def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return self._compare(other) > 0
+            try:
+                return self._compare(other) == 0
+            except ValueError:
+                return False
         return NotImplemented
 
-    def __ge__(self, other):
-        return self > other or self == other
-
     def _compare(self, other):
-        # Identical or empty ranges.
-        if (self.fp_beg == other.fp_beg and self.fp_end == other.fp_end) \
-                or (self.size() == 0 and other.size() == 0):
+        # Identical ranges.
+        if self.fp_beg == other.fp_beg and self.fp_end == other.fp_end:
             return 0
 
+        # Empty ranges are smaller than non-empty ranges.
+        if self.size() == 0:
+            if other.size() == 0:
+                return 0
+            return -1
+        elif other.size() == 0:
+            return 1
+
         # Overlap check.
-        if self.overlap(other).size() > 0:
+        if self.overlap_size(other) > 0:
             raise ValueError('FmapRange: comparing two overlap ranges. '
                              '{} vs. {}'.format(self, other))
 
@@ -156,6 +175,34 @@ class FmapRange(util.ContentHashClass):
             ', '.join([
                 'fp_beg={}'.format(repr(self.fp_beg)),
                 'fp_end={}'.format(repr(self.fp_end))]))
+
+    # Must explicitly overwrite all rich comparison operators, as they are
+    # already defined in the base class.
+
+    def __ne__(self, other):
+        r = self.__eq__(other)
+        if r is NotImplemented:
+            # "not" NotImplemented will be True.
+            return r
+        return not r
+
+    def __gt__(self, other):
+        r = self.__lt__(other)
+        if r is NotImplemented:
+            # NotImplemented "and" X will be X.
+            return r
+        return not r and self.__ne__(other)
+
+    def __le__(self, other):
+        # NotImplemented "or" X is safe.
+        return self.__lt__(other) or self.__eq__(other)
+
+    def __ge__(self, other):
+        r = self.__lt__(other)
+        if r is NotImplemented:
+            # "not" NotImplemented will be True.
+            return r
+        return not r
 
 
 class FmapRangeMap(object):
@@ -253,7 +300,7 @@ class FmapRangeMap(object):
         counts = Counter()
         for kv in self.keyvals:
             counts[kv[1]] = counts.setdefault(kv[1], 0) \
-                    + frng.overlap(kv[0]).size()
+                    + frng.overlap_size(kv[0])
         return counts
 
     def rget_single(self, frng):

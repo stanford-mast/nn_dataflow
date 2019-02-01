@@ -13,11 +13,16 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-'''
-Enum for loop types.
-'''
-IFM = 0
-OFM = 1
-BAT = 2
-NUM = 3
+import unittest
+
+from nn_dataflow import version
+
+class TestVersion(unittest.TestCase):
+    ''' Tests for version. '''
+
+    def test_get_version(self):
+        ''' get_version. '''
+        ver_raw = version.get_version()
+        ver_lcl = version.get_version(with_local=True)
+        self.assertIn(ver_raw, ver_lcl)
 

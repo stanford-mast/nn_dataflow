@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -92,20 +87,6 @@ class TestDataDimLoops(unittest.TestCase):
             self.assertEqual(len(takelst) + len(droplst), le.NUM)
             self.assertTrue(set(takelst).isdisjoint(set(droplst)))
             self.assertSetEqual(set(takelst) | set(droplst), set(lst))
-
-    def test_data_cnt(self):
-        ''' Get data_cnt. '''
-        lcnt = [3, 5, 7]
-
-        for loops in self._gen_loop_combs():
-            ddls = DataDimLoops(*loops)
-            dcnt = ddls.data_cnt(lcnt)
-
-            dcnt2 = 1
-            for lpe in ddls.loops():
-                dcnt2 *= lcnt[lpe]
-
-            self.assertEqual(dcnt, dcnt2)
 
     def test_repr(self):
         ''' __repr__. '''

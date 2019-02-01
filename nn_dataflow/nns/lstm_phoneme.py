@@ -13,11 +13,27 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from nn_dataflow.core import Network
+from nn_dataflow.core import InputLayer, FCLayer
+
+from nn_dataflow.nns import add_lstm_cell
+
 '''
-Enum for loop types.
+LSTM for phoneme classification.
+
+Graves and Schmidhuber, 2005
 '''
-IFM = 0
-OFM = 1
-BAT = 2
-NUM = 3
+
+NN = Network('PHONEME')
+
+NN.set_input_layer(InputLayer(26, 1))
+
+# Input.
+NN.add('We', FCLayer(26, 140), prevs=(NN.INPUT_LAYER_KEY,))
+
+# LSTM.
+C, H = add_lstm_cell(NN, 'cell', 140, 'We')
+
+# Output.
+NN.add('Wd', FCLayer(140, 61), prevs=(H,))
 

@@ -1,14 +1,9 @@
 """ $lic$
-Copyright (C) 2016-2017 by The Board of Trustees of Stanford University
+Copyright (C) 2016-2019 by The Board of Trustees of Stanford University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the Modified BSD-3 License as published by the Open Source
 Initiative.
-
-If you use this program in your research, we request that you reference the
-TETRIS paper ("TETRIS: Scalable and Efficient Neural Network Acceleration with
-3D Memory", in ASPLOS'17. April, 2017), and that you send us a citation of your
-work.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -21,7 +16,8 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 import unittest
 from collections import OrderedDict
 
-from nn_dataflow.core import partition
+from nn_dataflow.core import DataLayout
+from nn_dataflow.core import FmapPosition, FmapRange
 from nn_dataflow.core import InputLayer, ConvLayer, FCLayer, PoolingLayer
 from nn_dataflow.core import MemHierEnum as me
 from nn_dataflow.core import Network
@@ -35,52 +31,80 @@ from nn_dataflow.core import SchedulingResult
 class TestNNDataflowScheme(unittest.TestCase):
     ''' Tests for NNDataflowScheme. '''
 
+    # pylint: disable=too-many-public-methods
+
     def setUp(self):
         self.network = Network('test_net')
-        self.network.set_input(InputLayer(3, 224))
+        self.network.set_input_layer(InputLayer(3, 224))
         self.network.add('c1', ConvLayer(3, 64, 224, 3))
         self.network.add('p1', PoolingLayer(64, 7, 32), prevs='c1')
         self.network.add('p2', PoolingLayer(64, 7, 32), prevs='c1')
-        self.network.add('f1', FCLayer(64, 1000, 7), prevs=['p1', 'p2'])
+        self.network.add('f1', FCLayer(128, 1000, 7), prevs=['p1', 'p2'])
 
         self.batch_size = 4
 
-        self.input_layout = partition.get_ofmap_layout(
-            self.network.input_layer(), self.batch_size,
-            PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
-            NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(2, 1),
-                       type=NodeRegion.DATA))
+        input_layer = self.network.input_layer()
+        self.input_layout = DataLayout(
+            frngs=(FmapRange((0, 0, 0, 0),
+                             FmapPosition(b=self.batch_size,
+                                          n=input_layer.nofm,
+                                          h=input_layer.hofm,
+                                          w=input_layer.wofm)),),
+            regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(2, 1),
+                                type=NodeRegion.DRAM),),
+            parts=(PartitionScheme(order=range(pe.NUM),
+                                   pdims=[(1, 1)] * pe.NUM),))
 
+        c1_layer = self.network['c1']
         self.c1res = SchedulingResult(
-            dict_loop=OrderedDict([('cost', 1.), ('time', 2.), ('ops', 4.),
-                                   ('access', [[7, 8, 9]] * me.NUM),
-                                  ]),
-            dict_part=OrderedDict([('cost', 0.5), ('total_nhops', [4, 5, 6]),
-                                   ('num_nodes', 4),
-                                  ]),
-            ofmap_layout=partition.get_ofmap_layout(
-                self.network['c1'], self.batch_size,
-                PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
-                NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
-                           type=NodeRegion.DATA)))
+            scheme=OrderedDict([('cost', 1.5), ('time', 2.), ('ops', 4.),
+                                ('num_nodes', 4),
+                                ('cost_op', 0.5), ('cost_access', 1.),
+                                ('cost_noc', 0), ('cost_static', 0),
+                                ('proc_time', 2), ('bus_time', 0),
+                                ('dram_time', 0),
+                                ('access', [[7, 8, 9]] * me.NUM),
+                                ('total_nhops', [4, 5, 6]),
+                                ('fetch', [[1, 1, 1], [2, 2, 2]]),
+                               ]),
+            ofmap_layout=DataLayout(
+                frngs=(FmapRange((0, 0, 0, 0),
+                                 FmapPosition(b=self.batch_size,
+                                              n=c1_layer.nofm,
+                                              h=c1_layer.hofm,
+                                              w=c1_layer.wofm)),),
+                regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
+                                    type=NodeRegion.DRAM),),
+                parts=(PartitionScheme(order=range(pe.NUM),
+                                       pdims=[(1, 1)] * pe.NUM),)))
 
-        self.pres = SchedulingResult(
-            dict_loop=OrderedDict([('cost', 0.1), ('time', 0.05), ('ops', 0.1),
-                                   ('access', [[.7, .8, .9]] * me.NUM),
-                                  ]),
-            dict_part=OrderedDict([('cost', 0.5), ('total_nhops', [.4, .5, .6]),
-                                   ('num_nodes', 2),
-                                  ]),
-            ofmap_layout=partition.get_ofmap_layout(
-                self.network['p1'], self.batch_size,
-                PartitionScheme(order=range(pe.NUM), pdims=[(1, 1)] * pe.NUM),
-                NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
-                           type=NodeRegion.DATA)))
+        p1_layer = self.network['p1']
+        self.p1res = SchedulingResult(
+            scheme=OrderedDict([('cost', 0.6), ('time', 0.05), ('ops', 0.1),
+                                ('num_nodes', 2),
+                                ('cost_op', 0.1), ('cost_access', 0.5),
+                                ('cost_noc', 0), ('cost_static', 0),
+                                ('proc_time', 0.05), ('bus_time', 0),
+                                ('dram_time', 0),
+                                ('access', [[.7, .8, .9]] * me.NUM),
+                                ('total_nhops', [.4, .5, .6]),
+                                ('fetch', [[1, 1, 1], [2, 2, 2]]),
+                               ]),
+            ofmap_layout=DataLayout(
+                frngs=(FmapRange((0, 0, 0, 0),
+                                 FmapPosition(b=self.batch_size,
+                                              n=p1_layer.nofm,
+                                              h=p1_layer.hofm,
+                                              w=p1_layer.wofm)),),
+                regions=(NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(1, 2),
+                                    type=NodeRegion.DRAM),),
+                parts=(PartitionScheme(order=range(pe.NUM),
+                                       pdims=[(1, 1)] * pe.NUM),)))
 
         self.dtfl = NNDataflowScheme(self.network, self.input_layout)
         self.dtfl['c1'] = self.c1res
-        self.dtfl['p1'] = self.pres
-        self.dtfl['p2'] = self.pres
+        self.dtfl['p1'] = self.p1res
+        self.dtfl['p2'] = self.p1res
 
     def test_init(self):
         ''' Initial. '''
@@ -88,6 +112,7 @@ class TestNNDataflowScheme(unittest.TestCase):
 
         self.assertEqual(df.network, self.network)
         self.assertEqual(df.input_layout, self.input_layout)
+        self.assertDictEqual(df.ext_layout_dict, {})
 
         self.assertEqual(df.total_cost, 0)
         self.assertEqual(df.total_time, 0)
@@ -97,6 +122,38 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.assertEqual(df.total_ops, 0)
         self.assertSequenceEqual(df.total_accesses, [0] * me.NUM)
         self.assertEqual(df.total_noc_hops, 0)
+
+    def test_init_ext(self):
+        ''' Initial with external layers. '''
+        self.network.add_ext('e0', InputLayer(3, 224))
+        self.network.add_ext('e1', InputLayer(6, 224))
+
+        e0_layout = DataLayout(
+            frngs=(FmapRange((0, 0, 0, 0),
+                             FmapPosition(b=self.batch_size,
+                                          n=self.network['e0'].nofm,
+                                          h=self.network['e0'].hofm,
+                                          w=self.network['e0'].wofm)),),
+            regions=self.input_layout.regions,
+            parts=self.input_layout.parts)
+        e1_layout = DataLayout(
+            frngs=(FmapRange((0, 0, 0, 0),
+                             FmapPosition(b=self.batch_size,
+                                          n=self.network['e1'].nofm,
+                                          h=self.network['e1'].hofm,
+                                          w=self.network['e1'].wofm)),),
+            regions=self.input_layout.regions,
+            parts=self.input_layout.parts)
+
+        ext_layout_dict = {'e0': e0_layout, 'e1': e1_layout}
+
+        df = NNDataflowScheme(self.network, self.input_layout,
+                              ext_layout_dict)
+
+        self.assertIn('e0', df.ext_layout_dict)
+        self.assertIn('e1', df.ext_layout_dict)
+        self.assertEqual(df.ext_layout_dict['e0'], e0_layout)
+        self.assertEqual(df.ext_layout_dict['e1'], e1_layout)
 
     def test_init_invalid_network(self):
         ''' Invalid network. '''
@@ -108,7 +165,30 @@ class TestNNDataflowScheme(unittest.TestCase):
         ''' Invalid input_layout. '''
         with self.assertRaisesRegexp(TypeError,
                                      'NNDataflowScheme: .*input_layout*'):
-            _ = NNDataflowScheme(self.network, self.input_layout.frmap)
+            _ = NNDataflowScheme(self.network, self.input_layout.frngs)
+
+    def test_init_invalid_eld_keys(self):
+        ''' Invalid ext_layout_dict keys. '''
+        with self.assertRaisesRegexp(ValueError,
+                                     'NNDataflowScheme: .*ext_layout_dict*'):
+            _ = NNDataflowScheme(self.network, self.input_layout,
+                                 {'e0': self.input_layout})
+
+        self.network.add_ext('e0', InputLayer(3, 224))
+        with self.assertRaisesRegexp(ValueError,
+                                     'NNDataflowScheme: .*ext_layout_dict*'):
+            _ = NNDataflowScheme(self.network, self.input_layout)
+
+    def test_init_invalid_eld_type(self):
+        ''' Invalid ext_layout_dict value type. '''
+        self.network.add_ext('e0', InputLayer(3, 224))
+        self.network.add_ext('e1', InputLayer(3, 224))
+
+        with self.assertRaisesRegexp(TypeError,
+                                     'NNDataflowScheme: .*ext_layout*'):
+            _ = NNDataflowScheme(self.network, self.input_layout,
+                                 {'e0': self.input_layout,
+                                  'e1': self.input_layout.frngs})
 
     def test_setgetitem(self):
         ''' __set/getitem__. '''
@@ -137,7 +217,7 @@ class TestNNDataflowScheme(unittest.TestCase):
 
         with self.assertRaisesRegexp(TypeError,
                                      'NNDataflowScheme: .*SchedulingResult*'):
-            df['c1'] = self.c1res.dict_loop
+            df['c1'] = self.c1res.scheme
 
     def test_setitem_already_exists(self):
         ''' __setitem__ already exists. '''
@@ -148,11 +228,24 @@ class TestNNDataflowScheme(unittest.TestCase):
             df['c1'] = self.c1res
 
     def test_setitem_prev_not_in(self):
-        ''' __setitem__ already exists. '''
+        ''' __setitem__ previous not existing. '''
         df = NNDataflowScheme(self.network, self.input_layout)
 
         with self.assertRaisesRegexp(KeyError, 'NNDataflowScheme: .*p1*'):
-            df['p1'] = self.pres
+            df['p1'] = self.p1res
+
+    def test_setitem_prev_input_ext(self):
+        ''' __setitem__ previous is input or external. '''
+        df = NNDataflowScheme(self.network, self.input_layout)
+        df['c1'] = self.c1res
+        self.assertAlmostEqual(df.total_cost, self.c1res.total_cost)
+
+        self.network.add_ext('e0', InputLayer(3, 224))
+        self.network.add('c2', self.network['c1'], prevs=('e0',))
+        df = NNDataflowScheme(self.network, self.input_layout,
+                              {'e0': self.input_layout})
+        df['c2'] = self.c1res
+        self.assertAlmostEqual(df.total_cost, self.c1res.total_cost)
 
     def test_delitem(self):
         ''' __delitem__. '''
@@ -185,6 +278,70 @@ class TestNNDataflowScheme(unittest.TestCase):
         for layer_name in df:
             self.assertEqual(id(df[layer_name]), id(df2[layer_name]))
 
+    def test_copy_ext(self):
+        ''' copy external layers. '''
+        self.network.add_ext('e0', self.network.input_layer())
+        self.network.add_ext('e1', self.network.input_layer())
+
+        df1 = NNDataflowScheme(self.network, self.input_layout,
+                               {'e0': self.input_layout,
+                                'e1': self.input_layout})
+        df1['c1'] = self.c1res
+        df1['p1'] = self.p1res
+        df1['p2'] = self.p1res
+
+        df2 = df1.copy()
+
+        self.assertAlmostEqual(df1.total_cost, df2.total_cost)
+        self.assertAlmostEqual(df1.total_time, df2.total_time)
+        self.assertDictEqual(df1.res_dict, df2.res_dict)
+        self.assertDictEqual(df1.ext_layout_dict, df2.ext_layout_dict)
+
+    def test_fmap_layout(self):
+        ''' fmap_layout. '''
+        flayout = self.dtfl.fmap_layout(('c1',))
+        frng = flayout.complete_fmap_range()
+        self.assertTrue(flayout.is_in(self.c1res.ofmap_layout.regions[0]))
+        self.assertEqual(frng, self.c1res.ofmap_layout.frngs[0])
+
+        flayout = self.dtfl.fmap_layout((None,))
+        frng = flayout.complete_fmap_range()
+        self.assertTrue(flayout.is_in(self.input_layout.regions[0]))
+        self.assertEqual(frng, self.input_layout.frngs[0])
+
+        flayout = self.dtfl.fmap_layout(('p1', 'p2'))
+        frng = flayout.complete_fmap_range()
+        self.assertEqual(frng.size('n'),
+                         self.network['p1'].nofm + self.network['p2'].nofm)
+
+        flayout = self.dtfl.fmap_layout((None, 'c1'))
+        frng = flayout.complete_fmap_range()
+        self.assertEqual(frng.size('n'),
+                         self.network.input_layer().nofm
+                         + self.network['c1'].nofm)
+
+    def test_fmap_layout_ext(self):
+        ''' fmap_layout external layers. '''
+        self.network.add_ext('e0', self.network.input_layer())
+        self.network.add_ext('e1', self.network.input_layer())
+
+        df = NNDataflowScheme(self.network, self.input_layout,
+                              {'e0': self.input_layout,
+                               'e1': self.input_layout})
+        df['c1'] = self.c1res
+        df['p1'] = self.p1res
+        df['p2'] = self.p1res
+
+        flayout = df.fmap_layout(('e0',))
+        self.assertEqual(flayout, self.input_layout)
+
+        flayout = df.fmap_layout(('e1', None))
+        self.assertTrue(flayout.is_in(self.input_layout.regions[0]))
+        frng = flayout.complete_fmap_range()
+        self.assertEqual(frng.size('n'),
+                         self.network['e1'].nofm
+                         + self.network.input_layer().nofm)
+
     def test_properties(self):
         ''' Property accessors. '''
         self.assertAlmostEqual(self.dtfl.total_cost, 1.5 + 0.6 * 2)
@@ -195,7 +352,6 @@ class TestNNDataflowScheme(unittest.TestCase):
             self.assertAlmostEqual(a, (7 + 8 + 9) + (.7 + .8 + .9) * 2)
         self.assertAlmostEqual(self.dtfl.total_noc_hops,
                                (4 + 5 + 6) + (.4 + .5 + .6) * 2)
-        self.assertAlmostEqual(self.dtfl.total_node_time, 2 * 4 + 0.05 * 2 * 2)
 
     def test_stats_active_node_pes(self):
         ''' Per-layer stats: active node PEs. '''
@@ -205,9 +361,9 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.assertAlmostEqual(stats['p1'], 1)
         self.assertAlmostEqual(stats['p2'], 1)
 
-    def test_stats_total_dram_bw(self):
-        ''' Per-layer stats: total DRAM bandwidth. '''
-        stats = self.dtfl.perlayer_stats('total_dram_bandwidth')
+    def test_stats_dram_bandwidth(self):
+        ''' Per-layer stats: DRAM bandwidth. '''
+        stats = self.dtfl.perlayer_stats('dram_bandwidth')
         self.assertEqual(len(stats), len(self.dtfl))
         self.assertAlmostEqual(stats['c1'], (7 + 8 + 9) / 2.)
         self.assertAlmostEqual(stats['p1'], (.7 + .8 + .9) / 0.05)
