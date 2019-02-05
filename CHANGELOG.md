@@ -26,6 +26,12 @@ List of major changes and improvements
     - Specify maximum allowed execution time overhead due to layer pipelining
       in `Option`.
     - Specify maximum pipelining degree for layer pipelining in `Option`.
+
+  - Add layer pipelining optimizations.
+    - Ofmap forwarding: alternate layer loop ordering.
+    - Ifmap forwarding: sharing the same inputs from memory to multiple
+      regions.
+    - Support model weight pinning when no resource time-multiplexing.
     - Allow disabling optimizations for layer pipelining to fall back to basic
       pipelining techniques.
 
