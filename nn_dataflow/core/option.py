@@ -19,6 +19,8 @@ from . import data_category_enum as de
 
 OPTION_LIST = ['sw_gbuf_bypass',
                'sw_solve_loopblocking',
+               'hw_access_forwarding',
+               'hw_gbuf_sharing',
                'partition_hybrid',
                'partition_batch',
                'partition_ifmaps',
@@ -55,6 +57,8 @@ class Option(namedtuple('Option', OPTION_LIST)):
 
         kwdict.setdefault('sw_gbuf_bypass', (False,) * de.NUM)
         kwdict.setdefault('sw_solve_loopblocking', False)
+        kwdict.setdefault('hw_access_forwarding', False)
+        kwdict.setdefault('hw_gbuf_sharing', False)
         kwdict.setdefault('partition_hybrid', False)
         kwdict.setdefault('partition_batch', False)
         kwdict.setdefault('partition_ifmaps', False)
@@ -72,6 +76,15 @@ class Option(namedtuple('Option', OPTION_LIST)):
         if len(ntp.sw_gbuf_bypass) != de.NUM:
             raise ValueError('Option: sw_gbuf_bypass must have length {}'
                              .format(de.NUM))
+
+        if ntp.sw_solve_loopblocking and ntp.hw_gbuf_sharing:
+            raise ValueError('Option: sw_solve_loopblocking and '
+                             'hw_gbuf_sharing cannot be simultaneously '
+                             'enabled.')
+
+        if ntp.hw_access_forwarding and ntp.hw_gbuf_sharing:
+            raise ValueError('Option: hw_access_forwarding is implied by '
+                             'hw_gbuf_sharing, thus cannot be both enabled.')
 
         if ntp.partition_ifmaps and not ntp.partition_hybrid:
             raise ValueError('Option: partition_ifmaps requires '

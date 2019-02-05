@@ -252,7 +252,7 @@ class Scheduling(object):
 
             # Explore loop blocking schemes.
             for lbs in loop_blocking.gen_loopblocking(
-                    nested_loop_desc, resource, self.cost, options):
+                    nested_loop_desc, resource, part, self.cost, options):
 
                 if lbs.is_valid():
                     lbs_tops.append(lbs)
@@ -268,8 +268,13 @@ class Scheduling(object):
         # Cost components.
         cost_access = lbs.get_access_cost(self.cost)
 
-        total_nhops = [unh * f for unh, f
-                       in zip(unit_nhops, lbs.get_top_level_fetch())]
+        # Inter-node data forwarding/rotation hops.
+        node_nhops = lbs.get_noc_access()
+        # Memory access hops.
+        mem_nhops = [unh * f for unh, f
+                     in zip(unit_nhops, lbs.get_top_level_fetch())]
+        # Total hops = inter-node hops + memory hops.
+        total_nhops = [nnh + mnh for nnh, mnh in zip(node_nhops, mem_nhops)]
         cost_noc = self.cost.noc_hop * sum(total_nhops)
 
         cost_op = self.cost.mac_op * lbs.ops
@@ -305,9 +310,21 @@ class Scheduling(object):
                           for bl in range(lbs.BL.NUM)]
         scheme['unit_size'] = lbs.unit_size
         scheme['unit_cnt'] = lbs.unit_cnt
+        scheme['accfwd_reduction'] = lbs.accfwd_reduction
+        scheme['bufshr_grp_size'] = lbs.bufshr_grp_size
+        scheme['bufshr_subgrp_size'] = lbs.bufshr_subgrp_size
+        scheme['bufshr_bs_t'] = lbs.bufshr_bs_t
+        scheme['bufshr_bs_ord'] = lbs.bufshr_bs_ord
+        scheme['bufshr_rot_fetch'] = lbs.bufshr_rot_fetch
+        scheme['bufshr_rot_round_cnt'] = lbs.bufshr_rot_round_cnt
+        scheme['bufshr_rot_unit_cnt'] = lbs.bufshr_rot_unit_cnt
+        scheme['bufshr_wide_fetch'] = lbs.bufshr_wide_fetch
+        scheme['bufshr_wide_fetch_width'] = lbs.bufshr_wide_fetch_width
 
         # Partitioning.
         scheme['part'] = part
+        scheme['mem_nhops'] = mem_nhops
+        scheme['node_nhops'] = node_nhops
         scheme['unit_nhops'] = unit_nhops
 
         return SchedulingResult(scheme=scheme, ofmap_layout=ofmap_layout)

@@ -153,7 +153,7 @@ class TestLoopBlocking(TestLoopBlockingFixture):
                           optkey='BASE', skip_invalid=False):
         ''' gen_loopblocking trampoline. '''
         for lbs in loop_blocking.gen_loopblocking(
-                self.nld[wlkey], self.resource[rsrckey],
+                self.nld[wlkey], self.resource[rsrckey], self.part,
                 self.cost, self.options[optkey]):
             if not skip_invalid or lbs.is_valid():
                 yield lbs

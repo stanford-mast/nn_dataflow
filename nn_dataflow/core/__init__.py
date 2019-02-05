@@ -20,6 +20,7 @@ from . import data_category_enum as DataCategoryEnum
 from . import loop_enum as LoopEnum
 from . import mem_hier_enum as MemHierEnum
 from . import parallel_enum as ParallelEnum
+from .buf_shr_scheme import BufShrScheme
 from .cost import Cost
 from .data_dim_loops import DataDimLoops
 from .data_layout import DataLayout

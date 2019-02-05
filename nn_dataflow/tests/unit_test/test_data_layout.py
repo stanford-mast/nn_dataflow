@@ -212,6 +212,52 @@ class TestDataLayout(unittest.TestCase):
                                      PhyDim2(2, 2)),
                          nhops)
 
+    def test_nhops_to_multidests_fwd(self):
+        ''' Get nhops_to multiple destinations forwarding. '''
+        fr = FmapRange((0,) * 4, (4, 4, 16, 16))
+        # First to (2, 2), then (2, 2) to (-1, -2), (-1, -2) to (-2, -3).
+        nhops = 2 * 4 * 8 * 16 * (2 + 1 + 1 + 0) \
+                + 2 * 4 * 8 * 16 * (4 * 7) \
+                + 2 * 4 * 8 * 16 * (4 * 2)
+        self.assertEqual(self.dl1.nhops_to(fr,
+                                           PhyDim2(-1, -2), PhyDim2(-2, -3),
+                                           PhyDim2(2, 2),
+                                           forwarding=True),
+                         nhops)
+
+        frng1 = FmapRange((0, 4, 0, 0), (4, 8, 16, 16))
+        dl = DataLayout(frngs=(self.frng1, frng1),
+                        regions=(self.region1, self.region2),
+                        parts=(self.part1, self.part2))
+        self.assertEqual(dl.nhops_to(fr,
+                                     PhyDim2(-1, -2), PhyDim2(-2, -3),
+                                     PhyDim2(2, 2),
+                                     forwarding=True),
+                         nhops)
+
+        nhops += 2 * 4 * 16 * 16 * ((3 + 4) + 2 * 7 + 2 * 2)
+        fr = FmapRange((0,) * 4, (16,) * 4)
+        self.assertEqual(dl.nhops_to(fr,
+                                     PhyDim2(-1, -2), PhyDim2(-2, -3),
+                                     PhyDim2(2, 2),
+                                     forwarding=True),
+                         nhops)
+
+        # (2, 2) to (3, 10) and (8, 4)
+        nhops += 4 * 8 * 16 * 16 * (9 + 8)
+        self.assertEqual(dl.nhops_to(fr,
+                                     PhyDim2(-1, -2), PhyDim2(-2, -3),
+                                     PhyDim2(2, 2), PhyDim2(3, 10),
+                                     PhyDim2(8, 4),
+                                     forwarding=True),
+                         nhops)
+
+    def test_nhops_to_invalid_kwargs(self):
+        ''' Get nhops_to invalid kwargs. '''
+        fr = FmapRange((0,) * 4, (4, 4, 16, 16))
+        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*keyword.*'):
+            _ = self.dl1.nhops_to(fr, PhyDim2(1, 1), f=True)
+
     def test_is_in(self):
         ''' Whether is_in. '''
         nr1 = self.region1

@@ -24,6 +24,8 @@ class TestOption(unittest.TestCase):
         ''' Valid keyword arguments. '''
         options = Option(sw_gbuf_bypass=(False, False, False),
                          sw_solve_loopblocking=False,
+                         hw_access_forwarding=False,
+                         hw_gbuf_sharing=False,
                          partition_hybrid=True,
                          partition_batch=False,
                          partition_ifmaps=False,
@@ -36,6 +38,10 @@ class TestOption(unittest.TestCase):
                          'sw_gbuf_bypass')
         self.assertEqual(options.sw_solve_loopblocking, False,
                          'sw_solve_loopblocking')
+        self.assertEqual(options.hw_access_forwarding, False,
+                         'hw_access_forwarding')
+        self.assertEqual(options.hw_gbuf_sharing, False,
+                         'hw_gbuf_sharing')
         self.assertEqual(options.partition_hybrid, True,
                          'partition_hybrid')
         self.assertEqual(options.partition_batch, False,
@@ -92,6 +98,20 @@ class TestOption(unittest.TestCase):
         ''' Invalid sw_gbuf_bypass len. '''
         with self.assertRaisesRegexp(ValueError, 'Option: .*sw_gbuf_bypass.*'):
             _ = Option(sw_gbuf_bypass=(False, False))
+
+    def test_invalid_swsol_hwbufshr(self):
+        ''' Invalid sw_solve_loopblocking and hw_gbuf_sharing comb. '''
+        with self.assertRaisesRegexp(ValueError,
+                                     'Option: .*sw_solve_loopblocking.*'
+                                     'hw_gbuf_sharing.*'):
+            _ = Option(sw_solve_loopblocking=True, hw_gbuf_sharing=True)
+
+    def test_invalid_hwaccfwd_hwbufshr(self):
+        ''' Invalid hw_access_forwarding and hw_gbuf_sharing comb. '''
+        with self.assertRaisesRegexp(ValueError,
+                                     'Option: .*hw_access_forwarding.*'
+                                     'hw_gbuf_sharing.*'):
+            _ = Option(hw_access_forwarding=True, hw_gbuf_sharing=True)
 
     def test_invalid_part_hybrid_ifmaps(self):
         ''' Invalid partition_hybrid and partition_ifmaps comb. '''

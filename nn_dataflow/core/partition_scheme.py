@@ -173,6 +173,41 @@ class PartitionScheme(namedtuple('PartitionScheme', PARTITION_SCHEME_LIST)):
 
         return p_layer, p_batch_size, p_occ
 
+    def part_neighbor_dist(self, node_region, pae):
+        '''
+        Get the 2D distance between nearest neighbor nodes with the given
+        parallelism in the given node region.
+
+        The returned neighbor distance is a PhyDim2 instance, each dimension of
+        which is the hop distance to the neighbor on that logical dimension.
+        '''
+        if pae not in range(pe.NUM):
+            return PhyDim2(float('nan'), float('nan'))
+
+        hdist = []
+        wdist = []
+
+        for pidx in self.gen_pidx():
+            coord = self.coordinate(node_region, pidx)
+            # On logical h dimension.
+            if pidx[pae].h > 0:
+                pidx_ph = [pidx[p] - PhyDim2(h=1, w=0) if p == pae
+                           else pidx[p] for p in range(pe.NUM)]
+                coord_ph = self.coordinate(node_region, pidx_ph)
+                hdist.append(coord.hop_dist(coord_ph))
+            # On logical w dimension.
+            if pidx[pae].w > 0:
+                pidx_pw = [pidx[p] - PhyDim2(h=0, w=1) if p == pae
+                           else pidx[p] for p in range(pe.NUM)]
+                coord_pw = self.coordinate(node_region, pidx_pw)
+                wdist.append(coord.hop_dist(coord_pw))
+
+        # Average.
+        hd = 1. * sum(hdist) / len(hdist) if hdist else float('inf')
+        wd = 1. * sum(wdist) / len(wdist) if wdist else float('inf')
+
+        return PhyDim2(h=hd, w=wd)
+
     def projection(self, region, appl2frng=False):
         '''
         Get the projection of the partitioning scheme onto a new NodeRegion

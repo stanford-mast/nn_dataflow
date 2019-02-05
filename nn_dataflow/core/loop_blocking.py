@@ -20,6 +20,7 @@ from multiprocessing import Pool
 from . import loop_blocking_solver
 from . import loop_enum as le
 from .. import util
+from .buf_shr_scheme import BufShrScheme
 from .layer import ConvLayer
 from .loop_blocking_scheme import LoopBlockingScheme
 
@@ -110,7 +111,7 @@ def _loop_blocking_cmp_key(options, cost):
 
 
 def _gen_loopblocking_perprocess(
-        nested_loop_desc, resource, cost, options,
+        nested_loop_desc, resource, bufshr, cost, options,
         gen_tifm, gen_tofm, gen_tbat, gen_ords):
 
     def _gen_bl_ts():
@@ -134,17 +135,22 @@ def _gen_loopblocking_perprocess(
             if is_conv_loops and skip_conv(bl_ts, bl_ords):
                 continue
             lbs = LoopBlockingScheme(
-                nested_loop_desc, bl_ts, bl_ords, resource, options)
+                nested_loop_desc, bl_ts, bl_ords, resource, bufshr,
+                options)
             yield lbs
 
     return heapq.nsmallest(options.ntops, _sweep(),
                            key=_loop_blocking_cmp_key(options, cost))
 
 
-def gen_loopblocking(nested_loop_desc, resource, cost, options):
+def gen_loopblocking(nested_loop_desc, resource, part, cost, options):
     '''
     Generator for loop blocking.
     '''
+
+    # Buffer sharing scheme.
+    bufshr = BufShrScheme(resource.proc_region, part,
+                          nested_loop_desc.data_loops)
 
     # Solver only works for CONV layer.
     if options.sw_solve_loopblocking \
@@ -153,7 +159,7 @@ def gen_loopblocking(nested_loop_desc, resource, cost, options):
 
         for bl_ts, bl_ords in gen(nested_loop_desc, resource, options):
             lbs = LoopBlockingScheme(nested_loop_desc, bl_ts, bl_ords,
-                                     resource, options)
+                                     resource, bufshr, options)
             yield lbs
         return
 
@@ -199,8 +205,8 @@ def gen_loopblocking(nested_loop_desc, resource, cost, options):
     list_ords = list(gen_ords)
     for tifm, tofm in itertools.product(gen_tifm, gen_tofm):
         r = apply_func(_gen_loopblocking_perprocess,
-                       (nested_loop_desc, resource, cost, options,
-                        [tifm], [tofm], list_tbat, list_ords))
+                       (nested_loop_desc, resource, bufshr, cost,
+                        options, [tifm], [tofm], list_tbat, list_ords))
         results.append(r)
 
     for lbs in heapq.nsmallest(options.ntops, retrieve_func,
