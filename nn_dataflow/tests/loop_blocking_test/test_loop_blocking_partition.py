@@ -56,8 +56,8 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
             fil_fetch = part.size(pe.BATP, pe.OFMP) // bufshr.size(de.FIL)
 
             for lbs in loop_blocking.gen_loopblocking(
-                    p_nld, self.resource['PAR'], part, self.cost,
-                    self.options['ACCFWD']):
+                    p_nld, self.resource['PAR'], part, self.none_cstr,
+                    self.cost, self.options['ACCFWD']):
                 if not lbs.is_valid():
                     continue
 
@@ -97,8 +97,8 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
             for optkey in ['BUFSHR', 'BUFSHR-BYP']:
 
                 for lbs in loop_blocking.gen_loopblocking(
-                        p_nld, self.resource['PAR'], part, self.cost,
-                        self.options[optkey]):
+                        p_nld, self.resource['PAR'], part, self.none_cstr,
+                        self.cost, self.options[optkey]):
                     if not lbs.is_valid():
                         continue
 
@@ -132,8 +132,8 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
             bufshr = BufShrScheme(self.par_proc_region, part)
 
             for lbs in loop_blocking.gen_loopblocking(
-                    p_nld, self.resource['PAR'], part, self.cost,
-                    self.options['BUFSHR']):
+                    p_nld, self.resource['PAR'], part, self.none_cstr,
+                    self.cost, self.options['BUFSHR']):
                 if not lbs.is_valid():
                     continue
 
@@ -159,8 +159,8 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
             bufshr = BufShrScheme(self.par_proc_region, part)
 
             for lbs in loop_blocking.gen_loopblocking(
-                    p_nld, self.resource['PAR'], part, self.cost,
-                    self.options['BUFSHR-BYP']):
+                    p_nld, self.resource['PAR'], part, self.none_cstr,
+                    self.cost, self.options['BUFSHR-BYP']):
                 if not lbs.is_valid():
                     continue
 
@@ -382,8 +382,8 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
             p_nld = self._part_nld(part)
 
             for lbs in loop_blocking.gen_loopblocking(
-                    p_nld, self.resource['PAR'], part, self.cost,
-                    self.options['BUFSHR']):
+                    p_nld, self.resource['PAR'], part, self.none_cstr,
+                    self.cost, self.options['BUFSHR']):
 
                 noc_access = lbs.get_noc_access()
 
@@ -405,8 +405,8 @@ class TestLoopBlockingPartition(TestLoopBlockingFixture):
             p_nld = self._part_nld(part, layerkey='POOL')
 
             for lbs in loop_blocking.gen_loopblocking(
-                    p_nld, self.resource['PAR'], part, self.cost,
-                    self.options['BUFSHR']):
+                    p_nld, self.resource['PAR'], part, self.none_cstr,
+                    self.cost, self.options['BUFSHR']):
                 if not lbs.is_valid():
                     continue
 

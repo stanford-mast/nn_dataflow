@@ -301,6 +301,31 @@ class TestDataLayout(unittest.TestCase):
                                             dim=PhyDim2(50, 50),
                                             type=self.region1.type)))
 
+    def test_is_in_folded(self):
+        ''' Whether is_in with folded regions. '''
+        # (1, 1/2), (2/3, 0/1/2), (4, 1/2)
+        nr1 = NodeRegion(origin=PhyDim2(1, 1), dim=PhyDim2(1, 10),
+                         type=self.region1.type, wtot=3, wbeg=2)
+        # (1, 1/2), (2, 2)
+        nr2 = NodeRegion(origin=PhyDim2(1, 1), dim=PhyDim2(1, 3),
+                         type=self.region1.type, wtot=3, wbeg=2)
+        self.assertTrue(self.dl1.is_in(nr1))
+        self.assertFalse(self.dl1.is_in(nr2))
+
+        # (1-2, 2), (3-4/5-6/7-8, 0/1/2)
+        region = NodeRegion(origin=PhyDim2(1, 2), dim=PhyDim2(2, 10),
+                            type=self.region1.type, wtot=3, wbeg=1)
+        part = PartitionScheme(order=range(pe.NUM),
+                               pdims=(PhyDim2(1, 5), PhyDim2(2, 1),
+                                      PhyDim2(1, 2), PhyDim2(1, 1)))
+        dl = DataLayout(frngs=self.dl1.frngs,
+                        regions=(region,), parts=(part,))
+        # (1-2, 1/2), (3-4/5-6, -1/0/1/2), (7-8, 0/1/2)
+        nr3 = NodeRegion(origin=PhyDim2(1, 1), dim=PhyDim2(2, 13),
+                         type=self.region1.type, wtot=4, wbeg=2)
+        self.assertTrue(dl.is_in(nr3))
+        self.assertFalse(dl.is_in(nr2))
+
     def test_concat(self):
         ''' Concat. '''
         fr = FmapRange((0,) * 4, (30,) * 4)

@@ -34,6 +34,7 @@ from nn_dataflow.core import ParallelEnum as pe
 from nn_dataflow.core import PartitionScheme
 from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import Resource
+from nn_dataflow.core import SchedulingConstraint
 from nn_dataflow import util
 
 class TestLoopBlockingFixture(unittest.TestCase):
@@ -62,19 +63,22 @@ class TestLoopBlockingFixture(unittest.TestCase):
             proc_region=proc_region, dram_region=data_region,
             src_data_region=data_region, dst_data_region=data_region,
             dim_array=dim_array, size_gbuf=65536, size_regf=64,
-            array_bus_width=float('inf'), dram_bandwidth=float('inf'))
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'),
+            no_time_mux=False)
         # Larger resource with sufficient capacity, to make all schemes valid.
         self.resource['LG'] = Resource(
             proc_region=proc_region, dram_region=data_region,
             src_data_region=data_region, dst_data_region=data_region,
             dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3,
-            array_bus_width=float('inf'), dram_bandwidth=float('inf'))
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'),
+            no_time_mux=False)
         # Small resource.
         self.resource['SM'] = Resource(
             proc_region=proc_region, dram_region=data_region,
             src_data_region=data_region, dst_data_region=data_region,
             dim_array=dim_array, size_gbuf=4096, size_regf=16,
-            array_bus_width=float('inf'), dram_bandwidth=float('inf'))
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'),
+            no_time_mux=False)
         # Multi-node parallel resource.
         self.resource['PAR'] = Resource(
             proc_region=NodeRegion(origin=PhyDim2(0, 0),
@@ -83,7 +87,36 @@ class TestLoopBlockingFixture(unittest.TestCase):
             dram_region=data_region,
             src_data_region=data_region, dst_data_region=data_region,
             dim_array=dim_array, size_gbuf=25000, size_regf=64,
-            array_bus_width=float('inf'), dram_bandwidth=float('inf'))
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'),
+            no_time_mux=False)
+        # Resource with no data regions.
+        proc_data_region = NodeRegion(origin=PhyDim2(1, 1), dim=PhyDim2(1, 1),
+                                      type=NodeRegion.PROC)
+        self.resource['SRCNOTDATA'] = Resource(
+            proc_region=proc_region, dram_region=data_region,
+            src_data_region=proc_data_region, dst_data_region=data_region,
+            dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3,
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'),
+            no_time_mux=False)
+        self.resource['DSTNOTDATA'] = Resource(
+            proc_region=proc_region, dram_region=data_region,
+            src_data_region=data_region, dst_data_region=proc_data_region,
+            dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3,
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'),
+            no_time_mux=False)
+        self.resource['DATALOCAL'] = Resource(
+            proc_region=proc_region, dram_region=data_region,
+            src_data_region=proc_region, dst_data_region=proc_region,
+            dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3,
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'),
+            no_time_mux=False)
+        # Filter pinning.
+        self.resource['FILPIN'] = Resource(
+            proc_region=proc_region, dram_region=data_region,
+            src_data_region=data_region, dst_data_region=data_region,
+            dim_array=dim_array, size_gbuf=1024 ** 3, size_regf=1024 ** 3,
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'),
+            no_time_mux=True)
 
         # Nested loop description after mapping.
         self.nld = {}
@@ -160,6 +193,10 @@ class TestLoopBlockingFixture(unittest.TestCase):
         self.options['BUFSHR-BYP'] = Option(sw_gbuf_bypass=(True,) * 3,
                                             hw_gbuf_sharing=True,
                                             ntops=2 ** 30)
+
+        # Constraint.
+        self.none_cstr = SchedulingConstraint()
+        self.cstr = SchedulingConstraint(topifm=1, topbat=1)
 
         # Cost.
         self.cost = Cost(mac_op=1, mem_hier=(200, 6, 2, 1),

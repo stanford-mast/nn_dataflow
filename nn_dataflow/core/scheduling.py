@@ -20,6 +20,7 @@ import fastcache
 from . import data_category_enum as de
 from . import loop_blocking
 from . import loop_enum as le
+from . import mem_hier_enum as me
 from . import partition
 from .. import util
 from .cost import Cost
@@ -28,10 +29,13 @@ from .fmap_range import FmapPosition, FmapRange
 from .layer import Layer
 from .map_strategy import MapStrategy
 from .resource import Resource
+from .scheduling_constraint import SchedulingConstraint
 
 class SchedulingCondition(namedtuple('SchedulingCondition',
                                      ['resource',
+                                      'constraint',
                                       'ifmap_layout',
+                                      'sched_seq',
                                      ])):
     '''
     Layer scheduling condition.
@@ -43,9 +47,17 @@ class SchedulingCondition(namedtuple('SchedulingCondition',
         if not isinstance(ntp.resource, Resource):
             raise TypeError('SchedulingCondition: resource must be '
                             'a Resource instance.')
+        if not isinstance(ntp.constraint, SchedulingConstraint):
+            raise TypeError('SchedulingCondition: constraint must be '
+                            'a SchedulingConstraint instance.')
         if not isinstance(ntp.ifmap_layout, DataLayout):
             raise TypeError('SchedulingCondition: ifmap_layout must be '
                             'a DataLayout instance.')
+        if not isinstance(ntp.sched_seq, tuple):
+            raise TypeError('SchedulingCondition: sched_seq must be a tuple.')
+        if len(ntp.sched_seq) != 3:
+            raise ValueError('SchedulingCondition: sched_seq must have '
+                             '(segment, spatial, temporal) 3 indices.')
 
         return ntp
 
@@ -53,6 +65,7 @@ class SchedulingCondition(namedtuple('SchedulingCondition',
 class SchedulingResult(namedtuple('SchedulingResult',
                                   ['scheme',
                                    'ofmap_layout',
+                                   'sched_seq',
                                   ])):
     '''
     Layer scheduling result.
@@ -67,6 +80,11 @@ class SchedulingResult(namedtuple('SchedulingResult',
         if not isinstance(ntp.ofmap_layout, DataLayout):
             raise TypeError('SchedulingResult: ofmap_layout must be '
                             'a DataLayout instance.')
+        if not isinstance(ntp.sched_seq, tuple):
+            raise TypeError('SchedulingResult: sched_seq must be a tuple.')
+        if len(ntp.sched_seq) != 3:
+            raise ValueError('SchedulingResult: sched_seq must have '
+                             '(segment, spatial, temporal) 3 indices.')
 
         return ntp
 
@@ -103,7 +121,9 @@ class SchedulingResult(namedtuple('SchedulingResult',
     @property
     def total_accesses(self):
         ''' Get the total accesses at all memory hierarchies as a list. '''
-        return [sum(acc) for acc in self.scheme['access']]
+        accesses = [sum(acc) for acc in self.scheme['access']]
+        accesses[me.GBUF] += sum(self.scheme['remote_gbuf_access'])
+        return accesses
 
     @property
     def total_noc_hops(self):
@@ -160,7 +180,8 @@ class Scheduling(object):
 
         # Ifmap layout.
         ifmap_layout = condition.ifmap_layout
-        if not ifmap_layout.is_in(resource.src_data_region):
+        # Ifmap should be from the source data region or local.
+        if not ifmap_layout.is_in(resource.src_data_region, proc_region):
             raise ValueError('Scheduling: ifmap layout is not contained in '
                              'source data region.')
         ifrng = ifmap_layout.complete_fmap_range()
@@ -180,7 +201,7 @@ class Scheduling(object):
                                             guaranteed=True):
             # Explore single-node schedules.
             lbs_tops = list(self.schedule_search_per_node(
-                part, resource, options))
+                part, resource, condition.constraint, options))
             if not lbs_tops:
                 continue
 
@@ -201,7 +222,8 @@ class Scheduling(object):
                 filter_nodes, ifmap_layout, ofmap_layout, options)
 
             # Make scheduling result.
-            tops += [self._get_result(lbs, part, ofmap_layout, unit_nhops)
+            tops += [self._get_result(lbs, part, ofmap_layout,
+                                      condition.sched_seq, unit_nhops)
                      for lbs in lbs_tops]
 
         # Pick the top n.
@@ -231,7 +253,7 @@ class Scheduling(object):
         return (info.hits, info.misses)
 
     @fastcache.clru_cache(maxsize=1024)
-    def schedule_search_per_node(self, part, resource, options):
+    def schedule_search_per_node(self, part, resource, constraint, options):
         '''
         Search the best mapping strategies and loop blocking schemes for a
         single node after partitioning. Return the top LoopBlockingScheme
@@ -252,14 +274,15 @@ class Scheduling(object):
 
             # Explore loop blocking schemes.
             for lbs in loop_blocking.gen_loopblocking(
-                    nested_loop_desc, resource, part, self.cost, options):
+                    nested_loop_desc, resource, part, constraint, self.cost,
+                    options):
 
                 if lbs.is_valid():
                     lbs_tops.append(lbs)
 
         return lbs_tops
 
-    def _get_result(self, lbs, part, ofmap_layout, unit_nhops):
+    def _get_result(self, lbs, part, ofmap_layout, sched_seq, unit_nhops):
         '''
         Make the schedule result from loop blocking and partitioning.
         '''
@@ -288,6 +311,7 @@ class Scheduling(object):
         scheme['time'] = lbs.time
         scheme['ops'] = lbs.ops
         scheme['num_nodes'] = lbs.num_nodes
+        scheme['is_dram'] = (lbs.src_is_dram, lbs.dst_is_dram)
         scheme['cost_op'] = cost_op
         scheme['cost_access'] = cost_access
         scheme['cost_noc'] = cost_noc
@@ -296,6 +320,7 @@ class Scheduling(object):
         scheme['bus_time'] = lbs.bus_time
         scheme['dram_time'] = lbs.dram_time
         scheme['access'] = lbs.get_access()
+        scheme['remote_gbuf_access'] = lbs.remote_gbuf_access
         scheme['total_nhops'] = total_nhops
         scheme['fetch'] = lbs.fetch
 
@@ -327,5 +352,6 @@ class Scheduling(object):
         scheme['node_nhops'] = node_nhops
         scheme['unit_nhops'] = unit_nhops
 
-        return SchedulingResult(scheme=scheme, ofmap_layout=ofmap_layout)
+        return SchedulingResult(scheme=scheme, ofmap_layout=ofmap_layout,
+                                sched_seq=sched_seq)
 

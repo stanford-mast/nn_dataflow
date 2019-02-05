@@ -12,18 +12,60 @@ List of major changes and improvements
   - Buffer sharing scheme.
     - Use `BufShrScheme` class to represent and calculate NoC transfers.
 
+- Software models.
+
+  - Add `SchedulingConstraint` class to specify loop blocking and partitioning
+    constraints.
+    - Add lazily updated rules to allow refine constraint with previous
+      scheduling results at runtime.
+    - Add subclass `SchedulingConstraintLayerPipeline` for layer pipelining
+      constraints.
+
+  - Add `InterLayerPipeline`.
+    - Layers are organized into `PipelineSegment`, which are simultaneously
+      mapped on to the resource both spatially and temporally.
+    - Each layer in the segment has a 3-tuple scheduling index including
+      segment index, spatial index, and temporal index.
+    - Each layer in the segment has its resource allocation and scheduling
+      constraint.
+    - Use `PipelineSegmentTiming` to capture the timing relation of layers in
+      the segment.
+    - Specify maximum allowed execution time overhead due to layer pipelining
+      in `Option`.
+    - Specify maximum pipelining degree for layer pipelining in `Option`.
+
+  - Add layer pipelining optimizations.
+    - Ofmap forwarding: alternate layer loop ordering.
+    - Ifmap forwarding: sharing the same inputs from memory to multiple
+      regions.
+    - Support model weight pinning when no resource time-multiplexing.
+    - Allow disabling optimizations for layer pipelining to fall back to basic
+      pipelining techniques.
+
 
 ### Changed
+
+- Hardware models.
+
+  - Allow data source/destination regions in `Resource` to be non-DATA type.
+
+  - Allow `NodeRegion` to be folded along the w dimension in a zig-zag manner.
 
 - Software models.
 
   - `LoopBlockingScheme` supports access forwarding and buffer sharing.
+
+  - `LoopBlockingScheme` supports remote node buffers as data regions (non-data
+    type data regions).
 
   - `partition` unit number of hops calculation supports access forwarding and
     buffer sharing.
 
   - `DataLayout` supports closest-first forwarding data transfer for access
     forwarding and buffer sharing.
+
+  - Refactor `NNDataflow` and `NNDataflowScheme` to incorporate inter-layer
+    pipelining.
 
 
 ## [v1.5 -- v1.6] -- 2018-01-31

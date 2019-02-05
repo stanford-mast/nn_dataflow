@@ -19,6 +19,7 @@ import math
 from . import data_category_enum as de
 from . import loop_enum as le
 from . import mem_hier_enum as me
+from .node_region import NodeRegion
 from .. import util
 
 class LoopBlockingScheme(object):
@@ -138,6 +139,34 @@ class LoopBlockingScheme(object):
         # Data fetch calculation.
         self._set_fetch()
 
+        # Check resource data src/dst region.
+        self.src_is_dram = (resource.src_data_region.type == NodeRegion.DRAM)
+        self.dst_is_dram = (resource.dst_data_region.type == NodeRegion.DRAM)
+
+        # Check resource for filter pinning.
+        self.filter_pinned = False
+        if resource.no_time_mux:
+            if all(self.bl_ts[0][lpe] == 1 for lpe
+                   in self.nld.data_loops[de.FIL].loops()):
+                self.filter_pinned = True
+                self.fetch[0][de.FIL] = 0
+
+        # If data regions are not DRAM, can only access once, no spilling.
+        if not self.src_is_dram:
+            if self.fetch[BL.GBUF][de.IFM] > 1:
+                self.valid = False
+                return
+            if resource.src_data_region == resource.proc_region:
+                # Force to store in gbuf.
+                self.stored_in_gbuf[de.IFM] = True
+        if not self.dst_is_dram:
+            if self.fetch[BL.GBUF][de.OFM] > 1:
+                self.valid = False
+                return
+            if resource.dst_data_region == resource.proc_region:
+                # Force to store in gbuf.
+                self.stored_in_gbuf[de.OFM] = True
+
         # Now with the fetch times, we can calculate the actual
         # `stored_in_gbuf` values.
         # Only store in gbuf if having reuse.
@@ -171,6 +200,7 @@ class LoopBlockingScheme(object):
         self.bus_time = float('nan')
         self.dram_time = float('nan')
         self.access = [[float('nan')] * de.NUM for _ in range(me.NUM)]
+
         # NoC access due to buffer sharing.
         self.noc_access = [0.] * de.NUM
         self.bufshr_rotation_access = [0.] * de.NUM
@@ -181,6 +211,9 @@ class LoopBlockingScheme(object):
 
         # Access forwarding.
         self._set_accfwd(bufshr, options)
+
+        # Remote gbuf access.
+        self.remote_gbuf_access = [0.] * de.NUM
 
     def is_valid(self):
         '''
@@ -252,6 +285,7 @@ class LoopBlockingScheme(object):
             self._calc_stats()
 
         acc_cost = sum(c * sum(a) for c, a in zip(cost.mem_hier, self.access))
+        acc_cost += cost.mem_hier_at(me.GBUF) * sum(self.remote_gbuf_access)
 
         return acc_cost
 
@@ -465,6 +499,15 @@ class LoopBlockingScheme(object):
         self.noc_access = [a1 + a2 for a1, a2
                            in zip(self.bufshr_rotation_access,
                                   self.bufshr_wide_fetch_access)]
+
+        if not self.src_is_dram:
+            self.remote_gbuf_access[de.IFM] += self.access[me.DRAM][de.IFM]
+            self.access[me.DRAM][de.IFM] = 0
+        if not self.dst_is_dram:
+            self.remote_gbuf_access[de.OFM] += self.access[me.DRAM][de.OFM]
+            self.access[me.DRAM][de.OFM] = 0
+        if self.filter_pinned:
+            assert self.access[me.DRAM][de.FIL] == 0
 
         # DRAM access time.
         self.dram_time = int(math.ceil(sum(self.access[me.DRAM])

@@ -18,9 +18,10 @@ import sys
 import StringIO
 
 from nn_dataflow.core import Cost
-from nn_dataflow.core import InputLayer, FCLayer
+from nn_dataflow.core import InputLayer, ConvLayer, FCLayer
 from nn_dataflow.core import MapStrategy, MapStrategyEyeriss
 from nn_dataflow.core import MemHierEnum as me
+from nn_dataflow.core import Network
 from nn_dataflow.core import NodeRegion
 from nn_dataflow.core import NNDataflow
 from nn_dataflow.core import Option
@@ -36,6 +37,25 @@ class TestNNDataflow(unittest.TestCase):
 
         self.alex_net = import_network('alex_net')
         self.vgg_net = import_network('vgg_net')
+
+        net = Network('simple')
+        net.set_input_layer(InputLayer(4, 2))
+        net.add('1', ConvLayer(4, 4, 2, 1))
+        net.add('2', ConvLayer(4, 4, 2, 1))
+        # Two more layers to avoid single-segment case.
+        net.add('a1', ConvLayer(4, 1, 1, 1, strd=2))
+        net.add('a2', ConvLayer(1, 1, 1, 1))
+        self.simple_net = net
+
+        net = Network('complex')
+        net.set_input_layer(InputLayer(8, 8))
+        net.add('1', ConvLayer(8, 8, 8, 1))
+        net.add('2a', ConvLayer(8, 8, 8, 1), prevs=('1',))
+        net.add('3a', ConvLayer(8, 8, 8, 1))
+        net.add('2b', ConvLayer(8, 8, 8, 1), prevs=('1',))
+        net.add('3b', ConvLayer(8, 8, 8, 1))
+        net.add('4', ConvLayer(16, 8, 8, 1), prevs=('3a', '3b'))
+        self.complex_net = net
 
         self.map_strategy = MapStrategyEyeriss
 
@@ -56,6 +76,7 @@ class TestNNDataflow(unittest.TestCase):
                                  size_regf=512 // 2,  # 512 B
                                  array_bus_width=float('inf'),
                                  dram_bandwidth=float('inf'),
+                                 no_time_mux=False,
                                 )
 
         self.cost = Cost(mac_op=1,
@@ -126,6 +147,144 @@ class TestNNDataflow(unittest.TestCase):
         self.assertFalse(stdout_value)
         for layer in network:
             self.assertIn(layer, stderr_value)
+
+    def test_pipelining(self):
+        ''' Pipelining. '''
+        network = self.alex_net
+        batch_size = 1
+
+        options = Option(hw_gbuf_save_writeback=True,
+                         partition_interlayer=True)
+        nnd = NNDataflow(network, batch_size, self.resource, self.cost,
+                         self.map_strategy)
+
+        tops, _ = nnd.schedule_search(options)
+        self.assertTrue(tops)
+
+    def test_fast_forward_infeasible(self):
+        ''' Enter fast forward due to infeasible constraint. '''
+        network = self.simple_net
+        batch_size = 1
+
+        # Very small gbuf size. Small fmap tpart is infeasible.
+        resource = self.resource._replace(
+            dim_array=PhyDim2(2, 2),
+            size_gbuf=16)
+
+        options = Option(hw_gbuf_save_writeback=True,
+                         partition_interlayer=True)
+        nnd = NNDataflow(network, batch_size, resource, self.cost,
+                         self.map_strategy)
+
+        tops, _ = nnd.schedule_search(options)
+        self.assertTrue(tops)
+
+        # No pipelining is feasible.
+        for dtfl in tops:
+            self.assertTupleEqual(dtfl['1'].sched_seq, (0, 0, 0))
+            self.assertTupleEqual(dtfl['2'].sched_seq, (1, 0, 0))
+
+    def test_fast_forward_found(self):
+        ''' Enter fast forward due to early found. '''
+        network = self.simple_net
+        batch_size = 1
+
+        # No time overhead limit.
+        options = Option(hw_gbuf_save_writeback=True,
+                         partition_interlayer=True,
+                         layer_pipeline_time_ovhd=float('inf'))
+        nnd = NNDataflow(network, batch_size, self.resource, self.cost,
+                         self.map_strategy)
+
+        tops, _ = nnd.schedule_search(options)
+        self.assertTrue(tops)
+
+    def test_fast_forward_crit_time(self):
+        ''' Enter fast forward due to long critical time. '''
+        network = self.simple_net
+        batch_size = 1
+
+        # Multiple nodes for spatial pipelining.
+        resource = self.resource._replace(
+            proc_region=NodeRegion(origin=PhyDim2(0, 0),
+                                   dim=PhyDim2(8, 8),
+                                   type=NodeRegion.PROC),
+            dim_array=PhyDim2(1, 1),
+        )
+
+        # Very strict time overhead limit.
+        # At large fmap tpart, utilization decreases and critical time would
+        # increase.
+        options = Option(hw_gbuf_save_writeback=True,
+                         partition_interlayer=True,
+                         layer_pipeline_time_ovhd=1e-3)
+        nnd = NNDataflow(network, batch_size, resource, self.cost,
+                         self.map_strategy)
+
+        tops, _ = nnd.schedule_search(options)
+        self.assertTrue(tops)
+
+    def test_fast_forward_frontier(self):
+        ''' Enter fast forward due to off-frontier. '''
+        network = self.simple_net
+        batch_size = 16
+
+        # Multiple nodes for spatial pipelining.
+        resource = self.resource._replace(
+            proc_region=NodeRegion(origin=PhyDim2(0, 0),
+                                   dim=PhyDim2(8, 8),
+                                   type=NodeRegion.PROC),
+            dim_array=PhyDim2(2, 2),
+        )
+
+        # No time overhead limit.
+        options = Option(hw_gbuf_save_writeback=True,
+                         partition_interlayer=True,
+                         layer_pipeline_time_ovhd=float('inf'))
+        nnd = NNDataflow(network, batch_size, resource, self.cost,
+                         self.map_strategy)
+
+        tops, _ = nnd.schedule_search(options)
+        self.assertTrue(tops)
+
+    def test_fmap_fwd(self):
+        '''
+        Fmap forward with shared mem sources or both on/off-chip destinations.
+        '''
+        network = self.complex_net
+        batch_size = 16
+
+        # Multiple nodes for spatial pipelining.
+        resource = self.resource._replace(
+            proc_region=NodeRegion(origin=PhyDim2(0, 0),
+                                   dim=PhyDim2(8, 8),
+                                   type=NodeRegion.PROC),
+        )
+
+        # No time overhead limit.
+        options = Option(hw_gbuf_save_writeback=True,
+                         partition_interlayer=True,
+                         layer_pipeline_time_ovhd=float('inf'))
+        nnd = NNDataflow(network, batch_size, resource, self.cost,
+                         self.map_strategy)
+
+        tops, _ = nnd.schedule_search(options)
+        self.assertTrue(tops)
+
+    def test_sched_instance_sharing(self):
+        ''' Scheduling instance sharing between layers. '''
+        network = self.alex_net
+        batch_size = 1
+
+        nnd = NNDataflow(network, batch_size, self.resource, self.cost,
+                         self.map_strategy)
+
+        self.assertIs(nnd.layer_sched_dict['conv1_a'],
+                      nnd.layer_sched_dict['conv1_b'])
+        self.assertIs(nnd.layer_sched_dict['conv2_a'],
+                      nnd.layer_sched_dict['conv2_b'])
+        self.assertIs(nnd.layer_sched_dict['pool1_a'],
+                      nnd.layer_sched_dict['pool1_b'])
 
     def test_opt_goal(self):
         ''' Optimization goal. '''
@@ -206,27 +365,35 @@ class TestNNDataflow(unittest.TestCase):
 
         # Very small REGF.
         self.resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
-                                                        dim=PhyDim2(1, 1),
+                                                        dim=PhyDim2(4, 4),
                                                         type=NodeRegion.PROC),
                                  dram_region=NodeRegion(
                                      origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
                                      type=NodeRegion.DRAM),
                                  src_data_region=NodeRegion(
-                                     origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                     origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
                                      type=NodeRegion.DRAM),
                                  dst_data_region=NodeRegion(
-                                     origin=PhyDim2(0, 0), dim=PhyDim2(1, 1),
+                                     origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
                                      type=NodeRegion.DRAM),
                                  dim_array=PhyDim2(16, 16),
                                  size_gbuf=128 * 1024 // 2,  # 128 kB
                                  size_regf=2,
                                  array_bus_width=float('inf'),
                                  dram_bandwidth=float('inf'),
+                                 no_time_mux=False,
                                 )
 
         nnd = NNDataflow(self.alex_net, 4, self.resource, self.cost,
                          self.map_strategy)
         tops, _ = nnd.schedule_search(self.options)
+
+        self.assertFalse(tops)
+
+        # With inter-layer pipelining.
+        options = Option(hw_gbuf_save_writeback=True,
+                         partition_interlayer=True)
+        tops, _ = nnd.schedule_search(options)
 
         self.assertFalse(tops)
 
@@ -346,6 +513,7 @@ class TestNNDataflow(unittest.TestCase):
                             size_regf=261,  # 225 + 12 + 24
                             array_bus_width=float('inf'),
                             dram_bandwidth=float('inf'),
+                            no_time_mux=False,
                            )
 
         cost = Cost(mac_op=2e-12,
@@ -442,6 +610,7 @@ class TestNNDataflow(unittest.TestCase):
                             size_regf=1024 // 2,  # 1 kB
                             array_bus_width=float('inf'),
                             dram_bandwidth=float('inf'),
+                            no_time_mux=False,
                            )
 
         cost = Cost(mac_op=2e-12,
@@ -474,6 +643,7 @@ class TestNNDataflow(unittest.TestCase):
                             size_regf=512 // 2,  # 512 B
                             array_bus_width=float('inf'),
                             dram_bandwidth=float('inf'),
+                            no_time_mux=False,
                            )
 
         cost = Cost(mac_op=2e-12,

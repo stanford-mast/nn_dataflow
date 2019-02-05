@@ -45,6 +45,7 @@ class TestResource(unittest.TestCase):
                             size_regf=512,
                             array_bus_width=8,
                             dram_bandwidth=128,
+                            no_time_mux=False,
                            )
         self.assertTupleEqual(resource.proc_region.dim, (2, 2), 'proc_region')
         self.assertTupleEqual(resource.dram_region.dim, (2, 2), 'dram_region')
@@ -53,6 +54,7 @@ class TestResource(unittest.TestCase):
         self.assertEqual(resource.size_regf, 512, 'size_regf')
         self.assertEqual(resource.array_bus_width, 8, 'array_bus_width')
         self.assertEqual(resource.dram_bandwidth, 128, 'dram_bandwidth')
+        self.assertFalse(resource.no_time_mux, 'no_time_mux')
 
     def test_invalid_proc_region(self):
         ''' Invalid proc_region. '''
@@ -66,6 +68,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=8,
                          dram_bandwidth=128,
+                         no_time_mux=False,
                         )
 
     def test_invalid_proc_region_dram(self):
@@ -82,6 +85,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=8,
                          dram_bandwidth=128,
+                         no_time_mux=False,
                         )
 
     def test_invalid_dram_region(self):
@@ -96,6 +100,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=8,
                          dram_bandwidth=128,
+                         no_time_mux=False,
                         )
 
     def test_invalid_dram_region_proc(self):
@@ -112,6 +117,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=8,
                          dram_bandwidth=128,
+                         no_time_mux=False,
                         )
 
     def test_invalid_data_region(self):
@@ -126,6 +132,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=8,
                          dram_bandwidth=128,
+                         no_time_mux=False,
                         )
         with self.assertRaisesRegexp(TypeError, 'Resource: .*dst_data_.*'):
             _ = Resource(proc_region=self.proc_region,
@@ -137,6 +144,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=8,
                          dram_bandwidth=128,
+                         no_time_mux=False,
                         )
 
     def test_invalid_dim_array(self):
@@ -151,6 +159,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=8,
                          dram_bandwidth=128,
+                         no_time_mux=False,
                         )
 
     def test_invalid_size_gbuf(self):
@@ -165,6 +174,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=8,
                          dram_bandwidth=128,
+                         no_time_mux=False,
                         )
 
     def test_invalid_size_regf(self):
@@ -179,6 +189,7 @@ class TestResource(unittest.TestCase):
                          size_regf=(512,),
                          array_bus_width=8,
                          dram_bandwidth=128,
+                         no_time_mux=False,
                         )
 
     def test_invalid_array_bus_width(self):
@@ -194,6 +205,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=1.2,
                          dram_bandwidth=128,
+                         no_time_mux=False,
                         )
         with self.assertRaisesRegexp(ValueError,
                                      'Resource: .*array_bus_width.*'):
@@ -206,6 +218,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=-2,
                          dram_bandwidth=128,
+                         no_time_mux=False,
                         )
         with self.assertRaisesRegexp(ValueError,
                                      'Resource: .*array_bus_width.*'):
@@ -218,6 +231,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=0,
                          dram_bandwidth=128,
+                         no_time_mux=False,
                         )
 
     def test_invalid_dram_bandwidth(self):
@@ -233,6 +247,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=8,
                          dram_bandwidth=None,
+                         no_time_mux=False,
                         )
         with self.assertRaisesRegexp(ValueError,
                                      'Resource: .*dram_bandwidth.*'):
@@ -245,6 +260,7 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=8,
                          dram_bandwidth=-3,
+                         no_time_mux=False,
                         )
         with self.assertRaisesRegexp(ValueError,
                                      'Resource: .*dram_bandwidth.*'):
@@ -257,5 +273,22 @@ class TestResource(unittest.TestCase):
                          size_regf=512,
                          array_bus_width=8,
                          dram_bandwidth=0,
+                         no_time_mux=False,
+                        )
+
+    def test_invalid_no_time_mux(self):
+        ''' Invalid no_time_mux. '''
+        with self.assertRaisesRegexp(TypeError,
+                                     'Resource: .*no_time_mux.*'):
+            _ = Resource(proc_region=self.proc_region,
+                         dram_region=self.dram_region,
+                         src_data_region=self.src_data_region,
+                         dst_data_region=self.dst_data_region,
+                         dim_array=PhyDim2(16, 16),
+                         size_gbuf=131072,
+                         size_regf=512,
+                         array_bus_width=8,
+                         dram_bandwidth=128,
+                         no_time_mux=None,
                         )
 

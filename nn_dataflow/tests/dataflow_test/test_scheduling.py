@@ -28,6 +28,7 @@ from nn_dataflow.core import PhyDim2
 from nn_dataflow.core import Resource
 from nn_dataflow.core import Scheduling
 from nn_dataflow.core import SchedulingCondition, SchedulingResult
+from nn_dataflow.core import SchedulingConstraint
 
 class TestScheduling(unittest.TestCase):
     ''' Tests for Scheduling module. '''
@@ -44,6 +45,9 @@ class TestScheduling(unittest.TestCase):
         self.cost = Cost(mac_op=1, mem_hier=(200, 6, 2, 1),
                          noc_hop=50, idl_unit=50)
 
+        self.none_cstr = SchedulingConstraint()
+        self.cstr = SchedulingConstraint(topofm=1, topbat=self.batch_size)
+
         self.resource = Resource(
             proc_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 4),
                                    type=NodeRegion.PROC),
@@ -54,7 +58,8 @@ class TestScheduling(unittest.TestCase):
             dst_data_region=NodeRegion(origin=PhyDim2(0, 0), dim=PhyDim2(4, 1),
                                        type=NodeRegion.DRAM),
             dim_array=PhyDim2(16, 16), size_gbuf=65536, size_regf=64,
-            array_bus_width=float('inf'), dram_bandwidth=float('inf'))
+            array_bus_width=float('inf'), dram_bandwidth=float('inf'),
+            no_time_mux=False)
 
         self.options = Option(partition_hybrid=True, partition_batch=True,
                               partition_ifmaps=True, ntops=10)
@@ -73,6 +78,8 @@ class TestScheduling(unittest.TestCase):
                 regions=(self.resource.src_data_region,),
                 parts=(part.projection(self.resource.src_data_region,
                                        appl2frng=True),))
+
+        self.sched_seq = (2, 0, 1)
 
     def test_valid_args(self):
         ''' Valid arguments for constructor. '''
@@ -116,7 +123,9 @@ class TestScheduling(unittest.TestCase):
                               MapStrategyEyeriss)
 
             condition = SchedulingCondition(resource=self.resource,
-                                            ifmap_layout=ifmap_layout)
+                                            constraint=self.cstr,
+                                            ifmap_layout=ifmap_layout,
+                                            sched_seq=self.sched_seq)
 
             res = schd.schedule_search(condition, self.options)
 
@@ -142,10 +151,18 @@ class TestScheduling(unittest.TestCase):
                 self.assertEqual(r.num_nodes,
                                  self.resource.proc_region.dim.size())
 
+            # Constraint.
+            for r in res:
+                self.assertEqual(r.scheme['to'][0], 1)
+
             # Ofmap layout.
             for r in res:
                 self.assertEqual(r.ofmap_layout.complete_fmap_range().size(),
                                  layer.total_ofmap_size(self.batch_size))
+
+            # Sequence number.
+            for r in res:
+                self.assertTupleEqual(r.sched_seq, condition.sched_seq)
 
     def test_schedule_search_ilayout(self):
         ''' Invalid ifmap_layout. '''
@@ -157,9 +174,11 @@ class TestScheduling(unittest.TestCase):
         # Shift ifmap out of memory region.
         condition = SchedulingCondition(
             resource=self.resource,
+            constraint=self.none_cstr,
             ifmap_layout=self.ifmap_layouts['BASE']._replace(
                 regions=tuple(r._replace(origin=PhyDim2(-10, -10))
-                              for r in self.ifmap_layouts['BASE'].regions)))
+                              for r in self.ifmap_layouts['BASE'].regions)),
+            sched_seq=self.sched_seq)
 
         with self.assertRaisesRegexp(ValueError, 'Scheduling: .*ifmap.*'):
             _ = schd.schedule_search(condition, self.options)
@@ -167,7 +186,9 @@ class TestScheduling(unittest.TestCase):
         # Not match layer.
         condition = SchedulingCondition(
             resource=self.resource,
-            ifmap_layout=self.ifmap_layouts['POOL'])
+            constraint=self.none_cstr,
+            ifmap_layout=self.ifmap_layouts['POOL'],
+            sched_seq=self.sched_seq)
 
         with self.assertRaisesRegexp(ValueError, 'Scheduling: .*ifmap.*'):
             _ = schd.schedule_search(condition, self.options)
@@ -182,7 +203,9 @@ class TestScheduling(unittest.TestCase):
 
         condition = SchedulingCondition(
             resource=self.resource._replace(size_regf=0),
-            ifmap_layout=ifmap_layout)
+            constraint=self.none_cstr,
+            ifmap_layout=ifmap_layout,
+            sched_seq=self.sched_seq)
 
         res = schd.schedule_search(condition, self.options)
 
@@ -203,7 +226,9 @@ class TestScheduling(unittest.TestCase):
         self.assertTupleEqual(schd.cache_stats(), (0, 0))
 
         condition = SchedulingCondition(resource=self.resource,
-                                        ifmap_layout=ifmap_layout)
+                                        constraint=self.cstr,
+                                        ifmap_layout=ifmap_layout,
+                                        sched_seq=self.sched_seq)
 
         Scheduling.schedule_search.cache_clear()
         _ = schd.schedule_search(condition, self.options)
@@ -232,7 +257,9 @@ class TestScheduling(unittest.TestCase):
                           MapStrategyEyeriss)
 
         condition = SchedulingCondition(resource=self.resource,
-                                        ifmap_layout=ifmap_layout)
+                                        constraint=self.cstr,
+                                        ifmap_layout=ifmap_layout,
+                                        sched_seq=self.sched_seq)
 
         _ = schd.schedule_search(condition, self.options)
 
@@ -241,6 +268,7 @@ class TestScheduling(unittest.TestCase):
 
         # Make another instance.
         rsrc = Resource(**self.resource._asdict())
+        cstr = self.cstr
         opts = Option(**self.options._asdict())
         self.assertNotEqual(id(rsrc), id(self.resource))
         self.assertNotEqual(id(opts), id(self.options))
@@ -248,7 +276,7 @@ class TestScheduling(unittest.TestCase):
         part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
                                pdims=((2, 4), (2, 1), (1, 1), (1, 1)))
 
-        _ = schd.schedule_search_per_node(part, rsrc, opts)
+        _ = schd.schedule_search_per_node(part, rsrc, cstr, opts)
 
         h2, m2 = schd.cache_stats()
         self.assertEqual(h2, h + 1)

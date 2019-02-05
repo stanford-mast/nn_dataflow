@@ -111,7 +111,7 @@ def _loop_blocking_cmp_key(options, cost):
 
 
 def _gen_loopblocking_perprocess(
-        nested_loop_desc, resource, bufshr, cost, options,
+        nested_loop_desc, resource, bufshr, constraint, cost, options,
         gen_tifm, gen_tofm, gen_tbat, gen_ords):
 
     def _gen_bl_ts():
@@ -121,9 +121,8 @@ def _gen_loopblocking_perprocess(
         Transpose LoopEnum-major to BL-major.
         '''
         gen_lp_ts = [None] * le.NUM
-        gen_lp_ts[le.IFM] = gen_tifm
-        gen_lp_ts[le.OFM] = gen_tofm
-        gen_lp_ts[le.BAT] = gen_tbat
+        gen_lp_ts[le.IFM], gen_lp_ts[le.OFM], gen_lp_ts[le.BAT] = \
+                constraint.filter_gen_ts(gen_tifm, gen_tofm, gen_tbat)
         for lp_ts in itertools.product(*gen_lp_ts):
             bl_ts = tuple(zip(*lp_ts))
             yield bl_ts
@@ -134,6 +133,8 @@ def _gen_loopblocking_perprocess(
         for bl_ts, bl_ords in itertools.product(_gen_bl_ts(), gen_ords):
             if is_conv_loops and skip_conv(bl_ts, bl_ords):
                 continue
+            if not constraint.is_valid_top_bl(bl_ts[0], bl_ords[0]):
+                continue
             lbs = LoopBlockingScheme(
                 nested_loop_desc, bl_ts, bl_ords, resource, bufshr,
                 options)
@@ -143,7 +144,8 @@ def _gen_loopblocking_perprocess(
                            key=_loop_blocking_cmp_key(options, cost))
 
 
-def gen_loopblocking(nested_loop_desc, resource, part, cost, options):
+def gen_loopblocking(nested_loop_desc, resource, part, constraint, cost,
+                     options):
     '''
     Generator for loop blocking.
     '''
@@ -160,7 +162,8 @@ def gen_loopblocking(nested_loop_desc, resource, part, cost, options):
         for bl_ts, bl_ords in gen(nested_loop_desc, resource, options):
             lbs = LoopBlockingScheme(nested_loop_desc, bl_ts, bl_ords,
                                      resource, bufshr, options)
-            yield lbs
+            if constraint.is_valid_top_bl(lbs.bl_ts[0], lbs.bl_ords[0]):
+                yield lbs
         return
 
     ## Exhaustive search.
@@ -205,7 +208,7 @@ def gen_loopblocking(nested_loop_desc, resource, part, cost, options):
     list_ords = list(gen_ords)
     for tifm, tofm in itertools.product(gen_tifm, gen_tofm):
         r = apply_func(_gen_loopblocking_perprocess,
-                       (nested_loop_desc, resource, bufshr, cost,
+                       (nested_loop_desc, resource, bufshr, constraint, cost,
                         options, [tifm], [tofm], list_tbat, list_ords))
         results.append(r)
 
