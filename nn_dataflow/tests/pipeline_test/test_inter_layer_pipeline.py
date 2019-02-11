@@ -447,3 +447,51 @@ class TestInterLayerPipeline(TestPipelineFixture):
 
             self.assertTrue(segs_with_opt.issuperset(segs_not_opt))
 
+    def test_gen_segment_resnet(self):
+        ''' gen_segment() with ResNet. '''
+
+        net = self.net['resnet152']
+        ilp = self._make_ilp(net)
+
+        options = Option(partition_interlayer=True)
+
+        # One residual module fits.
+        segment = PipelineSegment(
+            (('conv3_2_a',), ('conv3_2_b',), ('conv3_2_c', 'conv3_2_res')),
+            ilp.network, ilp.batch_size, ilp.resource)
+
+        self.assertTupleEqual(net.prevs('conv3_2_res'),
+                              ('conv3_1_res', 'conv3_2_c'))
+        self.assertTrue(segment.valid)
+
+        segs = set(seg.seg for seg in ilp.gen_segment(options))
+        self.assertIn(segment.seg, segs)
+
+    def test_gen_segment_lstm(self):
+        ''' gen_segment() with LSTM cell. '''
+
+        net = self.net['lstm_phoneme']
+        ilp = self._make_ilp(net)
+
+        options = Option(partition_interlayer=True)
+
+        # Find a cell.
+        cname = None
+        for l in net:
+            if l[-6:] == '_igate':
+                cname = l[:-6]
+        self.assertIsNotNone(cname)
+
+        # One LSTM cell fits.
+        segment = PipelineSegment(
+            ((cname + '_cand',),
+             (cname + '_igate', cname + '_cout_i'),
+             (cname + '_fgate', cname + '_cout_f', cname + '_cout'),
+             (cname + '_ogate', cname + '_hout')),
+            ilp.network, ilp.batch_size, ilp.resource)
+
+        self.assertTrue(segment.valid)
+
+        segs = set(seg.seg for seg in ilp.gen_segment(options))
+        self.assertIn(segment.seg, segs)
+
