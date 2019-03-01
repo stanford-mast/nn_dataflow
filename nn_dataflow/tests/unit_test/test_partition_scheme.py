@@ -15,6 +15,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import collections
 import itertools
+import math
 import unittest
 
 from nn_dataflow.core import FmapPosition, FmapRange
@@ -247,6 +248,31 @@ class TestPartitionScheme(unittest.TestCase):
 
         with self.assertRaisesRegexp(TypeError, 'PartitionScheme: .*layer.*'):
             _ = self.ps1.part_layer(layer, self.ps1.size(pe.BATP))
+
+    def test_part_neighbor_dist(self):
+        ''' Get part_neighbor_dist. '''
+        for ps, nr in zip([self.ps1, self.ps2], [self.nr1, self.nr2]):
+
+            for idx in range(pe.NUM):
+                nbr_dist = ps.part_neighbor_dist(nr, ps.order[idx])
+                dim_below = ps.dim(*ps.order[idx + 1:]) if idx + 1 < pe.NUM \
+                        else PhyDim2(1, 1)
+                dim_cur = ps.dim(ps.order[idx])
+
+                if dim_cur.h == 1:
+                    self.assertTrue(math.isinf(nbr_dist.h))
+                else:
+                    self.assertEqual(nbr_dist.h, dim_below.h)
+
+                if dim_cur.w == 1:
+                    self.assertTrue(math.isinf(nbr_dist.w))
+                else:
+                    self.assertEqual(nbr_dist.w, dim_below.w)
+
+    def test_part_neighbor_dist_inv(self):
+        ''' Get part_neighbor_dist invalid arg. '''
+        dist = self.ps1.part_neighbor_dist(self.nr1, pe.NUM)
+        self.assertTrue(all(math.isnan(d) for d in dist))
 
     def test_projection(self):
         ''' Get projection. '''

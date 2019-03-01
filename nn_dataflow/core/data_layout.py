@@ -14,6 +14,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from collections import namedtuple
+import itertools
 
 from .fmap_range import FmapPosition, FmapRange, FmapRangeMap
 from .node_region import NodeRegion
@@ -84,12 +85,22 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
 
         return frmap
 
-    def nhops_to(self, fmap_range, *dest_list):
+    def nhops_to(self, fmap_range, *dest_list, **kwargs):
         '''
         Get the total number of hops to transfer the FmapRange `fmap_range` to
         destinations `dest_list` given as a list of absolute coordinates.
+
+        If `forwarding` is True, the data can be forwarded between destinations
+        rather than all from the source.
         '''
-        nhops = 0
+        forwarding = kwargs.pop('forwarding', False)
+        if kwargs:
+            raise ValueError('DataLayout: method nhops_to() got an unexpected '
+                             'keyword argument: {}.'
+                             .format(kwargs.popitem()[0]))
+
+        # The number of hops to transfer data to each destination individually.
+        nhops_list = [0] * len(dest_list)
 
         for frng, region, part in zip(self.frngs, self.regions, self.parts):
 
@@ -102,8 +113,31 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
                 pfrng = part.fmap_range(frng, pidx)
                 size = fmap_range.overlap_size(pfrng)
 
-                hop_dist_list = [d.hop_dist(psrc) for d in dest_list]
-                nhops += size * sum(hop_dist_list)
+                nhops_list = [n + size * d.hop_dist(psrc)
+                              for n, d in zip(nhops_list, dest_list)]
+
+        if forwarding:
+            # The number of hops to the first node and its coordinate.
+            nhops, coord = min(zip(nhops_list, dest_list))
+
+            # Size of all data.
+            total_size = self.complete_fmap_range().overlap_size(fmap_range)
+
+            # Data can be forwarded from all sources to any destination.
+            src_set = {coord}
+            dst_set = set(dest_list) - src_set
+
+            while dst_set:
+                # Each forward step, get the min-distance pair of source and
+                # destination.
+                src, dst = min(itertools.product(src_set, dst_set),
+                               key=lambda (s, d): d.hop_dist(s))
+                dst_set.remove(dst)
+                src_set.add(dst)
+                nhops += total_size * dst.hop_dist(src)
+
+        else:
+            nhops = sum(nhops_list)
 
         return nhops
 

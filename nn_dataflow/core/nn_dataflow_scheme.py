@@ -19,6 +19,7 @@ from . import mem_hier_enum as me
 from .. import util
 from .data_layout import DataLayout
 from .network import Network
+from .pipeline_segment_timing import PipelineSegmentTiming
 from .scheduling import SchedulingResult
 
 class NNDataflowScheme(MutableMapping):
@@ -53,8 +54,16 @@ class NNDataflowScheme(MutableMapping):
 
         self.res_dict = OrderedDict()
 
-        self.total_cost = 0
-        self.total_time = 0
+        # Naive sum of all layer cost.
+        self.sum_cost = 0
+        self.sum_static_cost = 0
+        # Naive sum of all layer time, used to adjust cost.
+        self.sum_time = 0
+
+        # A list of segment schedule timing information.
+        self.segment_timing_list = []
+
+        self.last_seg_idx = -1
 
     def __getitem__(self, layer_name):
         ''' Get the SchedulingResult of a scheduled layer. '''
@@ -84,8 +93,23 @@ class NNDataflowScheme(MutableMapping):
 
         self.res_dict[layer_name] = sched_result
 
-        self.total_cost += sched_result.total_cost
-        self.total_time += sched_result.total_time
+        self.sum_cost += sched_result.total_cost
+        self.sum_static_cost += sched_result.scheme['cost_static']
+        self.sum_time += sched_result.total_time
+
+        seg_idx = sched_result.sched_seq[0]
+        if seg_idx == self.last_seg_idx + 1:
+            self.segment_timing_list.append(
+                PipelineSegmentTiming(self.network, seg_idx))
+            self.last_seg_idx += 1
+        elif seg_idx == self.last_seg_idx:
+            pass
+        else:
+            raise ValueError('NNDataflowScheme: segment index is invalid. '
+                             'segment {} follows {}.'
+                             .format(seg_idx, self.last_seg_idx))
+        assert len(self.segment_timing_list) - 1 == self.last_seg_idx
+        self.segment_timing_list[-1].add(layer_name, sched_result)
 
     def __delitem__(self, layer_name):
         ''' Not legal to call. '''
@@ -130,6 +154,25 @@ class NNDataflowScheme(MutableMapping):
         return DataLayout.concat(*[_ofmap_layout(l) for l in layers])
 
     @property
+    def total_cost(self):
+        ''' Get the total cost. '''
+        if self.sum_time == 0:
+            return self.sum_cost
+        overcounted_static_cost = (self.sum_static_cost
+                                   * (1 - 1. * self.total_time / self.sum_time))
+        return self.sum_cost - overcounted_static_cost
+
+    @property
+    def total_time(self):
+        ''' Get the total time. '''
+        # Special case, when the entire network fits in one segment. No
+        # pipeline filling/draining delay.
+        if len(self.segment_timing_list) == 1 \
+                and self.__len__() == len(self.network):
+            return self.segment_timing_list[0].critical_time
+        return sum(t.time for t in self.segment_timing_list)
+
+    @property
     def total_ops(self):
         ''' Get the total ops. '''
         return sum(sr.total_ops for sr in self.values())
@@ -146,6 +189,16 @@ class NNDataflowScheme(MutableMapping):
     def total_noc_hops(self):
         ''' Get the total NoC hops. '''
         return sum(sr.total_noc_hops for sr in self.values())
+
+    def segment_time_list(self):
+        ''' Get the time for each segment. '''
+        return [t.time for t in self.segment_timing_list]
+
+    def segment_dram_time_list(self):
+        '''
+        Get the time for each segment on DRAM access.
+        '''
+        return [t.dram_time for t in self.segment_timing_list]
 
     def perlayer_stats(self, stats_name):
         '''

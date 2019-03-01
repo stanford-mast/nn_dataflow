@@ -149,11 +149,34 @@ class TestLoopBlocking(TestLoopBlockingFixture):
 
         self.assertLessEqual(cnt, 8)
 
+    def test_gen_loopblocking_cstr(self):
+        ''' gen_loopblocking with constraint. '''
+
+        for lbs in self._gen_loopblocking(rsrckey='LG', cstr=self.cstr):
+
+            self.assertTrue(self.cstr.is_valid_top_bl(lbs.bl_ts[0],
+                                                      lbs.bl_ords[0]))
+
+    def test_gen_loopblocking_cstr_sol(self):
+        ''' gen_loopblocking using bypass solvers with constraint. '''
+
+        cnt1 = len(list(self._gen_loopblocking(optkey='BYPSOL')))
+
+        lbs_list = list(self._gen_loopblocking(optkey='BYPSOL', cstr=self.cstr))
+        self.assertTrue(all(
+            self.cstr.is_valid_top_bl(lbs.bl_ts[0], lbs.bl_ords[0])
+            for lbs in lbs_list))
+        cnt2 = len(lbs_list)
+
+        self.assertLessEqual(cnt2, cnt1)
+
     def _gen_loopblocking(self, wlkey='BASE', rsrckey='BASE',
-                          optkey='BASE', skip_invalid=False):
+                          optkey='BASE', cstr=None, skip_invalid=False):
         ''' gen_loopblocking trampoline. '''
+        if cstr is None:
+            cstr = self.none_cstr
         for lbs in loop_blocking.gen_loopblocking(
-                self.nld[wlkey], self.resource[rsrckey],
+                self.nld[wlkey], self.resource[rsrckey], self.part, cstr,
                 self.cost, self.options[optkey]):
             if not skip_invalid or lbs.is_valid():
                 yield lbs

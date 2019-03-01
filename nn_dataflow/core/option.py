@@ -19,9 +19,16 @@ from . import data_category_enum as de
 
 OPTION_LIST = ['sw_gbuf_bypass',
                'sw_solve_loopblocking',
+               'hw_access_forwarding',
+               'hw_gbuf_sharing',
+               'hw_gbuf_save_writeback',
                'partition_hybrid',
                'partition_batch',
                'partition_ifmaps',
+               'partition_interlayer',
+               'layer_pipeline_time_ovhd',
+               'layer_pipeline_max_degree',
+               'layer_pipeline_opt',
                'opt_goal',
                'ntops',
                'nprocesses',
@@ -55,9 +62,16 @@ class Option(namedtuple('Option', OPTION_LIST)):
 
         kwdict.setdefault('sw_gbuf_bypass', (False,) * de.NUM)
         kwdict.setdefault('sw_solve_loopblocking', False)
+        kwdict.setdefault('hw_access_forwarding', False)
+        kwdict.setdefault('hw_gbuf_sharing', False)
+        kwdict.setdefault('hw_gbuf_save_writeback', False)
         kwdict.setdefault('partition_hybrid', False)
         kwdict.setdefault('partition_batch', False)
         kwdict.setdefault('partition_ifmaps', False)
+        kwdict.setdefault('partition_interlayer', False)
+        kwdict.setdefault('layer_pipeline_time_ovhd', float('inf'))
+        kwdict.setdefault('layer_pipeline_max_degree', float('inf'))
+        kwdict.setdefault('layer_pipeline_opt', True)
         kwdict.setdefault('opt_goal', 'e')
         kwdict.setdefault('ntops', 1)
         kwdict.setdefault('nprocesses', 1)
@@ -73,9 +87,37 @@ class Option(namedtuple('Option', OPTION_LIST)):
             raise ValueError('Option: sw_gbuf_bypass must have length {}'
                              .format(de.NUM))
 
+        if ntp.sw_solve_loopblocking and ntp.hw_gbuf_sharing:
+            raise ValueError('Option: sw_solve_loopblocking and '
+                             'hw_gbuf_sharing cannot be simultaneously '
+                             'enabled.')
+
+        if ntp.hw_access_forwarding and ntp.hw_gbuf_sharing:
+            raise ValueError('Option: hw_access_forwarding is implied by '
+                             'hw_gbuf_sharing, thus cannot be both enabled.')
+
+        if ntp.sw_solve_loopblocking and ntp.hw_gbuf_save_writeback:
+            raise ValueError('Option: sw_solve_loopblocking and '
+                             'hw_gbuf_save_writeback cannot be simultaneously '
+                             'enabled.')
+
         if ntp.partition_ifmaps and not ntp.partition_hybrid:
             raise ValueError('Option: partition_ifmaps requires '
                              'partition_hybrid to be set.')
+
+        if not isinstance(ntp.layer_pipeline_time_ovhd, (int, float)):
+            raise KeyError('Option: layer_pipeline_time_ovhd must be a '
+                           'number.')
+        if ntp.layer_pipeline_time_ovhd < 0:
+            raise ValueError('Option: layer_pipeline_time_ovhd must be '
+                             'positive.')
+
+        if not isinstance(ntp.layer_pipeline_max_degree, (int, float)):
+            raise KeyError('Option: layer_pipeline_max_degree must be a '
+                           'number.')
+        if ntp.layer_pipeline_max_degree < 0:
+            raise ValueError('Option: layer_pipeline_max_degree must be '
+                             'positive.')
 
         if ntp.opt_goal not in ['e', 'd', 'ed']:
             raise ValueError('Option: opt_goal is invalid, must be one of '

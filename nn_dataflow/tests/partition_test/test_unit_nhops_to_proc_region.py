@@ -316,6 +316,66 @@ class TestUnitNhopsToProcRegion(TestPartitionFixture):
 
         self.assertEqual(nhops[de.OFM], 0)
 
+    def test_use_fwd(self):
+        ''' Use access forwarding. '''
+        layer = self.layers['BASE']
+
+        part = PartitionScheme(order=(pe.BATP, pe.INPP, pe.OUTP, pe.OFMP),
+                               pdims=((2, 1), (2, 4), (1, 2), (2, 1)))
+
+        nr = NodeRegion(origin=PhyDim2(0, 0), dim=part.dim(),
+                        type=NodeRegion.PROC)
+
+        far_dist = 1000
+
+        ilayout = self._make_data_layout(
+            layer.nifm, layer.hifm, layer.wifm, PhyDim2(-far_dist, 0),
+            (1, 1), (1, 1), PhyDim2(1, 1))
+
+        olayout = self._make_data_layout(
+            layer.nofm, layer.hofm, layer.wofm, PhyDim2(0, -far_dist),
+            (1, 1), (1, 1), PhyDim2(1, 1))
+
+        filter_nodes = frozenset([PhyDim2(far_dist, 0), PhyDim2(0, far_dist)])
+
+        nhops_base = partition.unit_nhops_to_proc_region(
+            layer, self.batch_size, nr, part,
+            filter_nodes, ilayout, olayout, self.options['BASE'])
+        nhops_accfwd = partition.unit_nhops_to_proc_region(
+            layer, self.batch_size, nr, part,
+            filter_nodes, ilayout, olayout, self.options['ACCFWD'])
+        nhops_bufshr = partition.unit_nhops_to_proc_region(
+            layer, self.batch_size, nr, part,
+            filter_nodes, ilayout, olayout, self.options['BUFSHR'])
+
+        for dce in range(de.NUM):
+            self.assertEqual(nhops_accfwd[dce], nhops_bufshr[dce])
+
+        # In the basic access scheme, FIL and IFM are independently fetched,
+        # resulting in repeating remote fetch. OFM are merged locally and only
+        # stored back remotely once.
+        self.assertGreater(nhops_base[de.FIL],
+                           layer.total_filter_size() * far_dist
+                           * part.size(pe.BATP) * part.size(pe.OFMP) * 0.8)
+        self.assertGreater(nhops_base[de.IFM],
+                           layer.total_ifmap_size(self.batch_size) * far_dist
+                           * part.size(pe.OUTP) * 0.8)
+
+        p_layer, p_batch_size, _ = part.part_layer(layer, self.batch_size)
+        # With forwarding, everyone is only remotely fetched once.
+        self.assertLess(nhops_accfwd[de.FIL],
+                        p_layer.total_filter_size()
+                        * part.size(pe.INPP, pe.OUTP)
+                        * (far_dist + nr.dim.size()))
+        self.assertLess(nhops_accfwd[de.IFM],
+                        p_layer.total_ifmap_size(p_batch_size)
+                        * part.size(pe.INPP, pe.OFMP, pe.BATP)
+                        * (far_dist + nr.dim.size()))
+        self.assertLess(nhops_accfwd[de.OFM],
+                        p_layer.total_ofmap_size(p_batch_size)
+                        * part.size(pe.OUTP, pe.OFMP, pe.BATP)
+                        * (far_dist + nr.dim.size()))
+
     def _make_data_layout(self, nfm, hfm, wfm, origin, bdim, ndim, dims):
         ''' Make a DataLayout instance. '''
         frng = FmapRange((0,) * 4, (self.batch_size, nfm, hfm, wfm))

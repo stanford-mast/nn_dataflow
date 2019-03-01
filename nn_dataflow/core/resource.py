@@ -28,6 +28,7 @@ RESOURCE_LIST = ['proc_region',
                  'size_regf',
                  'array_bus_width',
                  'dram_bandwidth',
+                 'no_time_mux',
                 ]
 
 class Resource(namedtuple('Resource', RESOURCE_LIST)):
@@ -78,6 +79,9 @@ class Resource(namedtuple('Resource', RESOURCE_LIST)):
             raise TypeError('Resource: dram_bandwidth must be a number')
         if ntp.dram_bandwidth <= 0:
             raise ValueError('Resource: dram_bandwidth must be positive.')
+
+        if not isinstance(ntp.no_time_mux, bool):
+            raise TypeError('Resource: no_time_mux must be boolean')
 
         return ntp
 

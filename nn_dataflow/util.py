@@ -217,6 +217,48 @@ def get_ith_range(rng, idx, num):
     return beg, end
 
 
+def gcd(*values):
+    '''
+    Get the greatest common divisor of the given values.
+    '''
+    if any(not isinstance(v, int) for v in values):
+        raise TypeError('value must be integers.')
+    if any(v <= 0 for v in values):
+        raise ValueError('arguments must be positive.')
+
+    if not values:
+        raise ValueError('must give at least 1 value.')
+    if len(values) == 1:
+        return values[0]
+    if len(values) > 2:
+        return reduce(gcd, values)
+
+    a, b = values
+    while b:
+        a, b = b, a % b
+    return a
+
+
+def lcm(*values):
+    '''
+    Get the least common multiple of the given values.
+    '''
+    if any(not isinstance(v, int) for v in values):
+        raise TypeError('value must be integers.')
+    if any(v <= 0 for v in values):
+        raise ValueError('arguments must be positive.')
+
+    if not values:
+        raise ValueError('must give at least 1 value.')
+    if len(values) == 1:
+        return values[0]
+    if len(values) > 2:
+        return reduce(lcm, values)
+
+    a, b = values
+    return a * b // gcd(a, b)
+
+
 def isclose(vala, valb, rel_tol=1e-9, abs_tol=0.0):
     '''
     Whether two values are close to each other.

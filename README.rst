@@ -9,7 +9,7 @@ Neural Network Dataflow Scheduling
 
 This Python tool allows you to explore the energy-efficient dataflow scheduling
 for neural networks (NNs), including array mapping, loop blocking and
-reordering, and parallel partitioning.
+reordering, and (coarse-grained) parallel processing within and across layers.
 
 For hardware, we assume an Eyeriss-style NN accelerator [Chen16]_, i.e., a 2D
 array of processing elements (PEs) with a local register file in each PE, and a
@@ -26,18 +26,27 @@ In software, we decouple the dataflow scheduling into three subproblems:
   convolutions by blocking and reordering the nested loops. We support
   exhaustive search over all blocking and reordering schemes [Yang16]_, and
   analytical bypass solvers [Gao17]_.
-- Partitioning, which partitions the NN computations for parallel processing.
-  We support batch partitioning, fmap partitioning, output partitioning, input
-  partitioning, and the combination between them (hybrid) [Gao17]_. We use
-  layer-wise greedy beam search.
+- Parallel processing, which partitions the NN computations across the multiple
+  tiled engines. We support both intra-layer and inter-layer parallelism. For
+  intra-layer, we support batch partitioning, fmap partitioning, output
+  partitioning, input partitioning, and the combination between them (hybrid)
+  [Gao17]_. We also explore various dataflow optimizations including access
+  forwarding and buffer sharing [Gao19]_. We use exhaustive search within each
+  layer. For inter-layer, we support spatial pipelining (inter-layer
+  pipelining) and temporal pipelining (time multiplexing without writing back
+  intermediate data) as well as their optimized scheduling [Gao19]_. We use
+  layer-wise greedy beam search across layers.
 
-See the details in our ASPLOS'17 paper [Gao17]_.
+See the details in our ASPLOS'17 [Gao17]_ and ASPLOS'19 [Gao19]_ papers.
 
 If you use this tool in your work, we kindly request that you reference our
 paper(s) below, and send us a citation of your work.
 
 - Gao et al., "TETRIS: Scalable and Efficient Neural Network Acceleration with
-  3D Memory", in ASPLOS, April 2017 [Gao17]_.
+  3D Memory", in ASPLOS, April 2017.
+
+- Gao et al., "TANGRAM: Optimized Coarse-Grained Dataflow for Scalable NN
+  Accelerators", in ASPLOS. April 2019.
 
 
 Install
@@ -102,6 +111,20 @@ Other options include:
   layers, and output partitioning for FC layers.
 - ``--batch-partitioning`` and ``--ifmap-partitioning``: whether the hybrid
   partitioning also explores batch and input partitioning.
+- ``--enable-access-forwarding``: access forwarding, where the nodes fetch
+  disjoint subsets of data and forward them to other nodes. See [Gao19]_.
+- ``--enable-gbuf-sharing``: buffer sharing, where the global buffer capacity is
+  shared across nodes through NoC. See [Gao19]_.
+- ``--enable-save-writeback``: allow to elide the intermediate data writeback to
+  memory when switching between layers if it is possible to store the entire
+  data set in on-chip buffers.
+- ``--interlayer-partition``: whether to use inter-layer pipelining to
+  partition resources across multiple layers and process them simultaneously.
+- ``--layer-pipeline-time-overhead``, ``--layer-pipeline-max-degree``:
+  constrain the configuration space of inter-layer pipelining, by specifying
+  the maximum execution time overhead, or the maximum pipelining degree.
+- ``--disable-interlayer-opt``: disable optimizations and only allow basic
+  inter-layer pipelining.
 
 
 Code Structure
@@ -115,7 +138,10 @@ Code Structure
         - Array mapping: ``map_strategy``.
         - Loop blocking and reordering: ``loop_blocking``,
           ``loop_blocking_scheme``, ``loop_blocking_solver``.
-        - Partitioning: ``partition``, ``partition_scheme``.
+        - Intra-layer partitioning: ``partition``, ``partition_scheme``,
+          ``buf_shr_scheme``.
+        - Inter-layer pipelining: ``inter_layer_pipeline``,
+          ``pipeline_segment``.
         - Network and layer: ``network``, ``layer``.
     - ``nns``: example NN definitions.
     - ``tests``: unit tests.
@@ -155,6 +181,10 @@ with the Board of Trustees of Leland Stanford Junior University.
 
 References
 ----------
+
+.. [Gao19] Gao, Yang, Pu, Horowitz, and Kozyrakis, `TANGRAM: Optimized
+  Coarse-Grained Dataflow for Scalable NN Accelerators
+  <//dl.acm.org/citation.cfm?id=3297858.3304014>`__, in ASPLOS. April, 2019.
 
 .. [Gao17] Gao, Pu, Yang, Horowitz, and Kozyrakis, `TETRIS: Scalable and
   Efficient Neural Network Acceleration with 3D Memory

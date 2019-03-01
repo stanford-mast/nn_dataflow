@@ -44,6 +44,7 @@ class TestSchedulingResult(unittest.TestCase):
                                                [30, 40, 50],
                                                [400, 500, 600],
                                                [5000, 6000, 7000]]),
+                                   ('remote_gbuf_access', [0, 0, 0]),
                                    ('total_nhops', [123, 456, 789]),
                                    ('fetch', [[1, 2, 1], [3, 4, 5]]),
                                   ])
@@ -55,38 +56,60 @@ class TestSchedulingResult(unittest.TestCase):
                                 type=NodeRegion.DRAM),),
             parts=(part,))
 
+        self.sched_seq = (2, 0, 0)
+
     def test_valid_args(self):
         ''' Valid arguments. '''
         result = SchedulingResult(scheme=self.scheme,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertIn('ops', result.scheme)
         self.assertIn('total_nhops', result.scheme)
         self.assertEqual(result.ofmap_layout, self.ofmap_layout)
+        self.assertTupleEqual(result.sched_seq, self.sched_seq)
 
     def test_invalid_scheme(self):
         ''' Invalid scheme. '''
         with self.assertRaisesRegexp(TypeError,
                                      'SchedulingResult: .*scheme.*'):
             _ = SchedulingResult(scheme={},
-                                 ofmap_layout=self.ofmap_layout)
+                                 ofmap_layout=self.ofmap_layout,
+                                 sched_seq=self.sched_seq)
 
     def test_invalid_ofmap_layout(self):
         ''' Invalid ofmap_layout. '''
         with self.assertRaisesRegexp(TypeError,
                                      'SchedulingResult: .*ofmap_layout.*'):
             _ = SchedulingResult(scheme=self.scheme,
-                                 ofmap_layout=None)
+                                 ofmap_layout=None,
+                                 sched_seq=self.sched_seq)
+
+    def test_invalid_sched_seq(self):
+        ''' Invalid sched_seq. '''
+        with self.assertRaisesRegexp(TypeError,
+                                     'SchedulingResult: .*sched_seq.*'):
+            _ = SchedulingResult(scheme=self.scheme,
+                                 ofmap_layout=self.ofmap_layout,
+                                 sched_seq=list(self.sched_seq))
+
+        with self.assertRaisesRegexp(ValueError,
+                                     'SchedulingResult: .*sched_seq.*'):
+            _ = SchedulingResult(scheme=self.scheme,
+                                 ofmap_layout=self.ofmap_layout,
+                                 sched_seq=self.sched_seq[:-1])
 
     def test_total_cost(self):
         ''' Accessor total_cost. '''
         result = SchedulingResult(scheme=self.scheme,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertAlmostEqual(result.total_cost, 1.234 + 9.876)
 
     def test_total_time(self):
         ''' Accessor total_time. '''
         result = SchedulingResult(scheme=self.scheme,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertAlmostEqual(result.total_time, 123.4)
 
         self.assertGreaterEqual(result.total_time, result.total_node_time)
@@ -95,55 +118,74 @@ class TestSchedulingResult(unittest.TestCase):
     def test_total_node_time(self):
         ''' Accessor total_node_time. '''
         result = SchedulingResult(scheme=self.scheme,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertAlmostEqual(result.total_node_time, max(59, 40))
 
         scheme = self.scheme
         scheme['bus_time'] = 100
         result = SchedulingResult(scheme=scheme,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertAlmostEqual(result.total_node_time, max(59, 100))
 
     def test_total_dram_time(self):
         ''' Accessor total_dram_time. '''
         result = SchedulingResult(scheme=self.scheme,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertAlmostEqual(result.total_dram_time, 120)
 
     def test_total_proc_time(self):
         ''' Accessor total_proc_time. '''
         result = SchedulingResult(scheme=self.scheme,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertAlmostEqual(result.total_proc_time, 59)
 
         scheme = self.scheme
         scheme['bus_time'] = 100
         result = SchedulingResult(scheme=scheme,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertAlmostEqual(result.total_proc_time, 59)
 
     def test_total_ops(self):
         ''' Accessor total_ops. '''
         result = SchedulingResult(scheme=self.scheme,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertEqual(result.total_ops, 1234)
 
     def test_total_accesses(self):
         ''' Accessor total_cost. '''
         result = SchedulingResult(scheme=self.scheme,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertSequenceEqual(result.total_accesses,
                                  [9, 120, 1500, 18000])
+
+    def test_total_accesses_rgbuf(self):
+        ''' Accessor total_accesses remote gbuf. '''
+        scheme = self.scheme.copy()
+        scheme['remote_gbuf_access'] = [10, 20, 30]
+        result = SchedulingResult(scheme=scheme,
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
+        self.assertSequenceEqual(result.total_accesses,
+                                 [9, 120 + 60, 1500, 18000])
 
     def test_total_noc_hops(self):
         ''' Accessor total_noc_hops. '''
         result = SchedulingResult(scheme=self.scheme,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertEqual(result.total_noc_hops, 1368)
 
     def test_num_nodes(self):
         ''' Accessor num_nodes. '''
         result = SchedulingResult(scheme=self.scheme,
-                                  ofmap_layout=self.ofmap_layout)
+                                  ofmap_layout=self.ofmap_layout,
+                                  sched_seq=self.sched_seq)
         self.assertEqual(result.num_nodes, 4)
 

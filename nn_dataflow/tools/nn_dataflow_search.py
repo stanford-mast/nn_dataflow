@@ -71,6 +71,8 @@ def stats_dict(dfsch, cost):
 
     stats['active_node_pes'] = dfsch.perlayer_stats('active_node_pes')
     stats['dram_bandwidth'] = dfsch.perlayer_stats('dram_bandwidth')
+    stats['segment_time'] = dfsch.segment_time_list()
+    stats['segment_dram_time'] = dfsch.segment_dram_time_list()
     stats['input_layout'] = dfsch.input_layout
     stats['ext_layout_dict'] = dfsch.ext_layout_dict
     stats['schedules'] = dfsch.res_dict
@@ -129,7 +131,8 @@ def do_scheduling(args):
                         size_gbuf=size_gbuf,
                         size_regf=size_regf,
                         array_bus_width=array_bus_width,
-                        dram_bandwidth=dram_bandwidth)
+                        dram_bandwidth=dram_bandwidth,
+                        no_time_mux=False)
 
     ## Cost.
 
@@ -151,9 +154,16 @@ def do_scheduling(args):
     bypass[de.FIL] = 'f' not in args.disable_bypass
     options = Option(sw_gbuf_bypass=tuple(bypass),
                      sw_solve_loopblocking=args.solve_loopblocking,
+                     hw_access_forwarding=args.enable_access_forwarding,
+                     hw_gbuf_sharing=args.enable_gbuf_sharing,
+                     hw_gbuf_save_writeback=args.enable_save_writeback,
                      partition_hybrid=args.hybrid_partition,
                      partition_batch=args.batch_partition,
                      partition_ifmaps=args.ifmaps_partition,
+                     partition_interlayer=args.interlayer_partition,
+                     layer_pipeline_time_ovhd=args.layer_pipeline_time_overhead,
+                     layer_pipeline_max_degree=args.layer_pipeline_max_degree,
+                     layer_pipeline_opt=not args.disable_interlayer_opt,
                      opt_goal=args.goal.lower(),
                      ntops=args.top,
                      nprocesses=args.processes,
@@ -249,6 +259,20 @@ def argparser():
     ap.add_argument('--solve-loopblocking', action='store_true',
                     help='Use analytical solver to choose loop blocking. '
                          'Otherwise use exhaustive search.')
+    ap.add_argument('--enable-access-forwarding', action='store_true',
+                    help='Each node fetches a subset of data and forwards to '
+                         'other nodes.')
+    ap.add_argument('--enable-gbuf-sharing', action='store_true',
+                    help='Share gbuf capacity across nodes through NoC.')
+    ap.add_argument('--enable-save-writeback', action='store_true',
+                    help='Allow to save the writeback to memory for the '
+                         'intermediate data between layers if able to '
+                         'store the entire data set in on-chip buffers.')
+    ap.add_argument('--disable-interlayer-opt',
+                    '--basic-interlayer-partition',
+                    action='store_true',
+                    help='Disable optimizations and only allow basic '
+                         'inter-layer pipeline.')
 
     ap.add_argument('--hybrid-partition',
                     '--hybrid-partition2d',  # deprecated old name
@@ -262,6 +286,20 @@ def argparser():
                     action='store_true',
                     help='Allow partitioning ifmap channel dimension, which '
                          'requires extra data synchronization.')
+    ap.add_argument('--interlayer-partition', '--inter-layer-partition',
+                    action='store_true',
+                    help='Allow partitioning resources across multiple layers '
+                         'and process them simultaneously as an inter-layer '
+                         'pipeline.')
+
+    ap.add_argument('--layer-pipeline-time-overhead',
+                    type=float, default=float('inf'),
+                    help='maximum allowed execution time overhead due to '
+                         'layer pipelining.')
+    ap.add_argument('--layer-pipeline-max-degree',
+                    type=float, default=float('inf'),
+                    help='maximum allowed layer pipelining degree, i.e., '
+                         'number of vertices in a pipeline segment.')
 
     ap.add_argument('-g', '--goal', default='e',
                     choices=['e', 'd', 'ed', 'E', 'D', 'ED'],
