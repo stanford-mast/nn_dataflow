@@ -1,7 +1,7 @@
 List of major changes and improvements
 ======================================
 
-## [Unreleased]
+## [v1.6 -- v2.0] -- 2018-03-01
 
 ### Added
 
