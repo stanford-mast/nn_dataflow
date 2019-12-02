@@ -325,23 +325,12 @@ class NNDataflow(object):
                 regions=(input_region,),
                 parts=(part.projection(input_region, appl2frng=True),))
 
-            if ext_layers:
-                for ext_parts in itertools.product(
-                        *[partition.gen_partition(ext_layer, self.batch_size,
-                                                  ext_region.dim, options,
-                                                  guaranteed=True)
-                          for ext_layer in ext_layers]):
-                    ext_layout_dict = dict(zip(
-                        ext_layer_names,
-                        [DataLayout(
-                            frngs=(ext_frng,),
-                            regions=(ext_region,),
-                            parts=(ext_part.projection(ext_region,
-                                                       appl2frng=True),))
-                         for ext_part, ext_frng in zip(ext_parts, ext_frngs)]))
+            ext_layout_dict = dict(zip(
+                ext_layer_names,
+                [DataLayout(
+                    frngs=(ext_frng,),
+                    regions=(ext_region,),
+                    parts=(part.projection(ext_region, appl2frng=True),))
+                 for ext_frng in ext_frngs])) if ext_layers else None
 
-                    yield input_layout, ext_layout_dict
-
-            else:
-                yield input_layout, None
-
+            yield input_layout, ext_layout_dict

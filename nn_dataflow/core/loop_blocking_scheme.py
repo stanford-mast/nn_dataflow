@@ -143,13 +143,7 @@ class LoopBlockingScheme(object):
         self.src_is_dram = (resource.src_data_region.type == NodeRegion.DRAM)
         self.dst_is_dram = (resource.dst_data_region.type == NodeRegion.DRAM)
 
-        # Check resource for filter pinning.
         self.filter_pinned = False
-        if resource.no_time_mux:
-            if all(self.bl_ts[0][lpe] == 1 for lpe
-                   in self.nld.data_loops[de.FIL].loops()):
-                self.filter_pinned = True
-                self.fetch[0][de.FIL] = 0
 
         # If data regions are not DRAM, can only access once, no spilling.
         if not self.src_is_dram:
@@ -214,6 +208,13 @@ class LoopBlockingScheme(object):
 
         # Remote gbuf access.
         self.remote_gbuf_access = [0.] * de.NUM
+
+        # Check resource for filter pinning.
+        if resource.no_time_mux:
+            if all(self.bl_ts[0][lpe] == 1 for lpe
+                   in self.nld.data_loops[de.FIL].loops()):
+                self.filter_pinned = True
+                self.fetch[0][de.FIL] = 0
 
     def is_valid(self):
         '''

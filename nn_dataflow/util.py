@@ -123,10 +123,14 @@ def prod(lst):
     return reduce(mul, lst, 1)
 
 
-def approx_dividable(total, num, overhead=0.1):
+def approx_dividable(total, num, rel_overhead=0.1, abs_overhead=1):
     ''' Whether it is reasonable to divide `total` into `num` parts.
-    `overhead` is the allowed max padding overhead.  '''
-    return idivc(total, num) * num <= total * (1 + overhead)
+    `rel_overhead` is the allowed max padding overhead measured
+    relatively; `abs_overhead` is the allowed max padding
+    overhead measured by absolute value.'''
+    return total >= num and isclose(
+        idivc(total, num) * num, total,
+        rel_tol=rel_overhead, abs_tol=abs_overhead)
 
 
 def factorize(value, num, limits=None):
