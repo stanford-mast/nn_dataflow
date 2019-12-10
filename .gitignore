@@ -5,3 +5,6 @@ eggs/
 .eggs/
 *.egg-info/
 *.egg
+
+# Editor related.
+settings.json

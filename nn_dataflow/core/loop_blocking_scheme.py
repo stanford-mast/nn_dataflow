@@ -91,7 +91,8 @@ class LoopBlockingScheme(object):
                 'LoopBlockingScheme: bl_ts elements have invalid length.'
         assert len(bl_ords) == BL.NUM, \
                 'LoopBlockingScheme: bl_ords has invalid length.'
-        assert all(sorted(bl_ord) == range(le.NUM) for bl_ord in bl_ords), \
+        assert all(tuple(sorted(bl_ord)) == tuple(range(le.NUM)) \
+                   for bl_ord in bl_ords), \
                 'LoopBlockingScheme: bl_ords elements are invalid.'
 
         self.bl_ts = [tuple(bl_t) for bl_t in bl_ts]

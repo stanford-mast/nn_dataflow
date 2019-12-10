@@ -15,7 +15,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import heapq
 import itertools
-from multiprocessing import Pool
+from multiprocessing.pool import Pool
 
 from . import loop_blocking_solver
 from . import loop_enum as le
@@ -65,7 +65,7 @@ def skip_conv(bl_ts, bl_ords):
 
     outer_level_innermost_nt_loop = None
 
-    for t_, ord_ in itertools.izip_longest(bl_ts, bl_ords, fillvalue=None):
+    for t_, ord_ in itertools.zip_longest(bl_ts, bl_ords, fillvalue=None):
 
         # Non-trivial loops.
         nt_loops = [lpe for lpe in range(le.NUM) if t_[lpe] > 1]
@@ -187,8 +187,8 @@ def gen_loopblocking(nested_loop_desc, resource, part, constraint, cost,
         apply_func = pool.apply_async
         retrieve_func = retrieve_result()
     else:
-        pool = None
-        apply_func = apply
+        pool = Pool(processes=1)
+        apply_func = pool.apply
         retrieve_func = retrieve_result_st()
 
     # Exhaustive generators.

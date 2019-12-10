@@ -83,7 +83,7 @@ class Network(object):
                                    'has not been added to the network'.
                                    format(p))
         else:
-            prevs = (self.layer_dict.keys()[-1],)
+            prevs = (list(self.layer_dict.keys())[-1],)
 
         self.layer_dict[layer_name] = layer
         self.prevs_dict[layer_name] = prevs

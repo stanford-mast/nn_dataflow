@@ -144,6 +144,15 @@ class FmapRange(namedtuple('FmapRange', ['fp_beg', 'fp_end'])):
             except ValueError:
                 return False
         return NotImplemented
+    
+    def __hash__(self):
+        '''
+        If a class does not define an __eq__() method, it should not define a
+        __hash__() operation either; if it defines __eq__() but not __hash__(),
+        its instances will not be usable as items in hashable collections.
+        See https://docs.python.org/3.1/reference/datamodel.html?highlight=hash#object.__hash__
+        '''
+        return hash((self.fp_beg, self.fp_end)) 
 
     def _compare(self, other):
         # Identical ranges.

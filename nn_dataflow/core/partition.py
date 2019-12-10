@@ -325,7 +325,7 @@ def _unit_nhops_to_fil(layer, filter_nodes, fil_dict, fwd=False):
                 # Each forward step, get the min-distance pair of source and
                 # destination.
                 src, dst = min(itertools.product(src_set, dst_set),
-                               key=lambda (s, d): d.hop_dist(s))
+                               key=lambda sd: sd[1].hop_dist(sd[0]))
                 dst_set.remove(dst)
                 src_set.add(dst)
                 nhops += fil_size * dst.hop_dist(src)

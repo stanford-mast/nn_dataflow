@@ -13,6 +13,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from functools import reduce
 import math
 from operator import mul
 
@@ -215,8 +216,8 @@ def get_ith_range(rng, idx, num):
     Divide the full range `rng` into `num` parts, and get the `idx`-th range.
     '''
     length = rng[1] - rng[0]
-    beg = rng[0] + idx * length / num
-    end = rng[0] + (idx + 1) * length / num
+    beg = rng[0] + idx * length // num
+    end = rng[0] + (idx + 1) * length // num
     assert end <= rng[1]
     return beg, end
 

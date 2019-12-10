@@ -953,7 +953,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
 
         outer_level_innermost_loop = None
 
-        for t_, ord_ in itertools.izip_longest(bl_ts, bl_ords, fillvalue=None):
+        for t_, ord_ in itertools.zip_longest(bl_ts, bl_ords, fillvalue=None):
 
             # Non-trivial loops and trivial loops of this level.
             ntlp_list = sorted(lpe for lpe in range(le.NUM)

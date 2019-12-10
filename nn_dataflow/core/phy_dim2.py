@@ -14,6 +14,7 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
 from collections import namedtuple
+from functools import reduce
 from operator import add, sub, neg, mul
 
 class PhyDim2(namedtuple('PhyDim2', ['h', 'w'])):

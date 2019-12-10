@@ -203,7 +203,7 @@ class TestGenPartition(TestPartitionFixture):
 
         for wlkey in self.layers:
             if wlkey.startswith('SSM'):
-                print wlkey
+                print(wlkey)
                 self.assertEqual(len(list(self._gen_partition(wlkey=wlkey,
                                                               optkey=optkey))),
                                  0)
