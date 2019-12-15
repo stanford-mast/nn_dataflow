@@ -100,7 +100,7 @@ def do_scheduling(args):
     size_gbuf = args.gbuf // word
     size_regf = args.regf // word
 
-    array_bus_width = args.bus_width / args.word
+    array_bus_width = args.bus_width // args.word
     if not array_bus_width:
         array_bus_width = float('inf')
     dram_bandwidth = args.dram_bw / word
