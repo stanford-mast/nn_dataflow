@@ -52,6 +52,16 @@ class TestNNDataflow(unittest.TestCase):
         net.add('a2', ConvLayer(1, 1, 1, 1))
         self.simple_net = net
 
+        net = Network('complex')
+        net.set_input_layer(InputLayer(8, 8))
+        net.add('1', ConvLayer(8, 8, 8, 1))
+        net.add('2a', ConvLayer(8, 8, 8, 1), prevs=('1',))
+        net.add('3a', ConvLayer(8, 8, 8, 1))
+        net.add('2b', ConvLayer(8, 8, 8, 1), prevs=('1',))
+        net.add('3b', ConvLayer(8, 8, 8, 1))
+        net.add('4', ConvLayer(16, 8, 8, 1), prevs=('3a', '3b'))
+        self.complex_net = net
+
         self.map_strategy = MapStrategyEyeriss
 
         self.resource = Resource(proc_region=NodeRegion(origin=PhyDim2(0, 0),
@@ -229,6 +239,30 @@ class TestNNDataflow(unittest.TestCase):
                                    dim=PhyDim2(8, 8),
                                    type=NodeRegion.PROC),
             dim_array=PhyDim2(2, 2),
+        )
+
+        # No time overhead limit.
+        options = Option(hw_gbuf_save_writeback=True,
+                         partition_interlayer=True,
+                         layer_pipeline_time_ovhd=float('inf'))
+        nnd = NNDataflow(network, batch_size, resource, self.cost,
+                         self.map_strategy)
+
+        tops, _ = nnd.schedule_search(options)
+        self.assertTrue(tops)
+
+    def test_fmap_fwd(self):
+        '''
+        Fmap forward with shared mem sources or both on/off-chip destinations.
+        '''
+        network = self.complex_net
+        batch_size = 16
+
+        # Multiple nodes for spatial pipelining.
+        resource = self.resource._replace(
+            proc_region=NodeRegion(origin=PhyDim2(0, 0),
+                                   dim=PhyDim2(8, 8),
+                                   type=NodeRegion.PROC),
         )
 
         # No time overhead limit.

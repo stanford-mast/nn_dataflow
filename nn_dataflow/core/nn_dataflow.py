@@ -168,6 +168,19 @@ class NNDataflow(object):
         # Allocation.
         allocation = segment.allocation()
 
+        # Forwarding data regions. Map a spatial index to the forwarding region.
+        fwd_data_region_dict = {}
+        for sh_list in segment.ifm_fwd_dict.values():
+            # A list of spatial indices that share the same ifmaps.
+            r = allocation[sh_list[0].sp_idx][sh_list[0].tm_idx].proc_region
+            for idx in sh_list[1:]:
+                fwd_data_region_dict[idx] = r
+        for fwd_src, fwd_dst_list in segment.ofm_fwd_dict.items():
+            # Ofmaps forwarded to neighbors.
+            r = allocation[fwd_src.sp_idx][fwd_src.tm_idx].proc_region
+            for idx in fwd_dst_list:
+                fwd_data_region_dict[idx] = r
+
         # Max allowed time overhead for segment timing.
         max_time_ovhd = options.layer_pipeline_time_ovhd
 
@@ -195,6 +208,7 @@ class NNDataflow(object):
 
                     curr_nndf_tops = self._layer_schedule_search(
                         layer, resource, cstr, sp_idx, tm_idx,
+                        fwd_data_region_dict.get((sp_idx, tm_idx)),
                         curr_nndf_tops, options)
 
             # Filter by time limit.
@@ -212,8 +226,8 @@ class NNDataflow(object):
         return sorted(nndf_tops, key=NNDataflowScheme.cmp_key)[:options.ntops]
 
     def _layer_schedule_search(self, layer_name, resource, constraint,
-                               spatial_idx, temporal_idx, prev_nndf_tops,
-                               options):
+                               spatial_idx, temporal_idx, fwd_data_region,
+                               prev_nndf_tops, options):
         '''
         Schedule the given layer under the given previous top NNDataflowScheme
         instances in 'prev_nndf_tops`.
@@ -231,6 +245,14 @@ class NNDataflow(object):
 
         for ifmap_layout, prev_nndf in self._gen_layer_ifmap_layout(
                 layer_name, prev_nndf_tops):
+
+            if fwd_data_region is not None:
+                # Remap source data regions to the forwarding region.
+                ifmap_layout = DataLayout(
+                    frngs=ifmap_layout.frngs,
+                    regions=(fwd_data_region,) * len(ifmap_layout.frngs),
+                    parts=tuple(p.projection(fwd_data_region, appl2frng=True)
+                                for p in ifmap_layout.parts))
 
             segment_idx = prev_nndf.last_seg_idx
             if spatial_idx == 0 and temporal_idx == 0:

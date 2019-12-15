@@ -41,6 +41,8 @@ class PipelineSegment(object):
     scheduled and the second level is temporally scheduled.
     '''
 
+    # pylint: disable=too-many-instance-attributes
+
     # Scheduling index in the segment, as a tuple of spatial and temporal
     # scheduling indices.
     SchedIndex = namedtuple('SchedIndex', ['sp_idx', 'tm_idx'])
@@ -216,15 +218,39 @@ class PipelineSegment(object):
         Local dependencies are omitted, as by default each layer has its
         immediately previous layer as local source and immediately next layer
         as local destination.
+
+        Construct an ifmap forwarding dict for shared memory source data. It
+        maps previous layer name tuples, to a list of scheduling indices of all
+        layers in this segment that share these exact previous layers. The
+        first in the list is responsible to fetch the previous layer data and
+        to forward them to others. We allow shared memory source data between
+        two layers only when both layers have memory dependency only (so their
+        temporal indices must be 0), and their previous layers are exactly the
+        same.
+
+        Construct an ofmap forwarding dict for multiple destinations of both
+        on-chip and off-chip. It maps the scheduling index of a layer in this
+        segment that has both memory and neighbor/local destinations (so needs
+        to store its ofmaps back to memory), to a list of scheduling indices of
+        all layers in this segment that accepts its ofmaps as ifmaps. Neighbor
+        dependencies are only between the last temporal one and the first
+        temporal ones; local dependencies are only between adjacent temporal
+        ones.
         '''
 
         self.src_dict = [[None for _ in ltpl] for ltpl in self.seg]
         self.dst_dict = [[None for _ in ltpl] for ltpl in self.seg]
 
+        self.ifm_fwd_dict = {}
+        self.ofm_fwd_dict = {}
+
         # Mapping from layer to spatial/temporal indices in the segment.
         layer2idx = {l: PipelineSegment.SchedIndex(sp_idx, tm_idx)
                      for sp_idx, ltpl in enumerate(self.seg)
                      for tm_idx, l in enumerate(ltpl)}
+
+        # Mapping from previous layer tuple to layer.
+        prevs2layer = {}
 
         for sp_idx, ltpl in enumerate(self.seg):
 
@@ -276,6 +302,17 @@ class PipelineSegment(object):
                     single_nbr_src = prev_idx
                     src += (prev_idx,)
 
+                # Shared memory source.
+                if mem_src and not lcl_src:
+                    assert not nbr_src
+                    assert tm_idx == 0
+                    if prevs in prevs2layer:
+                        fet_idx = layer2idx[prevs2layer[prevs]]
+                        self.ifm_fwd_dict.setdefault(prevs, [fet_idx]).append(
+                            layer2idx[l])
+                    else:
+                        prevs2layer[prevs] = l
+
                 # Destinations.
                 dst = tuple()
 
@@ -301,6 +338,13 @@ class PipelineSegment(object):
                 # Mutual exclusive.
                 # Now they can co-exist.
                 # assert not mem_dst or not nbr_dst
+                if mem_dst and nbr_dst:
+                    assert tm_idx == len(ltpl) - 1
+                    self.ofm_fwd_dict[layer2idx[l]] = [layer2idx[n]
+                                                       for n in nbr_dst]
+                if mem_dst and lcl_dst:
+                    assert not nbr_dst
+                    self.ofm_fwd_dict[layer2idx[l]] = [layer2idx[lcl_dst[0]]]
 
                 if mem_dst:
                     # Memory destination.
@@ -355,6 +399,11 @@ class PipelineSegment(object):
                     # Data source is memory.
                     assert src == (None,)
                     src_data_region = self.resource.src_data_region
+                    for sh_idx_list in self.ifm_fwd_dict.values():
+                        # Find shared memory source to use forwarding.
+                        if (sp_idx, tm_idx) in sh_idx_list[1:]:
+                            src_data_region = subregions[sh_idx_list[0].sp_idx]
+                            break
                 elif src:
                     # Data source is neighbor.
                     assert len(src) == 1
@@ -550,6 +599,17 @@ class PipelineSegment(object):
             assert vals
             return vals
 
+        def _layer_topifm_vals(layer_name):
+            layer = self.network[layer_name]
+            # We require that the total ifmap size takes at least 5% of the
+            # gbuf capacity of a single node, to avoid too fine blocking.
+            tmax = layer.total_ifmap_size(self.batch_size) \
+                    / (0.05 * self.resource.size_gbuf)
+            vals = [t for t, _ in util.factorize(layer.nifm, 2)
+                    if t <= tmax or t == 1]
+            assert vals
+            return vals
+
         # Layer constraint kwargs.
         symargs = [[{'topbat': topbat} for _ in ltpl] for ltpl in self.seg]
 
@@ -678,10 +738,6 @@ class PipelineSegment(object):
                         and tm_idx == len(ltpl) - 1:
                     curr_sa.pop('fbofm', False)
 
-        # Sort symbol dict.
-        symvals = OrderedDict(sorted(((s, symvals[s]) for s in symvals),
-                                     key=lambda item: str(item[0])))
-
         # Simplify.
         self._simplify_symargs(symargs, symvals)
 
@@ -720,14 +776,41 @@ class PipelineSegment(object):
             return False
         # Use the optimal value.
         symvals[fbofm_init] = [opt_val]
-
-        # Simplify twice. First substitute fbofm_init, then simplify.
         self._simplify_symargs(symargs, symvals)
+
+        # Shared memory source must have the same topifm.
+        for sh_idx_list in self.ifm_fwd_dict.values():
+            assert len(sh_idx_list) > 1
+            fet_sp_idx = sh_idx_list[0].sp_idx
+            sh_symarg_list = [symargs[idx.sp_idx][0] for idx in sh_idx_list]
+
+            # Must have no constraint on ifmaps access from memory.
+            assert all(not sa.get('fbifm', False) and not sa.get('topifm', 0)
+                       for sa in sh_symarg_list)
+
+            # Cannot constrain both topifm and topofm.
+            if any(sa.get('fbofm', False) or sa.get('topofm', 0)
+                   for sa in sh_symarg_list):
+                sh_kwargs = {'fbifm': True}
+            else:
+                topifm = symbols('topifm_{}'.format(fet_sp_idx), integer=True)
+                symvals[topifm] = _layer_topifm_vals(self.seg[fet_sp_idx][0])
+                sh_kwargs = {'topifm': topifm}
+
+            # Set constraints.
+            for sa in sh_symarg_list:
+                sa.update(sh_kwargs)
+
+        # Simplify.
         self._simplify_symargs(symargs, symvals)
 
         # Turn constraints into lazily updated rules.
         self._lazify_topofm_symargs(symargs, symvals)
         # Cannot simplify any more as update_dict is not sympifi-able.
+
+        # Sort symbol dict.
+        symvals = OrderedDict(sorted(((s, symvals[s]) for s in symvals),
+                                     key=lambda item: str(item[0])))
 
         if not symvals:
             # Must add a dummy symbol so iterative substitution can happen.
