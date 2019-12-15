@@ -79,86 +79,86 @@ class TestOption(unittest.TestCase):
 
     def test_invalid_args(self):
         ''' Invalid args. '''
-        with self.assertRaisesRegexp(TypeError, 'Option: .*at most.*100'):
+        with self.assertRaisesRegex(TypeError, 'Option: .*at most.*100'):
             _ = Option(*[None] * 100)
 
     def test_invalid_kwargs(self):
         ''' Invalid kwargs. '''
-        with self.assertRaisesRegexp(TypeError, 'Option: .*bad.*'):
+        with self.assertRaisesRegex(TypeError, 'Option: .*bad.*'):
             _ = Option(bad='')
 
     def test_invalid_both_args_kwargs(self):
         ''' Invalid both args and kwargs are given. '''
-        with self.assertRaisesRegexp(TypeError, 'Option: .*sw_gbuf_bypass.*'):
+        with self.assertRaisesRegex(TypeError, 'Option: .*sw_gbuf_bypass.*'):
             _ = Option((False,) * 3, sw_gbuf_bypass=(False,) * 3)
 
     def test_invalid_swgbyp_type(self):
         ''' Invalid sw_gbuf_bypass type. '''
-        with self.assertRaisesRegexp(TypeError, 'Option: .*sw_gbuf_bypass.*'):
+        with self.assertRaisesRegex(TypeError, 'Option: .*sw_gbuf_bypass.*'):
             _ = Option(sw_gbuf_bypass=[False, False, False])
 
     def test_invalid_swgbyp_len(self):
         ''' Invalid sw_gbuf_bypass len. '''
-        with self.assertRaisesRegexp(ValueError, 'Option: .*sw_gbuf_bypass.*'):
+        with self.assertRaisesRegex(ValueError, 'Option: .*sw_gbuf_bypass.*'):
             _ = Option(sw_gbuf_bypass=(False, False))
 
     def test_invalid_swsol_hwbufshr(self):
         ''' Invalid sw_solve_loopblocking and hw_gbuf_sharing comb. '''
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'Option: .*sw_solve_loopblocking.*'
                                      'hw_gbuf_sharing.*'):
             _ = Option(sw_solve_loopblocking=True, hw_gbuf_sharing=True)
 
     def test_invalid_hwaccfwd_hwbufshr(self):
         ''' Invalid hw_access_forwarding and hw_gbuf_sharing comb. '''
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'Option: .*hw_access_forwarding.*'
                                      'hw_gbuf_sharing.*'):
             _ = Option(hw_access_forwarding=True, hw_gbuf_sharing=True)
 
     def test_invalid_swsol_hwswb(self):
         ''' Invalid sw_solve_loopblocking and hw_gbuf_save_writeback comb. '''
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'Option: .*sw_solve_loopblocking.*'
                                      'hw_gbuf_save_writeback.*'):
             _ = Option(sw_solve_loopblocking=True, hw_gbuf_save_writeback=True)
 
     def test_invalid_part_hybrid_ifmaps(self):
         ''' Invalid partition_hybrid and partition_ifmaps comb. '''
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'Option: .*partition_ifmaps.*'
                                      'partition_hybrid.*'):
             _ = Option(partition_hybrid=False, partition_ifmaps=True)
 
     def test_invalid_time_ovhd(self):
         ''' Invalid layer_pipeline_time_ovhd. '''
-        with self.assertRaisesRegexp(KeyError,
+        with self.assertRaisesRegex(KeyError,
                                      'Option: .*layer_pipeline_time_ovhd.*'):
             _ = Option(layer_pipeline_time_ovhd=None)
 
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'Option: .*layer_pipeline_time_ovhd.*'):
             _ = Option(layer_pipeline_time_ovhd=-1)
 
     def test_invalid_max_degree(self):
         ''' Invalid layer_pipeline_max_degree. '''
-        with self.assertRaisesRegexp(KeyError,
+        with self.assertRaisesRegex(KeyError,
                                      'Option: .*layer_pipeline_max_degree.*'):
             _ = Option(layer_pipeline_max_degree=None)
 
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'Option: .*layer_pipeline_max_degree.*'):
             _ = Option(layer_pipeline_max_degree=-1)
 
     def test_invalid_opt_goal(self):
         ''' Invalid opt_goal. '''
-        with self.assertRaisesRegexp(ValueError, 'Option: .*opt_goal.*'):
+        with self.assertRaisesRegex(ValueError, 'Option: .*opt_goal.*'):
             _ = Option(opt_goal='o')
-        with self.assertRaisesRegexp(ValueError, 'Option: .*opt_goal.*'):
+        with self.assertRaisesRegex(ValueError, 'Option: .*opt_goal.*'):
             _ = Option(opt_goal='E')
 
     def test_option_list(self):
         ''' Accessor option_list. '''
         options = Option()
-        self.assertItemsEqual(options.option_list(), options._fields)
+        self.assertCountEqual(options.option_list(), options._fields)
 

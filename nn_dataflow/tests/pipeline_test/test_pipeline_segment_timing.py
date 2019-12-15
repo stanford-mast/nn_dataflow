@@ -44,7 +44,7 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
 
     def test_invalid_network(self):
         ''' Invalid network. '''
-        with self.assertRaisesRegexp(TypeError,
+        with self.assertRaisesRegex(TypeError,
                                      'PipelineSegmentTiming: .*network.*'):
             _ = PipelineSegmentTiming(self.net1.input_layer(), 3)
 
@@ -117,11 +117,11 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         timing = PipelineSegmentTiming(self.net1, 3)
         timing.add('0', self._make_sched_res((3, 0, 0), 123))
 
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'PipelineSegmentTiming: .*belong to.*'):
             timing.add('1', self._make_sched_res((2, 1, 0), 123))
 
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'PipelineSegmentTiming: .*follow.*'):
             timing.add('1p', self._make_sched_res((3, 1, 1), 123))
 
@@ -129,7 +129,7 @@ class TestPipelineSegmentTiming(TestPipelineFixture):
         ''' add(), layer already in. '''
         timing = PipelineSegmentTiming(self.net1, 3)
         timing.add('0', self._make_sched_res((3, 0, 0), 123))
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'PipelineSegmentTiming: .*layer 0.*'):
             timing.add('0', self._make_sched_res((3, 1, 0), 123))
 

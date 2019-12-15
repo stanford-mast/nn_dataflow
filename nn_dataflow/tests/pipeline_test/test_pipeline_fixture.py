@@ -434,7 +434,8 @@ class TestPipelineFixture(unittest.TestCase):
                 seq = None
                 # str is greater than all numbers, see
                 # https://docs.python.org/2/library/stdtypes.html#comparisons
-                seq_prev_oaps = [poap for poap in prev_oaps if poap > 0]
+                seq_prev_oaps = [poap for poap in prev_oaps \
+                                 if isinstance(poap, str)]
                 if seq_prev_oaps:
                     self.assertEqual(len(seq_prev_oaps), 1,
                                      '_validate_constraint: layer {} ({}) '

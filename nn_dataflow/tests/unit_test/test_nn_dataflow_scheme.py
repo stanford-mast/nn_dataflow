@@ -176,25 +176,25 @@ class TestNNDataflowScheme(unittest.TestCase):
 
     def test_init_invalid_network(self):
         ''' Invalid network. '''
-        with self.assertRaisesRegexp(TypeError,
+        with self.assertRaisesRegex(TypeError,
                                      'NNDataflowScheme: .*network*'):
             _ = NNDataflowScheme(self.network['c1'], self.input_layout)
 
     def test_init_invalid_input_layout(self):
         ''' Invalid input_layout. '''
-        with self.assertRaisesRegexp(TypeError,
+        with self.assertRaisesRegex(TypeError,
                                      'NNDataflowScheme: .*input_layout*'):
             _ = NNDataflowScheme(self.network, self.input_layout.frngs)
 
     def test_init_invalid_eld_keys(self):
         ''' Invalid ext_layout_dict keys. '''
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'NNDataflowScheme: .*ext_layout_dict*'):
             _ = NNDataflowScheme(self.network, self.input_layout,
                                  {'e0': self.input_layout})
 
         self.network.add_ext('e0', InputLayer(3, 224))
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'NNDataflowScheme: .*ext_layout_dict*'):
             _ = NNDataflowScheme(self.network, self.input_layout)
 
@@ -203,7 +203,7 @@ class TestNNDataflowScheme(unittest.TestCase):
         self.network.add_ext('e0', InputLayer(3, 224))
         self.network.add_ext('e1', InputLayer(3, 224))
 
-        with self.assertRaisesRegexp(TypeError,
+        with self.assertRaisesRegex(TypeError,
                                      'NNDataflowScheme: .*ext_layout*'):
             _ = NNDataflowScheme(self.network, self.input_layout,
                                  {'e0': self.input_layout,
@@ -227,14 +227,14 @@ class TestNNDataflowScheme(unittest.TestCase):
         ''' __setitem__ not in network. '''
         df = NNDataflowScheme(self.network, self.input_layout)
 
-        with self.assertRaisesRegexp(KeyError, 'NNDataflowScheme: .*cc.*'):
+        with self.assertRaisesRegex(KeyError, 'NNDataflowScheme: .*cc.*'):
             df['cc'] = self.c1res
 
     def test_setitem_invalid_value(self):
         ''' __setitem__ invalid value. '''
         df = NNDataflowScheme(self.network, self.input_layout)
 
-        with self.assertRaisesRegexp(TypeError,
+        with self.assertRaisesRegex(TypeError,
                                      'NNDataflowScheme: .*SchedulingResult*'):
             df['c1'] = self.c1res.scheme
 
@@ -243,14 +243,14 @@ class TestNNDataflowScheme(unittest.TestCase):
         df = NNDataflowScheme(self.network, self.input_layout)
         df['c1'] = self.c1res
 
-        with self.assertRaisesRegexp(KeyError, 'NNDataflowScheme: .*c1*'):
+        with self.assertRaisesRegex(KeyError, 'NNDataflowScheme: .*c1*'):
             df['c1'] = self.c1res._replace(sched_seq=(1, 0, 0))
 
     def test_setitem_prev_not_in(self):
         ''' __setitem__ previous not existing. '''
         df = NNDataflowScheme(self.network, self.input_layout)
 
-        with self.assertRaisesRegexp(KeyError, 'NNDataflowScheme: .*p1*'):
+        with self.assertRaisesRegex(KeyError, 'NNDataflowScheme: .*p1*'):
             df['p1'] = self.p1res
 
     def test_setitem_prev_input_ext(self):
@@ -270,7 +270,7 @@ class TestNNDataflowScheme(unittest.TestCase):
         ''' __setitem__ invalid segment index. '''
         df = NNDataflowScheme(self.network, self.input_layout)
 
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'NNDataflowScheme: .*segment index*'):
             df['c1'] = self.c1res._replace(sched_seq=(1, 0, 0))
 
@@ -278,7 +278,7 @@ class TestNNDataflowScheme(unittest.TestCase):
         df['c1'] = self.c1res
         df['p1'] = self.p1res._replace(sched_seq=(1, 0, 0))
 
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'NNDataflowScheme: .*segment index*'):
             df['p2'] = self.p2res._replace(sched_seq=(0, 0, 0))
 
@@ -287,7 +287,7 @@ class TestNNDataflowScheme(unittest.TestCase):
         df = NNDataflowScheme(self.network, self.input_layout)
         df['c1'] = self.c1res
 
-        with self.assertRaisesRegexp(KeyError, 'NNDataflowScheme: .*'):
+        with self.assertRaisesRegex(KeyError, 'NNDataflowScheme: .*'):
             del df['c1']
 
     def test_iter_len(self):
@@ -490,7 +490,7 @@ class TestNNDataflowScheme(unittest.TestCase):
 
     def test_stats_not_supported(self):
         ''' Per-layer stats: not supported. '''
-        with self.assertRaisesRegexp(AttributeError,
+        with self.assertRaisesRegex(AttributeError,
                                      'NNDataflowScheme: .*not_supported.*'):
             _ = self.dtfl.perlayer_stats('not_supported')
 

@@ -574,7 +574,7 @@ class LoopBlockingScheme(object):
         gens = [None] * le.NUM
         rev_order = [le.NUM - 1 - o for o in order_x]
         for lpe in range(le.NUM):
-            gens[rev_order[lpe]] = xrange(t_x[lpe])
+            gens[rev_order[lpe]] = range(t_x[lpe])
 
         for idx in itertools.product(*gens):
             # Index now is in the loop order from outer to inner. Reorder to be

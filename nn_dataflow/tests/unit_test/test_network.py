@@ -44,16 +44,16 @@ class TestNetwork(unittest.TestCase):
     def test_set_input_layer_type(self):
         ''' Modifier set_input_layer type. '''
         network = Network('test_net')
-        with self.assertRaisesRegexp(TypeError, 'Network: .*input_layer.*'):
+        with self.assertRaisesRegex(TypeError, 'Network: .*input_layer.*'):
             network.set_input_layer(Layer(3, 24))
-        with self.assertRaisesRegexp(TypeError, 'Network: .*input_layer.*'):
+        with self.assertRaisesRegex(TypeError, 'Network: .*input_layer.*'):
             network.set_input_layer(ConvLayer(3, 8, 24, 3))
 
     def test_set_input_layer_duplicate(self):
         ''' Modifier set_input_layer duplicate. '''
         network = Network('test_net')
         network.set_input_layer(InputLayer(3, 24))
-        with self.assertRaisesRegexp(KeyError, 'Network: .*input.*'):
+        with self.assertRaisesRegex(KeyError, 'Network: .*input.*'):
             network.set_input_layer(InputLayer(3, 24))
 
     def test_add(self):
@@ -72,14 +72,14 @@ class TestNetwork(unittest.TestCase):
         network.set_input_layer(InputLayer(3, 224))
 
         network.add('c1', ConvLayer(3, 64, 224, 3))
-        with self.assertRaisesRegexp(KeyError, 'Network: .*c1.*'):
+        with self.assertRaisesRegex(KeyError, 'Network: .*c1.*'):
             network.add('c1', ConvLayer(64, 128, 224, 3))
 
     def test_add_no_input(self):
         ''' Modifier add no input. '''
         network = Network('test_net')
 
-        with self.assertRaisesRegexp(RuntimeError, 'Network: .*input.*'):
+        with self.assertRaisesRegex(RuntimeError, 'Network: .*input.*'):
             network.add('c1', ConvLayer(3, 64, 224, 3))
 
     def test_add_no_prev(self):
@@ -88,7 +88,7 @@ class TestNetwork(unittest.TestCase):
         network.set_input_layer(InputLayer(3, 224))
 
         network.add('c1', ConvLayer(3, 64, 224, 3))
-        with self.assertRaisesRegexp(KeyError, 'Network: .*prev.*p1.*'):
+        with self.assertRaisesRegex(KeyError, 'Network: .*prev.*p1.*'):
             network.add('p1', PoolingLayer(64, 7, 32), prevs='p1')
 
     def test_add_invalid_type(self):
@@ -96,7 +96,7 @@ class TestNetwork(unittest.TestCase):
         network = Network('test_net')
         network.set_input_layer(InputLayer(3, 224))
 
-        with self.assertRaisesRegexp(TypeError, 'Network: .*Layer.*'):
+        with self.assertRaisesRegex(TypeError, 'Network: .*Layer.*'):
             network.add('c1', (3, 64, 224, 3))
 
     def test_add_unmatch_prev(self):
@@ -105,25 +105,25 @@ class TestNetwork(unittest.TestCase):
         network.set_input_layer(InputLayer(3, 224))
         network.add('c1', ConvLayer(3, 64, 224, 3))
 
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'Network: .*c1.*p1.*mismatch fmap.*'):
             network.add('p1', PoolingLayer(64, 7, 2))
         self.assertEqual(len(network), 1)
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'Network: .*c1.*c2.*mismatch fmap.*'):
             network.add('c2', ConvLayer(64, 128, 220, 3))
         self.assertEqual(len(network), 1)
 
-        with self.assertRaisesRegexp(ValueError, 'Network: .*c1.*prev.*p1.*'):
+        with self.assertRaisesRegex(ValueError, 'Network: .*c1.*prev.*p1.*'):
             network.add('p1', PoolingLayer(32, 7, 32))
         self.assertEqual(len(network), 1)
-        with self.assertRaisesRegexp(ValueError, 'Network: .*c1.*prev.*c2.*'):
+        with self.assertRaisesRegex(ValueError, 'Network: .*c1.*prev.*c2.*'):
             network.add('c2', ConvLayer(32, 128, 224, 3))
         self.assertEqual(len(network), 1)
 
         network.add('c2', ConvLayer(64, 128, 224, 3))
 
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      r'Network: .*c1 | c2.*prev.*p1.*'):
             network.add('p1', PoolingLayer(128, 7, 32), prevs=('c1', 'c2'))
         self.assertEqual(len(network), 2)
@@ -151,16 +151,16 @@ class TestNetwork(unittest.TestCase):
         network = Network('test_net')
 
         network.add_ext('e0', InputLayer(3, 24))
-        with self.assertRaisesRegexp(KeyError, 'Network: .*ext.*'):
+        with self.assertRaisesRegex(KeyError, 'Network: .*ext.*'):
             network.add_ext('e0', InputLayer(3, 24))
 
     def test_add_ext_invalid_type(self):
         ''' Modifier add_ext invalid type. '''
         network = Network('test_net')
 
-        with self.assertRaisesRegexp(TypeError, 'Network: .*external layer.*'):
+        with self.assertRaisesRegex(TypeError, 'Network: .*external layer.*'):
             network.add_ext('e0', Layer(3, 24))
-        with self.assertRaisesRegexp(TypeError, 'Network: .*external layer.*'):
+        with self.assertRaisesRegex(TypeError, 'Network: .*external layer.*'):
             network.add_ext('e0', ConvLayer(3, 8, 24, 3))
 
     def test_prevs(self):
@@ -189,7 +189,7 @@ class TestNetwork(unittest.TestCase):
 
     def test_prevs_input(self):
         ''' Get prevs input layer. '''
-        with self.assertRaisesRegexp(ValueError, 'Network: .*input.*'):
+        with self.assertRaisesRegex(ValueError, 'Network: .*input.*'):
             _ = self.network.prevs(self.network.INPUT_LAYER_KEY)
 
     def test_prevs_ext_next(self):
@@ -205,7 +205,7 @@ class TestNetwork(unittest.TestCase):
     def test_prevs_ext(self):
         ''' Get prevs external layer. '''
         self.network.add_ext('e0', InputLayer(3, 3))
-        with self.assertRaisesRegexp(ValueError, 'Network: .*ext.*'):
+        with self.assertRaisesRegex(ValueError, 'Network: .*ext.*'):
             _ = self.network.prevs('e0')
 
     def test_nexts(self):
@@ -370,7 +370,7 @@ class TestNetwork(unittest.TestCase):
 
     def test_getitem_error(self):
         ''' Accessor getitem. '''
-        with self.assertRaisesRegexp(KeyError, 'Network: .*c2.*'):
+        with self.assertRaisesRegex(KeyError, 'Network: .*c2.*'):
             _ = self.network['c2']
 
     def test_str(self):

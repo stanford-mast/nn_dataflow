@@ -281,3 +281,9 @@ def assert_float_eq_int(vfloat, vint, message=''):
     if abs(vfloat - vint) > 1:
         raise AssertionError(message + ' {} != {}'.format(vfloat, vint))
 
+def apply(func, argv):
+    '''
+    Similar to python2 built-in apply function.
+    '''
+    return func(*argv)
+

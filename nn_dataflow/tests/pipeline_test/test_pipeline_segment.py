@@ -41,13 +41,13 @@ class TestPipelineSegment(TestPipelineFixture):
 
     def test_invalid_seg(self):
         ''' Invalid seg. '''
-        with self.assertRaisesRegexp(TypeError,
+        with self.assertRaisesRegex(TypeError,
                                      'PipelineSegment: .*seg.*tuple.*'):
             _ = PipelineSegment([('0',), ('1', '1p')],
                                 self.net['net1'], self.batch_size,
                                 self.resource)
 
-        with self.assertRaisesRegexp(TypeError,
+        with self.assertRaisesRegex(TypeError,
                                      'PipelineSegment: .*seg.*sub-tuple.*'):
             _ = PipelineSegment(('0', '1', '1p'),
                                 self.net['net1'], self.batch_size,
@@ -55,7 +55,7 @@ class TestPipelineSegment(TestPipelineFixture):
 
     def test_invalid_network(self):
         ''' Invalid network. '''
-        with self.assertRaisesRegexp(TypeError,
+        with self.assertRaisesRegex(TypeError,
                                      'PipelineSegment: .*network.*'):
             _ = PipelineSegment((('0',), ('1', '1p')),
                                 self.net['net1'].input_layer(), self.batch_size,
@@ -63,7 +63,7 @@ class TestPipelineSegment(TestPipelineFixture):
 
     def test_invalid_resource(self):
         ''' Invalid resource. '''
-        with self.assertRaisesRegexp(TypeError,
+        with self.assertRaisesRegex(TypeError,
                                      'PipelineSegment: .*resource.*'):
             _ = PipelineSegment((('0',), ('1', '1p')),
                                 self.net['net1'], self.batch_size,

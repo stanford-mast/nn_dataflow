@@ -40,11 +40,11 @@ class TestDataDimLoops(unittest.TestCase):
 
     def test_invalid_args(self):
         ''' Invalid arguments. '''
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'DataDimLoops: .*LoopEnum.*'):
             _ = DataDimLoops(le.NUM + 1)
 
-        with self.assertRaisesRegexp(ValueError,
+        with self.assertRaisesRegex(ValueError,
                                      'DataDimLoops: .*LoopEnum.*'):
             _ = DataDimLoops(le.IFM, le.NUM)
 

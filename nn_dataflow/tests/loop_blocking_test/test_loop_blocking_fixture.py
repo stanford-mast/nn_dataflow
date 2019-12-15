@@ -346,7 +346,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
                             for lpe in range(le.NUM) if t_bs[lpe] > 1],
                            key=lambda tpl: ord_bs[tpl[0]],
                            reverse=True) \
-                  + sorted([(lpe, t_x[lpe] / t_bs[lpe])
+                  + sorted([(lpe, t_x[lpe] // t_bs[lpe])
                             for lpe in range(le.NUM) if t_x[lpe] > t_bs[lpe]],
                            key=lambda tpl: ord_x[tpl[0]],
                            reverse=True)
@@ -517,7 +517,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
             ''' Get number of rotation rounds. '''
 
             # Ensure all ranges have the same rotation steps.
-            steps_list = self.rot_step_cnt.values()
+            steps_list = tuple(self.rot_step_cnt.values())
             if not steps_list:
                 return 0
             assert all(s == steps_list[0] for s in steps_list)
@@ -719,7 +719,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
 
         data_loops = lbs.nld.data_loops
 
-        lpts = zip(*lbs.bl_ts)
+        lpts = tuple(zip(*lbs.bl_ts))
 
         subgrp_size, rot_unit_cnt, lp_t_list = self._bufshr_params(lbs)
         data_loops = lbs.nld.data_loops

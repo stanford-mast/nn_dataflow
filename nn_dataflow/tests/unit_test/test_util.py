@@ -39,7 +39,7 @@ class TestUtilHashableDict(unittest.TestCase):
 
     def test_fromdict_error(self):
         ''' fromdict error. '''
-        with self.assertRaisesRegexp(TypeError, 'HashableDict: .*dict.*'):
+        with self.assertRaisesRegex(TypeError, 'HashableDict: .*dict.*'):
             _ = util.HashableDict.fromdict([1, 2])
 
     def test_eq(self):
@@ -277,9 +277,9 @@ class TestUtilClosestFactor(unittest.TestCase):
 
     def test_value_float(self):
         ''' Value is float. '''
-        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+        with self.assertRaisesRegex(TypeError, '.*integers.*'):
             _ = util.closest_factor(24.3, 5)
-        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+        with self.assertRaisesRegex(TypeError, '.*integers.*'):
             _ = util.closest_factor(24., 10)
 
     def test_factor_float(self):
@@ -294,11 +294,11 @@ class TestUtilClosestFactor(unittest.TestCase):
 
     def test_negative(self):
         ''' Negative. '''
-        with self.assertRaisesRegexp(ValueError, '.*negative.*'):
+        with self.assertRaisesRegex(ValueError, '.*negative.*'):
             _ = util.closest_factor(24, -5)
-        with self.assertRaisesRegexp(ValueError, '.*negative.*'):
+        with self.assertRaisesRegex(ValueError, '.*negative.*'):
             _ = util.closest_factor(-24, -5)
-        with self.assertRaisesRegexp(ValueError, '.*negative.*'):
+        with self.assertRaisesRegex(ValueError, '.*negative.*'):
             _ = util.closest_factor(-24, 5)
 
     def test_missing(self):
@@ -388,36 +388,36 @@ class TestUtilGCD(unittest.TestCase):
 
     def test_float(self):
         ''' Float. '''
-        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+        with self.assertRaisesRegex(TypeError, '.*integers.*'):
             _ = util.gcd(1., 2)
 
-        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+        with self.assertRaisesRegex(TypeError, '.*integers.*'):
             _ = util.gcd(1, 2.2)
 
-        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+        with self.assertRaisesRegex(TypeError, '.*integers.*'):
             _ = util.gcd(1, 2, 3, 4.2)
 
     def test_non_positive(self):
         ''' Non-positive values. '''
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.gcd(-1, 2)
 
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.gcd(1, -2)
 
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.gcd(3, 6, 9, 12, -21)
 
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.gcd(3, 0)
 
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.gcd(0, 3)
 
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.gcd(0, 5, 10, 15, 20)
 
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.gcd(5, 10, 0, 15, 20)
 
 
@@ -449,36 +449,36 @@ class TestUtilLCM(unittest.TestCase):
 
     def test_float(self):
         ''' Float. '''
-        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+        with self.assertRaisesRegex(TypeError, '.*integers.*'):
             _ = util.lcm(1., 2)
 
-        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+        with self.assertRaisesRegex(TypeError, '.*integers.*'):
             _ = util.lcm(1, 2.2)
 
-        with self.assertRaisesRegexp(TypeError, '.*integers.*'):
+        with self.assertRaisesRegex(TypeError, '.*integers.*'):
             _ = util.lcm(1, 2, 3, 4.2)
 
     def test_non_positive(self):
         ''' Non-positive values. '''
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.lcm(-1, 2)
 
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.lcm(1, -2)
 
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.lcm(3, 6, 9, 12, -21)
 
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.lcm(3, 0)
 
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.lcm(0, 3)
 
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.lcm(0, 5, 10, 15, 20)
 
-        with self.assertRaisesRegexp(ValueError, '.*positive.*'):
+        with self.assertRaisesRegex(ValueError, '.*positive.*'):
             _ = util.lcm(5, 10, 0, 15, 20)
 
 
@@ -535,10 +535,10 @@ class TestUtilAssertFloatEqInt(unittest.TestCase):
 
     def test_fail(self):
         ''' Fail. '''
-        with self.assertRaisesRegexp(AssertionError, '.*12.*'):
+        with self.assertRaisesRegex(AssertionError, '.*12.*'):
             util.assert_float_eq_int(13.01, 12)
-        with self.assertRaisesRegexp(AssertionError, '.*12.*'):
+        with self.assertRaisesRegex(AssertionError, '.*12.*'):
             util.assert_float_eq_int(10.99, 12)
-        with self.assertRaisesRegexp(AssertionError, '.*12.*'):
+        with self.assertRaisesRegex(AssertionError, '.*12.*'):
             util.assert_float_eq_int(12., -12)
 

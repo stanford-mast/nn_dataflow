@@ -112,6 +112,7 @@ class PipelineSegment(object):
         # hint A are larger than the corresponding values in hint B, A will be
         # generated after B.
         vals = [sorted(v) for v in vals]
+        syms = list(syms)
 
         if self.cstr_topbat_idx is not None:
             # Tovhd =  (1 + 1/to + 1 + 1/to + ...) / tb
@@ -123,8 +124,7 @@ class PipelineSegment(object):
         for valp in itertools.product(*vals):
 
             constraint = tuple()
-
-            for atpl in self._subs_symargs(self.cstr_symargs, zip(syms, valp)):
+            for atpl in self._subs_symargs(self.cstr_symargs, tuple(zip(syms, valp))):
                 ctpl = tuple()
                 for a in atpl:
                     # Construct kwargs, adjust the types of the values.

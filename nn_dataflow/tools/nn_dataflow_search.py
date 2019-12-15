@@ -96,11 +96,11 @@ def do_scheduling(args):
     dim_array = PhyDim2(*args.array)
 
     # Sizes of gbuf and regf are in words.
-    word = (args.word + 7) / 8
-    size_gbuf = args.gbuf / word
-    size_regf = args.regf / word
+    word = (args.word + 7) // 8
+    size_gbuf = args.gbuf // word
+    size_regf = args.regf // word
 
-    array_bus_width = args.bus_width // args.word
+    array_bus_width = args.bus_width / args.word
     if not array_bus_width:
         array_bus_width = float('inf')
     dram_bandwidth = args.dram_bw / word
@@ -307,7 +307,7 @@ def argparser():
     ap.add_argument('-t', '--top', type=int, default=1,
                     help='Number of top schedules to keep during search.')
     ap.add_argument('-p', '--processes', type=int,
-                    default=multiprocessing.cpu_count()/2,
+                    default=multiprocessing.cpu_count()//2,
                     help='Number of parallel processes to use for search.')
     ap.add_argument('-v', '--verbose', action='store_true',
                     help='Show progress and details.')

@@ -130,6 +130,7 @@ def _gen_loopblocking_perprocess(
     def _sweep():
         ''' Sweep all. '''
         is_conv_loops = (nested_loop_desc.data_loops == ConvLayer.data_loops())
+        counter = 0
         for bl_ts, bl_ords in itertools.product(_gen_bl_ts(), gen_ords):
             if is_conv_loops and skip_conv(bl_ts, bl_ords):
                 continue
@@ -138,6 +139,7 @@ def _gen_loopblocking_perprocess(
             lbs = LoopBlockingScheme(
                 nested_loop_desc, bl_ts, bl_ords, resource, bufshr,
                 options)
+            counter += 1
             yield lbs
 
     return heapq.nsmallest(options.ntops, _sweep(),
@@ -187,8 +189,8 @@ def gen_loopblocking(nested_loop_desc, resource, part, constraint, cost,
         apply_func = pool.apply_async
         retrieve_func = retrieve_result()
     else:
-        pool = Pool(processes=1)
-        apply_func = pool.apply
+        pool = None
+        apply_func = util.apply
         retrieve_func = retrieve_result_st()
 
     # Exhaustive generators.

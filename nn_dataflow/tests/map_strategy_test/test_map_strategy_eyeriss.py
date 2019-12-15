@@ -34,7 +34,7 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
 
     def test_invalid_layer(self):
         ''' Constructor with invalid layer type. '''
-        with self.assertRaisesRegexp(TypeError, 'MapEyeriss: .*type.*'):
+        with self.assertRaisesRegex(TypeError, 'MapEyeriss: .*type.*'):
             _ = MapStrategyEyeriss(Layer(1, 1), 4, 1, self.dim_array)
 
     def test_nested_loop_desc_sanity(self):
@@ -43,8 +43,10 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
         batch_size = 4
         occ = 1
 
-        for layer in self.convlayers.values() + self.fclayers.values() \
-                + self.lrlayers.values() + self.fake_layers.values():
+        for layer in tuple(self.convlayers.values()) + \
+                     tuple(self.fclayers.values()) + \
+                     tuple(self.lrlayers.values()) + \
+                     tuple(self.fake_layers.values()):
 
             ms = MapStrategyEyeriss(layer, batch_size, occ, self.dim_array)
 
@@ -127,8 +129,10 @@ class TestMapStrategyEyeriss(TestMapStrategyFixture):
         occ0 = 1
         occ1 = 0.8
 
-        for layer in self.convlayers.values() + self.fclayers.values() \
-                + self.lrlayers.values() + self.fake_layers.values():
+        for layer in tuple(self.convlayers.values()) + \
+                     tuple(self.fclayers.values()) + \
+                     tuple(self.lrlayers.values()) + \
+                     tuple(self.fake_layers.values()):
 
             ms0 = MapStrategyEyeriss(layer, batch_size, occ0, self.dim_array)
             ms1 = MapStrategyEyeriss(layer, batch_size, occ1, self.dim_array)

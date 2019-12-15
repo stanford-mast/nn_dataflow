@@ -70,6 +70,6 @@ class TestPhyDim2(unittest.TestCase):
     def test_hop_dist_error(self):
         ''' Get hop distance. '''
         dim1 = PhyDim2(14, 12)
-        with self.assertRaisesRegexp(TypeError, 'hop_dist'):
+        with self.assertRaisesRegex(TypeError, 'hop_dist'):
             _ = dim1.hop_dist((5, 20))
 

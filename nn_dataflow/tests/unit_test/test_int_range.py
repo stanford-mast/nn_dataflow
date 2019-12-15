@@ -34,14 +34,14 @@ class TestIntRange(unittest.TestCase):
 
     def test_invalid_args(self):
         ''' Invalid arguments. '''
-        with self.assertRaisesRegexp(TypeError, 'IntRange: .*beg.*'):
+        with self.assertRaisesRegex(TypeError, 'IntRange: .*beg.*'):
             _ = IntRange(7.2, 3)
-        with self.assertRaisesRegexp(TypeError, 'IntRange: .*end.*'):
+        with self.assertRaisesRegex(TypeError, 'IntRange: .*end.*'):
             _ = IntRange(7, None)
 
-        with self.assertRaisesRegexp(ValueError, 'IntRange: .*beg.*end.*'):
+        with self.assertRaisesRegex(ValueError, 'IntRange: .*beg.*end.*'):
             _ = IntRange(7, 3)
-        with self.assertRaisesRegexp(ValueError, 'IntRange: .*beg.*end.*'):
+        with self.assertRaisesRegex(ValueError, 'IntRange: .*beg.*end.*'):
             _ = IntRange(-3, -7)
 
     def test_size(self):
@@ -90,7 +90,7 @@ class TestIntRange(unittest.TestCase):
     def test_overlap_error(self):
         ''' Get overlap error. '''
         ir = IntRange(-11, 5)
-        with self.assertRaisesRegexp(TypeError, 'IntRange: .*'):
+        with self.assertRaisesRegex(TypeError, 'IntRange: .*'):
             ir.overlap((0, 1))
 
     def test_offset(self):
