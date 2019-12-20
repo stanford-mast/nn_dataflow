@@ -212,10 +212,12 @@ class NNDataflow(object):
                 # Temporal scheduling.
                 for tm_idx, (layer, resource, cstr) \
                         in enumerate(zip(ltpl, rtpl, ctpl)):
+
                     curr_nndf_tops = self._layer_schedule_search(
                         layer, resource, cstr, sp_idx, tm_idx,
                         fwd_data_region_dict.get((sp_idx, tm_idx)),
                         curr_nndf_tops, options)
+
             # Filter by time limit.
             seg_nndf_tops = [nndf for nndf in curr_nndf_tops
                              if all(timing.time_overhead <= max_time_ovhd

@@ -124,7 +124,9 @@ class PipelineSegment(object):
         for valp in itertools.product(*vals):
 
             constraint = tuple()
-            for atpl in self._subs_symargs(self.cstr_symargs, tuple(zip(syms, valp))):
+
+            for atpl in self._subs_symargs(self.cstr_symargs,
+                                           tuple(zip(syms, valp))):
                 ctpl = tuple()
                 for a in atpl:
                     # Construct kwargs, adjust the types of the values.

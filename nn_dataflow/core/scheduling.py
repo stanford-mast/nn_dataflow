@@ -225,6 +225,7 @@ class Scheduling(object):
             tops += [self._get_result(lbs, part, ofmap_layout,
                                       condition.sched_seq, unit_nhops)
                      for lbs in lbs_tops]
+
         # Pick the top n.
         tops = sorted(tops, key=self.cmp_key)[:options.ntops]
 
@@ -270,10 +271,12 @@ class Scheduling(object):
 
         # Explore PE array mapping schemes for partitioned layer.
         for nested_loop_desc in map_strategy.gen_nested_loop_desc():
+
             # Explore loop blocking schemes.
             for lbs in loop_blocking.gen_loopblocking(
                     nested_loop_desc, resource, part, constraint, self.cost,
                     options):
+
                 if lbs.is_valid():
                     lbs_tops.append(lbs)
 
