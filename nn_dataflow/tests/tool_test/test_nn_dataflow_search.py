@@ -56,6 +56,6 @@ class TestNNDataflowSearch(unittest.TestCase):
             result = subprocess.call(args, cwd=self.cwd,
                                      stderr=subprocess.STDOUT,
                                      stdout=output)
-            
+
         return result
 

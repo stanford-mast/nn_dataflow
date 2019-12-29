@@ -193,8 +193,6 @@ class TestFmapRange(unittest.TestCase):
         fr4 = FmapRange((0, 0, 0, 0), (0, 0, 0, 0))
         self.assertEqual(fr3, fr4)
 
-        _ = fr1 == 4
-
     def test_ne(self):
         ''' Whether ne. '''
         fr1 = FmapRange((1, 2, 3, 4), (5, 7, 11, 13))

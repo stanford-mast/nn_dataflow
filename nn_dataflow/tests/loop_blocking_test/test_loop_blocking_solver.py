@@ -116,7 +116,7 @@ class TestLoopBlockingSolver(TestLoopBlockingFixture):
                         'test_reside_sol_opt: wlkey {} rsrckey {}: '
                         'solutions do not cover all optimal ones. '
                         'sol {} opt {}.'
-                        .format(wlkey, rsrckey, sol_sch_dict, min_sch_dict))                       
+                        .format(wlkey, rsrckey, sol_sch_dict, min_sch_dict))
 
         self.assertListEqual(
             min(sol_sch_dict.values()), min(min_sch_dict.values()),

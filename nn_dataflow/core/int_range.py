@@ -23,7 +23,7 @@ class IntRange(namedtuple('IntRange', ['beg', 'end'])):
 
     def __new__(cls, *args, **kwargs):
         ntp = super(IntRange, cls).__new__(cls, *args, **kwargs)
-        
+
         if not isinstance(ntp.beg, numbers.Integral):
             raise TypeError('IntRange: begin value must be an integer.')
         if not isinstance(ntp.end, numbers.Integral):
