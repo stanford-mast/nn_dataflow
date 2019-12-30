@@ -366,7 +366,7 @@ class TestPipelineFixture(unittest.TestCase):
 
         seg_layers = set(l for ltpl in segment for l in ltpl)
 
-        class OutAccPat(object):
+        class OutAccPat():
             ''' Output data access pattern types. '''
             # pylint: disable=too-few-public-methods
             ANY = 0   # can access in any way

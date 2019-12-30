@@ -20,7 +20,7 @@ from .loop_blocking_scheme import LoopBlockingScheme
 from .layer import ConvLayer
 from .network import Network
 
-class PipelineSegmentTiming(object):
+class PipelineSegmentTiming():
     ''' Timing information of a pipeline segment. '''
 
     # Each layer timing info is a tuple:

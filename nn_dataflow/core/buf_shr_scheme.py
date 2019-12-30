@@ -22,7 +22,7 @@ from .. import util
 from .layer import ConvLayer
 from .phy_dim2 import PhyDim2
 
-class BufShrScheme(object):
+class BufShrScheme():
     '''
     The buffer sharing scheme.
     '''

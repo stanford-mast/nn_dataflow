@@ -17,7 +17,7 @@ from collections import OrderedDict
 
 from .layer import Layer, InputLayer
 
-class Network(object):
+class Network():
     '''
     NN topology. Support DAG structure of layers.
     '''

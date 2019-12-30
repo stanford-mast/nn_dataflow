@@ -21,7 +21,7 @@ from operator import mul
 Utilities.
 '''
 
-class ContentHashClass(object):
+class ContentHashClass():
     '''
     Class using the content instead of the object ID for hash.
 

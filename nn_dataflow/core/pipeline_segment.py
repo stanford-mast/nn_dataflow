@@ -28,7 +28,7 @@ from .network import Network
 from .resource import Resource
 from .scheduling_constraint import SchedulingConstraintLayerPipeline as Cstr
 
-class PipelineSegment(object):
+class PipelineSegment():
     '''
     Inter-layer pipeline segment.
 

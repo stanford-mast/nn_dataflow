@@ -136,7 +136,7 @@ class SchedulingResult(namedtuple('SchedulingResult',
         return self.scheme['num_nodes']
 
 
-class Scheduling(object):
+class Scheduling():
     '''
     Layer scheduling.
     '''

@@ -28,7 +28,7 @@ from .nn_dataflow_scheme import NNDataflowScheme
 from .resource import Resource
 from .scheduling import SchedulingCondition, Scheduling
 
-class NNDataflow(object):
+class NNDataflow():
     '''
     Search optimized dataflows for neural networks.
     '''

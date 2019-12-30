@@ -354,7 +354,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
         return subgrp_size, rot_unit_cnt, lp_t_list
 
 
-    class _SimBuffer(object):
+    class _SimBuffer():
         ''' A data buffer model for simulation. '''
 
         def __init__(self, dce, buf_cnt_pr, unit_size, bypass=False):

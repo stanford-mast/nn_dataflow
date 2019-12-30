@@ -105,7 +105,7 @@ class TestScheduling(unittest.TestCase):
 
     def test_invalid_map_strategy(self):
         ''' Invalid cost argument. '''
-        class _DummyClass(object):  # pylint: disable=too-few-public-methods
+        class _DummyClass():  # pylint: disable=too-few-public-methods
             pass
 
         with self.assertRaisesRegex(TypeError,

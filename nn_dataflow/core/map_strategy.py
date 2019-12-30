@@ -21,7 +21,7 @@ from .layer import Layer, ConvLayer, LocalRegionLayer
 from .nested_loop_desc import NestedLoopDesc
 from .phy_dim2 import PhyDim2
 
-class MapStrategy(object):
+class MapStrategy():
     '''
     Base mapping strategy.
 

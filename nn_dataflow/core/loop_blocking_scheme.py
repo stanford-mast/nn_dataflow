@@ -22,7 +22,7 @@ from . import mem_hier_enum as me
 from .node_region import NodeRegion
 from .. import util
 
-class LoopBlockingScheme(object):
+class LoopBlockingScheme():
     '''
     Loop blocking scheme.
 
@@ -30,7 +30,7 @@ class LoopBlockingScheme(object):
     '''
     # pylint: disable=too-many-instance-attributes
 
-    class BL(object):  # pylint: disable=too-few-public-methods
+    class BL():  # pylint: disable=too-few-public-methods
         '''
         Blocking-level enum. Only used locally.
         '''

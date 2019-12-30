@@ -204,7 +204,7 @@ class FmapRange(namedtuple('FmapRange', ['fp_beg', 'fp_end'])):
         return not r
 
 
-class FmapRangeMap(object):
+class FmapRangeMap():
     '''
     A map with key as type FmapPosition, and the keys within a FmapRange all
     map to the same value.
