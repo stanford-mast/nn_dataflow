@@ -907,6 +907,7 @@ class PipelineSegment():
 
     class TopOfmUpdateLambda(symbasic):
         ''' A sympifi-able lambda function to lazily update topofm. '''
+        # pylint: disable=no-init
         def __new__(cls, *args):
             return super(PipelineSegment.TopOfmUpdateLambda, cls).__new__(cls)
         def __call__(self, arg_s, arg_r):

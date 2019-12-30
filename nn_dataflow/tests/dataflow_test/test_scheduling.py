@@ -109,7 +109,7 @@ class TestScheduling(unittest.TestCase):
             pass
 
         with self.assertRaisesRegex(TypeError,
-                                     'Scheduling: .*map_strategy_class.*'):
+                                    'Scheduling: .*map_strategy_class.*'):
             _ = Scheduling(self.layers['BASE'], self.batch_size, self.cost,
                            _DummyClass)
 

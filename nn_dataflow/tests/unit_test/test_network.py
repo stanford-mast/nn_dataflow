@@ -106,11 +106,11 @@ class TestNetwork(unittest.TestCase):
         network.add('c1', ConvLayer(3, 64, 224, 3))
 
         with self.assertRaisesRegex(ValueError,
-                                     'Network: .*c1.*p1.*mismatch fmap.*'):
+                                    'Network: .*c1.*p1.*mismatch fmap.*'):
             network.add('p1', PoolingLayer(64, 7, 2))
         self.assertEqual(len(network), 1)
         with self.assertRaisesRegex(ValueError,
-                                     'Network: .*c1.*c2.*mismatch fmap.*'):
+                                    'Network: .*c1.*c2.*mismatch fmap.*'):
             network.add('c2', ConvLayer(64, 128, 220, 3))
         self.assertEqual(len(network), 1)
 
@@ -124,7 +124,7 @@ class TestNetwork(unittest.TestCase):
         network.add('c2', ConvLayer(64, 128, 224, 3))
 
         with self.assertRaisesRegex(ValueError,
-                                     r'Network: .*c1 | c2.*prev.*p1.*'):
+                                    r'Network: .*c1 | c2.*prev.*p1.*'):
             network.add('p1', PoolingLayer(128, 7, 32), prevs=('c1', 'c2'))
         self.assertEqual(len(network), 2)
 

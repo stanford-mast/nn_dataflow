@@ -478,12 +478,11 @@ class TestLoopBlockingFixture(unittest.TestCase):
                         cur_buf_cap -= rem_frac
                         rem_frac = 0.
                         break
-                    else:
-                        # Partially fits.
-                        centroid += cur_buf_idx * cur_buf_cap
-                        rem_frac -= cur_buf_cap
-                        cur_buf_cap = self.buf_subrng_num
-                        cur_buf_idx += 1
+                    # Partially fits.
+                    centroid += cur_buf_idx * cur_buf_cap
+                    rem_frac -= cur_buf_cap
+                    cur_buf_cap = self.buf_subrng_num
+                    cur_buf_idx += 1
                 self.buf_subrng_centroid.append(centroid)
 
             # Rotation unit.
@@ -815,17 +814,16 @@ class TestLoopBlockingFixture(unittest.TestCase):
             return dram_access, gbuf_access, \
                     (rotation_access, wide_fetch_access, rotation_rounds)
 
-        else:
-            for dce in range(de.NUM):
-                self.assertAlmostEqual(gbufs[dce].rotation_access_size(), 0,
-                                       msg='_sim_access_conv: non-0 '
-                                           'rotation access with no bufshr.')
-                self.assertAlmostEqual(gbufs[dce].wide_fetch_access_size(), 0,
-                                       msg='_sim_access_conv: non-0 '
-                                           'wide fetch access with no bufshr.')
-                self.assertEqual(gbufs[dce].rotation_rounds(), 0,
-                                 msg='_sim_access_conv: non-0 '
-                                     'rotation rounds with no bufshr.')
+        for dce in range(de.NUM):
+            self.assertAlmostEqual(gbufs[dce].rotation_access_size(), 0,
+                                   msg='_sim_access_conv: non-0 '
+                                       'rotation access with no bufshr.')
+            self.assertAlmostEqual(gbufs[dce].wide_fetch_access_size(), 0,
+                                   msg='_sim_access_conv: non-0 '
+                                       'wide fetch access with no bufshr.')
+            self.assertEqual(gbufs[dce].rotation_rounds(), 0,
+                             msg='_sim_access_conv: non-0 '
+                                 'rotation rounds with no bufshr.')
 
         return dram_access, gbuf_access
 

@@ -13,7 +13,8 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
-from collections import OrderedDict, MutableMapping
+from collections import OrderedDict
+from collections.abc import MutableMapping
 
 from . import mem_hier_enum as me
 from .. import util

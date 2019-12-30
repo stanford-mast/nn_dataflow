@@ -163,9 +163,8 @@ def factorize(value, num, limits=None):
             factors[lvl] += 1
             if prod(factors[:lvl+1]) <= value:
                 break
-            else:
-                factors[lvl] = 1
-                lvl -= 1
+            factors[lvl] = 1
+            lvl -= 1
         if lvl < 0:
             return
 

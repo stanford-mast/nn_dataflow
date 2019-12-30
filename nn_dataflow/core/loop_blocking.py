@@ -104,7 +104,7 @@ def skip_conv(bl_ts, bl_ords):
 def _loop_blocking_cmp_key(options, cost):
     if options.opt_goal == 'ed':
         return lambda lbs: lbs.get_access_cost(cost) * lbs.time
-    elif options.opt_goal == 'd':
+    if options.opt_goal == 'd':
         return lambda lbs: (lbs.time, lbs.get_access_cost(cost))
     assert options.opt_goal == 'e'
     return lambda lbs: (lbs.get_access_cost(cost), lbs.time)
@@ -130,7 +130,6 @@ def _gen_loopblocking_perprocess(
     def _sweep():
         ''' Sweep all. '''
         is_conv_loops = (nested_loop_desc.data_loops == ConvLayer.data_loops())
-        counter = 0
         for bl_ts, bl_ords in itertools.product(_gen_bl_ts(), gen_ords):
             if is_conv_loops and skip_conv(bl_ts, bl_ords):
                 continue
@@ -139,7 +138,6 @@ def _gen_loopblocking_perprocess(
             lbs = LoopBlockingScheme(
                 nested_loop_desc, bl_ts, bl_ords, resource, bufshr,
                 options)
-            counter += 1
             yield lbs
 
     return heapq.nsmallest(options.ntops, _sweep(),

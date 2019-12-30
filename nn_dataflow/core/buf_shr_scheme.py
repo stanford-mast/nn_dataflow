@@ -272,7 +272,7 @@ class BufShrScheme():
         '''
         if fetch_width <= 1:
             return 0
-        elif fetch_width > subgrp_size:
+        if fetch_width > subgrp_size:
             raise ValueError('BufShrScheme: fetch width is larger than '
                              'subgroup size. {} vs. {}.'
                              .format(fetch_width, subgrp_size))

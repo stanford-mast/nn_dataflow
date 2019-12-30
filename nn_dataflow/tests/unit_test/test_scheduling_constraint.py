@@ -73,20 +73,20 @@ class TestSchedulingConstraint(TestSchedulingConstraintFixture):
     def test_invalid_args(self):
         ''' Invalid arguments. '''
         with self.assertRaisesRegex(ValueError,
-                                     'SchedulingConstraint: '
-                                     '.*positive integers.*'):
+                                    'SchedulingConstraint: '
+                                    '.*positive integers.*'):
             _ = SchedulingConstraint(topbat=-1, topofm=2.)
 
     def test_invalid_update_dict(self):
         ''' Invalid argument update_dict. '''
         with self.assertRaisesRegex(TypeError,
-                                     'SchedulingConstraint: '
-                                     '.*update_dict.*'):
+                                    'SchedulingConstraint: '
+                                    '.*update_dict.*'):
             _ = SchedulingConstraint(update_dict=['l1'])
 
         with self.assertRaisesRegex(TypeError,
-                                     'SchedulingConstraint: '
-                                     '.*update_dict.*'):
+                                    'SchedulingConstraint: '
+                                    '.*update_dict.*'):
             _ = SchedulingConstraint(update_dict={'l1': 1})
 
     def test_null_constraint(self):
@@ -141,13 +141,13 @@ class TestSchedulingConstraint(TestSchedulingConstraintFixture):
             })
 
         with self.assertRaisesRegex(ValueError,
-                                     'SchedulingConstraint: '
-                                     '.*update_dict.*'):
+                                    'SchedulingConstraint: '
+                                    '.*update_dict.*'):
             cstr.is_valid_top_bl([1] * le.NUM, range(le.NUM))
 
         with self.assertRaisesRegex(ValueError,
-                                     'SchedulingConstraint: '
-                                     '.*update_dict.*'):
+                                    'SchedulingConstraint: '
+                                    '.*update_dict.*'):
             cstr.is_valid_part(PartitionScheme(order=range(pe.NUM),
                                                pdims=[(2, 2)] * pe.NUM))
 
@@ -170,9 +170,9 @@ class TestSchedulingConstraint(TestSchedulingConstraintFixture):
         self.assertTrue(set_fgofm.issubset(set(gofm0)))
         self.assertTrue(set_fgbat.issubset(set(gbat0)))
         self.assertSetEqual(set_fgofm,
-                            set([(4,) + tpl for tpl in util.factorize(5, 2)]))
+                            {(4,) + tpl for tpl in util.factorize(5, 2)})
         self.assertSetEqual(set_fgbat,
-                            set([(2,) + tpl for tpl in util.factorize(8, 2)]))
+                            {(2,) + tpl for tpl in util.factorize(8, 2)})
 
         cstr = SchedulingConstraint(topifm=4)
 
@@ -186,7 +186,7 @@ class TestSchedulingConstraint(TestSchedulingConstraintFixture):
         set_fgifm = set(fgifm)
         self.assertTrue(set_fgifm.issubset(set(gifm0)))
         self.assertSetEqual(set_fgifm,
-                            set([(4,) + tpl for tpl in util.factorize(9, 2)]))
+                            {(4,) + tpl for tpl in util.factorize(9, 2)})
 
         cstr = SchedulingConstraint()
 
@@ -288,18 +288,18 @@ class TestSchedulingConstraintLayerPipeline(TestSchedulingConstraintFixture):
     def test_invalid_args(self):
         ''' Invalid arguments. '''
         with self.assertRaisesRegex(ValueError,
-                                     'SchedulingConstraintLayerPipeline: '
-                                     '.*IFM.*'):
+                                    'SchedulingConstraintLayerPipeline: '
+                                    '.*IFM.*'):
             _ = SchedulingConstraintLayerPipeline(topifm=2, fbifm=True)
 
         with self.assertRaisesRegex(ValueError,
-                                     'SchedulingConstraintLayerPipeline: '
-                                     '.*OFM.*'):
+                                    'SchedulingConstraintLayerPipeline: '
+                                    '.*OFM.*'):
             _ = SchedulingConstraintLayerPipeline(topofm=2, fbofm=True)
 
         with self.assertRaisesRegex(ValueError,
-                                     'SchedulingConstraintLayerPipeline: '
-                                     '.*IFM.*OFM.*'):
+                                    'SchedulingConstraintLayerPipeline: '
+                                    '.*IFM.*OFM.*'):
             _ = SchedulingConstraintLayerPipeline(topifm=2, topofm=2)
 
     def test_null_constraint(self):

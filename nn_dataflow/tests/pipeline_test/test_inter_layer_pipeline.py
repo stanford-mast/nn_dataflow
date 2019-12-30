@@ -39,26 +39,26 @@ class TestInterLayerPipeline(TestPipelineFixture):
     def test_invalid_network(self):
         ''' Invalid network. '''
         with self.assertRaisesRegex(TypeError,
-                                     'InterLayerPipeline: .*network.*'):
+                                    'InterLayerPipeline: .*network.*'):
             _ = InterLayerPipeline(self.net['net1'].input_layer(),
                                    self.batch_size, self.resource)
 
     def test_invalid_resource(self):
         ''' Invalid resource. '''
         with self.assertRaisesRegex(TypeError,
-                                     'InterLayerPipeline: .*resource.*'):
+                                    'InterLayerPipeline: .*resource.*'):
             _ = InterLayerPipeline(self.net['net1'], self.batch_size,
                                    PhyDim2(1, 1))
 
     def test_invalid_max_util_drop(self):
         ''' Invalid max_util_drop. '''
         with self.assertRaisesRegex(ValueError,
-                                     'InterLayerPipeline: .*max_util_drop.*'):
+                                    'InterLayerPipeline: .*max_util_drop.*'):
             _ = InterLayerPipeline(self.net['net1'], self.batch_size,
                                    self.resource, max_util_drop=1.1)
 
         with self.assertRaisesRegex(ValueError,
-                                     'InterLayerPipeline: .*max_util_drop.*'):
+                                    'InterLayerPipeline: .*max_util_drop.*'):
             _ = InterLayerPipeline(self.net['net1'], self.batch_size,
                                    self.resource, max_util_drop=-0.1)
 

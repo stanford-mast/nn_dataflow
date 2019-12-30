@@ -54,7 +54,7 @@ class TestDataLayout(unittest.TestCase):
                            regions=(self.region1,),
                            parts=(self.part1,))
         with self.assertRaisesRegex(TypeError,
-                                     'DataLayout: .*elements in frngs.*'):
+                                    'DataLayout: .*elements in frngs.*'):
             _ = DataLayout(frngs=(None,),
                            regions=(self.region1,),
                            parts=(self.part1,))
@@ -64,7 +64,7 @@ class TestDataLayout(unittest.TestCase):
                            regions=None,
                            parts=(self.part1,))
         with self.assertRaisesRegex(TypeError,
-                                     'DataLayout: .*elements in regions.*'):
+                                    'DataLayout: .*elements in regions.*'):
             _ = DataLayout(frngs=(self.frng1,),
                            regions=self.region1,
                            parts=(self.part1,))
@@ -74,7 +74,7 @@ class TestDataLayout(unittest.TestCase):
                            regions=(self.region1,),
                            parts=None)
         with self.assertRaisesRegex(TypeError,
-                                     'DataLayout: .*elements in parts.*'):
+                                    'DataLayout: .*elements in parts.*'):
             _ = DataLayout(frngs=(self.frng1,),
                            regions=(self.region1,),
                            parts=self.part1)

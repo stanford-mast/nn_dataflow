@@ -129,7 +129,7 @@ class FmapRange(namedtuple('FmapRange', ['fp_beg', 'fp_end'])):
         '''
         Whether the given FmapPosition is in the FmapRange.
         '''
-        return all(p >= b and p < e for p, b, e
+        return all(b <= p < e for p, b, e
                    in zip(fpos, self.fp_beg, self.fp_end))
 
     def __lt__(self, other):
@@ -164,7 +164,7 @@ class FmapRange(namedtuple('FmapRange', ['fp_beg', 'fp_end'])):
             if other.size() == 0:
                 return 0
             return -1
-        elif other.size() == 0:
+        if other.size() == 0:
             return 1
 
         # Overlap check.

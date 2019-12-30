@@ -105,49 +105,49 @@ class TestOption(unittest.TestCase):
     def test_invalid_swsol_hwbufshr(self):
         ''' Invalid sw_solve_loopblocking and hw_gbuf_sharing comb. '''
         with self.assertRaisesRegex(ValueError,
-                                     'Option: .*sw_solve_loopblocking.*'
-                                     'hw_gbuf_sharing.*'):
+                                    'Option: .*sw_solve_loopblocking.*'
+                                    'hw_gbuf_sharing.*'):
             _ = Option(sw_solve_loopblocking=True, hw_gbuf_sharing=True)
 
     def test_invalid_hwaccfwd_hwbufshr(self):
         ''' Invalid hw_access_forwarding and hw_gbuf_sharing comb. '''
         with self.assertRaisesRegex(ValueError,
-                                     'Option: .*hw_access_forwarding.*'
-                                     'hw_gbuf_sharing.*'):
+                                    'Option: .*hw_access_forwarding.*'
+                                    'hw_gbuf_sharing.*'):
             _ = Option(hw_access_forwarding=True, hw_gbuf_sharing=True)
 
     def test_invalid_swsol_hwswb(self):
         ''' Invalid sw_solve_loopblocking and hw_gbuf_save_writeback comb. '''
         with self.assertRaisesRegex(ValueError,
-                                     'Option: .*sw_solve_loopblocking.*'
-                                     'hw_gbuf_save_writeback.*'):
+                                    'Option: .*sw_solve_loopblocking.*'
+                                    'hw_gbuf_save_writeback.*'):
             _ = Option(sw_solve_loopblocking=True, hw_gbuf_save_writeback=True)
 
     def test_invalid_part_hybrid_ifmaps(self):
         ''' Invalid partition_hybrid and partition_ifmaps comb. '''
         with self.assertRaisesRegex(ValueError,
-                                     'Option: .*partition_ifmaps.*'
-                                     'partition_hybrid.*'):
+                                    'Option: .*partition_ifmaps.*'
+                                    'partition_hybrid.*'):
             _ = Option(partition_hybrid=False, partition_ifmaps=True)
 
     def test_invalid_time_ovhd(self):
         ''' Invalid layer_pipeline_time_ovhd. '''
         with self.assertRaisesRegex(KeyError,
-                                     'Option: .*layer_pipeline_time_ovhd.*'):
+                                    'Option: .*layer_pipeline_time_ovhd.*'):
             _ = Option(layer_pipeline_time_ovhd=None)
 
         with self.assertRaisesRegex(ValueError,
-                                     'Option: .*layer_pipeline_time_ovhd.*'):
+                                    'Option: .*layer_pipeline_time_ovhd.*'):
             _ = Option(layer_pipeline_time_ovhd=-1)
 
     def test_invalid_max_degree(self):
         ''' Invalid layer_pipeline_max_degree. '''
         with self.assertRaisesRegex(KeyError,
-                                     'Option: .*layer_pipeline_max_degree.*'):
+                                    'Option: .*layer_pipeline_max_degree.*'):
             _ = Option(layer_pipeline_max_degree=None)
 
         with self.assertRaisesRegex(ValueError,
-                                     'Option: .*layer_pipeline_max_degree.*'):
+                                    'Option: .*layer_pipeline_max_degree.*'):
             _ = Option(layer_pipeline_max_degree=-1)
 
     def test_invalid_opt_goal(self):

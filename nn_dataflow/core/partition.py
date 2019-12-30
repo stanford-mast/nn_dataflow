@@ -53,7 +53,7 @@ def gen_partition(layer, batch_size, dim_nodes, options, guaranteed=False):
         # Batch partitoning.
         if (not options.partition_batch) and pdims[pe.BATP].size() > 1:
             continue
-        elif batch_size % pdims[pe.BATP].size() != 0:
+        if batch_size % pdims[pe.BATP].size() != 0:
             continue
 
         # Force each partitioning to fully utilize one dimension before
@@ -72,14 +72,13 @@ def gen_partition(layer, batch_size, dim_nodes, options, guaranteed=False):
 
             if (not options.partition_ifmaps) and pdims[pe.INPP].size() > 1:
                 continue
-            else:
-                if isinstance(layer, ConvLayer):
-                    if not util.approx_dividable(layer.nifm,
-                                                 pdims[pe.INPP].size()):
-                        continue
-                elif isinstance(layer, LocalRegionLayer):
-                    if pdims[pe.INPP].size() > 1:
-                        continue
+            if isinstance(layer, ConvLayer):
+                if not util.approx_dividable(layer.nifm,
+                                             pdims[pe.INPP].size()):
+                    continue
+            elif isinstance(layer, LocalRegionLayer):
+                if pdims[pe.INPP].size() > 1:
+                    continue
         else:
             assert not options.partition_ifmaps
             if pdims[pe.INPP].size() != 1:

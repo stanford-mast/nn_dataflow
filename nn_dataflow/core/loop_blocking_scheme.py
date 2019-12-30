@@ -134,8 +134,7 @@ class LoopBlockingScheme():
                 or self.data_size(BL.GBUF) > resource.size_gbuf:
             self.valid = False
             return
-        else:
-            self.valid = True
+        self.valid = True
 
         # Data fetch calculation.
         self._set_fetch()

@@ -42,13 +42,13 @@ class TestPipelineSegment(TestPipelineFixture):
     def test_invalid_seg(self):
         ''' Invalid seg. '''
         with self.assertRaisesRegex(TypeError,
-                                     'PipelineSegment: .*seg.*tuple.*'):
+                                    'PipelineSegment: .*seg.*tuple.*'):
             _ = PipelineSegment([('0',), ('1', '1p')],
                                 self.net['net1'], self.batch_size,
                                 self.resource)
 
         with self.assertRaisesRegex(TypeError,
-                                     'PipelineSegment: .*seg.*sub-tuple.*'):
+                                    'PipelineSegment: .*seg.*sub-tuple.*'):
             _ = PipelineSegment(('0', '1', '1p'),
                                 self.net['net1'], self.batch_size,
                                 self.resource)
@@ -56,7 +56,7 @@ class TestPipelineSegment(TestPipelineFixture):
     def test_invalid_network(self):
         ''' Invalid network. '''
         with self.assertRaisesRegex(TypeError,
-                                     'PipelineSegment: .*network.*'):
+                                    'PipelineSegment: .*network.*'):
             _ = PipelineSegment((('0',), ('1', '1p')),
                                 self.net['net1'].input_layer(), self.batch_size,
                                 self.resource)
@@ -64,7 +64,7 @@ class TestPipelineSegment(TestPipelineFixture):
     def test_invalid_resource(self):
         ''' Invalid resource. '''
         with self.assertRaisesRegex(TypeError,
-                                     'PipelineSegment: .*resource.*'):
+                                    'PipelineSegment: .*resource.*'):
             _ = PipelineSegment((('0',), ('1', '1p')),
                                 self.net['net1'], self.batch_size,
                                 PhyDim2(1, 1))
@@ -197,11 +197,11 @@ class TestPipelineSegment(TestPipelineFixture):
 
         psr = self._make_segment((1, 2), net)._alloc_proc()
         nodes = [nr.dim.size() for nr in psr]
-        self.assertTrue(nodes == [24, 40] or nodes == [22, 42])
+        self.assertIn(nodes, ([24, 40], [22, 42]))
 
         psr = self._make_segment((1, 2, 3), net)._alloc_proc()
         nodes = [nr.dim.size() for nr in psr]
-        self.assertTrue(nodes == [12, 20, 32] or nodes == [10, 20, 34])
+        self.assertIn(nodes, ([12, 20, 32], [10, 20, 34]))
 
         # All segments.
 

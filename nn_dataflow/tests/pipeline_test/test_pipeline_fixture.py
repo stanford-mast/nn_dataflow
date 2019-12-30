@@ -483,13 +483,12 @@ class TestPipelineFixture(unittest.TestCase):
                     if any(pl in ltpl for pl in prev_layers):
                         # Local source.
                         lcl_poap = avail_data[sp_idx][1]
-                        self.assertTrue(lcl_poap == OutAccPat.DBF
-                                        or lcl_poap == OutAccPat.ANY,
-                                        '_validate_constraint: layer {} ({}) '
-                                        'local source data {} must fully '
-                                        'buffer output.'
-                                        .format(layer, (sp_idx, tm_idx),
-                                                lcl_poap))
+                        self.assertIn(lcl_poap, (OutAccPat.DBF, OutAccPat.ANY),
+                                      '_validate_constraint: layer {} ({}) '
+                                      'local source data {} must fully '
+                                      'buffer output.'
+                                      .format(layer, (sp_idx, tm_idx),
+                                              lcl_poap))
 
                     # DBF source.
                     if OutAccPat.DBF in prev_oaps:
