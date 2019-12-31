@@ -183,7 +183,7 @@ class TestBufShrScheme(unittest.TestCase):
     def test_mismatch_node_region(self):
         ''' Mismatched node region and part in constructor. '''
         # Smaller node region. Invalid.
-        with self.assertRaisesRegexp(ValueError, 'BufShrScheme: .*region.*'):
+        with self.assertRaisesRegex(ValueError, 'BufShrScheme: .*region.*'):
             _ = BufShrScheme(NodeRegion(origin=PhyDim2(0, 0),
                                         dim=PhyDim2(1, 1),
                                         type=NodeRegion.PROC),
@@ -242,7 +242,7 @@ class TestBufShrScheme(unittest.TestCase):
 
     def test_nhops_rotate_all_invalid(self):
         ''' Get nhops_rotate_all with invalid args. '''
-        with self.assertRaisesRegexp(ValueError, 'BufShrScheme: .*subgroup.*'):
+        with self.assertRaisesRegex(ValueError, 'BufShrScheme: .*subgroup.*'):
             _ = self.bufshr3.nhops_rotate_all(
                 de.FIL, self.bufshr3.size(de.FIL) + 1)
 
@@ -331,11 +331,11 @@ class TestBufShrScheme(unittest.TestCase):
 
     def test_nhops_wide_fetch_once_inv(self):
         ''' Get nhops_wide_fetch_once with invalid args. '''
-        with self.assertRaisesRegexp(ValueError, 'BufShrScheme: .*subgroup.*'):
+        with self.assertRaisesRegex(ValueError, 'BufShrScheme: .*subgroup.*'):
             _ = self.bufshr3.nhops_wide_fetch_once(
                 de.FIL, self.bufshr3.size(de.FIL) + 1, 2)
 
-        with self.assertRaisesRegexp(ValueError, 'BufShrScheme: .*width.*'):
+        with self.assertRaisesRegex(ValueError, 'BufShrScheme: .*width.*'):
             _ = self.bufshr3.nhops_wide_fetch_once(
                 de.FIL,
                 self.bufshr3.size(de.FIL) / 2,

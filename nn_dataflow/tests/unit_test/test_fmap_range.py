@@ -31,7 +31,7 @@ class TestFmapRange(unittest.TestCase):
 
     def test_invalid_beg_end(self):
         ''' Invalid fp_beg/fp_end. '''
-        with self.assertRaisesRegexp(ValueError, 'FmapRange: .*beg.*end.*'):
+        with self.assertRaisesRegex(ValueError, 'FmapRange: .*beg.*end.*'):
             _ = FmapRange((0, 0, 0, 0), (3, -5, 7, 11))
 
     def test_valid_zero_range(self):
@@ -107,7 +107,7 @@ class TestFmapRange(unittest.TestCase):
     def test_overlap_error(self):
         ''' Get overlap error. '''
         fr1 = FmapRange((-11, -4, 3, 0), (3, 5, 7, 11))
-        with self.assertRaisesRegexp(TypeError, 'FmapRange: .*'):
+        with self.assertRaisesRegex(TypeError, 'FmapRange: .*'):
             fr1.overlap(((0,) * 4, (2,) * 4))
 
     def test_overlap_size(self):
@@ -126,7 +126,7 @@ class TestFmapRange(unittest.TestCase):
     def test_overlap_size_error(self):
         ''' Get overlap_size error. '''
         fr1 = FmapRange((-11, -4, 3, 0), (3, 5, 7, 11))
-        with self.assertRaisesRegexp(TypeError, 'FmapRange: .*'):
+        with self.assertRaisesRegex(TypeError, 'FmapRange: .*'):
             fr1.overlap_size(((0,) * 4, (2,) * 4))
 
     def test_contains(self):
@@ -157,45 +157,19 @@ class TestFmapRange(unittest.TestCase):
             self.assertLessEqual(lst[idx], lst[idx])
             self.assertGreaterEqual(lst[idx], lst[idx])
 
-    def test_compare_notimplemented(self):
-        ''' Comparison with types not implemented. '''
-        ins1 = FmapRange((-11, -4, 3, 0), (3, 5, 7, 11))
-        ins2 = (3, 5, 7, 11)
-        ins3 = None
-        # The default comparison gives a consistent but arbitrary order.
-        # https://docs.python.org/2/reference/expressions.html#value-comparisons
-
-        sort = sorted([ins1, ins2, ins3])
-
-        self.assertGreater(sort[2], sort[1])
-        self.assertGreater(sort[2], sort[0])
-        self.assertGreater(sort[1], sort[0])
-        self.assertLess(sort[0], sort[1])
-        self.assertLess(sort[0], sort[2])
-        self.assertLess(sort[1], sort[2])
-        self.assertGreaterEqual(sort[2], sort[1])
-        self.assertGreaterEqual(sort[2], sort[0])
-        self.assertGreaterEqual(sort[1], sort[0])
-        self.assertLessEqual(sort[0], sort[1])
-        self.assertLessEqual(sort[0], sort[2])
-        self.assertLessEqual(sort[1], sort[2])
-        self.assertNotEqual(sort[0], sort[1])
-        self.assertNotEqual(sort[0], sort[2])
-        self.assertNotEqual(sort[1], sort[2])
-
     def test_compare_overlap(self):
         ''' Comparison with overlapping FmapRange. '''
         fr1 = FmapRange((-11, -4, 3, 0), (3, 5, 7, 11))
         fr2 = FmapRange((-11, -4, 3, 0), (1, 1, 5, 5))
         fr3 = FmapRange((0, 0, 3, 1), (1, 1, 5, 5))
         fr4 = FmapRange((0, 0, 3, 1), (3, 5, 7, 11))
-        with self.assertRaisesRegexp(ValueError, 'FmapRange: .*overlap.*'):
+        with self.assertRaisesRegex(ValueError, 'FmapRange: .*overlap.*'):
             _ = fr1 < fr2
-        with self.assertRaisesRegexp(ValueError, 'FmapRange: .*overlap.*'):
+        with self.assertRaisesRegex(ValueError, 'FmapRange: .*overlap.*'):
             _ = fr1 >= fr2
-        with self.assertRaisesRegexp(ValueError, 'FmapRange: .*overlap.*'):
+        with self.assertRaisesRegex(ValueError, 'FmapRange: .*overlap.*'):
             _ = fr1 <= fr3
-        with self.assertRaisesRegexp(ValueError, 'FmapRange: .*overlap.*'):
+        with self.assertRaisesRegex(ValueError, 'FmapRange: .*overlap.*'):
             _ = fr1 < fr4
 
     def test_compare_empty(self):
@@ -218,8 +192,6 @@ class TestFmapRange(unittest.TestCase):
         fr3 = FmapRange((1, 1, 1, 1), (1, 2, 2, 2))
         fr4 = FmapRange((0, 0, 0, 0), (0, 0, 0, 0))
         self.assertEqual(fr3, fr4)
-
-        _ = fr1 == 4
 
     def test_ne(self):
         ''' Whether ne. '''
@@ -274,7 +246,7 @@ class TestFmapRangeMap(unittest.TestCase):
 
     def test_add_overlap_fr(self):
         ''' Modifier add overlapping FmapRange. '''
-        with self.assertRaisesRegexp(ValueError, 'FmapRangeMap: .*overlap.*'):
+        with self.assertRaisesRegex(ValueError, 'FmapRangeMap: .*overlap.*'):
             self.frm.add(FmapRange((3, 7, 15, 15), (5, 9, 17, 17)), 10)
 
     def test_get(self):
@@ -286,7 +258,7 @@ class TestFmapRangeMap(unittest.TestCase):
 
     def test_get_not_in(self):
         ''' Get not in. '''
-        with self.assertRaisesRegexp(KeyError, 'FmapRangeMap: .*key.*'):
+        with self.assertRaisesRegex(KeyError, 'FmapRangeMap: .*key.*'):
             _ = self.frm.get(FmapPosition(4, 8, 16, 16))
 
     def test_complete_fmap_range(self):
@@ -305,14 +277,14 @@ class TestFmapRangeMap(unittest.TestCase):
         ''' Get complete_fmap_range incomplete. '''
         self.frm.add(FmapRange((4, 8, 16, 16), (5, 9, 17, 17)), 10)
         self.assertFalse(self.frm.is_complete(), 'is_complete: incomplete')
-        with self.assertRaisesRegexp(ValueError, 'FmapRangeMap: .*complete.*'):
+        with self.assertRaisesRegex(ValueError, 'FmapRangeMap: .*complete.*'):
             _ = self.frm.complete_fmap_range()
 
         fr = FmapRange((1, 0, 0, 0), (3, 5, 7, 9))
         frm = FmapRangeMap()
         frm.add(fr, 3.4)
         self.assertFalse(frm.is_complete(), 'is_complete: incomplete')
-        with self.assertRaisesRegexp(ValueError, 'FmapRangeMap: .*complete.*'):
+        with self.assertRaisesRegex(ValueError, 'FmapRangeMap: .*complete.*'):
             _ = frm.complete_fmap_range()
 
     def test_items(self):
@@ -332,13 +304,13 @@ class TestFmapRangeMap(unittest.TestCase):
         fr1 = FmapRange((10, 10, 10, 10), (11, 11, 11, 11))
         frm.add(fr1, 10)
         self.assertEqual(frm.get(fr1.fp_beg), 10, 'copy: in')
-        with self.assertRaisesRegexp(KeyError, 'FmapRangeMap: .*key.*'):
+        with self.assertRaisesRegex(KeyError, 'FmapRangeMap: .*key.*'):
             _ = self.frm.get(fr1.fp_beg)
 
         fr2 = FmapRange((20, 20, 20, 20), (21, 21, 21, 21))
         self.frm.add(fr2, 20)
         self.assertEqual(self.frm.get(fr2.fp_beg), 20, 'copy: in')
-        with self.assertRaisesRegexp(KeyError, 'FmapRangeMap: .*key.*'):
+        with self.assertRaisesRegex(KeyError, 'FmapRangeMap: .*key.*'):
             _ = frm.get(fr2.fp_beg)
 
     def test_rget_counter(self):
@@ -378,7 +350,7 @@ class TestFmapRangeMap(unittest.TestCase):
 
     def test_rget_single_multi(self):
         ''' Get rget_single with . '''
-        with self.assertRaisesRegexp(ValueError, 'FmapRangeMap: .*single.*'):
+        with self.assertRaisesRegex(ValueError, 'FmapRangeMap: .*single.*'):
             _ = self.frm.rget_single(FmapRange((3, 1, 10, 3), (4, 6, 13, 7)))
 
     def test_str(self):

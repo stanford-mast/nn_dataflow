@@ -112,11 +112,11 @@ class TestLoopBlockingSolver(TestLoopBlockingFixture):
                 if not sol_sch or _cost(lbs) < sol_sch:
                     sol_sch_dict[true_reside_dce] = _cost(lbs)
 
-        self.assertDictContainsSubset(
-            sol_sch_dict, min_sch_dict,
-            'test_reside_sol_opt: wlkey {} rsrckey {}: '
-            'solutions do not cover all optimal ones. sol {} opt {}.'
-            .format(wlkey, rsrckey, sol_sch_dict, min_sch_dict))
+        self.assertTrue(sol_sch_dict.items() <= min_sch_dict.items(),
+                        'test_reside_sol_opt: wlkey {} rsrckey {}: '
+                        'solutions do not cover all optimal ones. '
+                        'sol {} opt {}.'
+                        .format(wlkey, rsrckey, sol_sch_dict, min_sch_dict))
 
         self.assertListEqual(
             min(sol_sch_dict.values()), min(min_sch_dict.values()),
@@ -134,7 +134,7 @@ class TestLoopBlockingSolver(TestLoopBlockingFixture):
     def test_reside_sol_opt_pool(self):
         ''' Data reside solution optimal with PoolingLayer. '''
 
-        with self.assertRaisesRegexp(ValueError, 'loop_blocking_solver: .*'):
+        with self.assertRaisesRegex(ValueError, 'loop_blocking_solver: .*'):
             self.test_reside_sol_opt(wlkey='POOL')
 
     def test_reside_sol_opt_zero(self):

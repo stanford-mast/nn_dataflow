@@ -35,7 +35,7 @@ class TestCost(unittest.TestCase):
 
     def test_invalid_mac_op(self):
         ''' Invalid mac_op. '''
-        with self.assertRaisesRegexp(TypeError, 'Cost: .*mac_op.*'):
+        with self.assertRaisesRegex(TypeError, 'Cost: .*mac_op.*'):
             _ = Cost(mac_op=(1, 2),
                      mem_hier=(200, 6, 2, 1),
                      noc_hop=10,
@@ -44,13 +44,13 @@ class TestCost(unittest.TestCase):
 
     def test_invalid_mem_hier_type(self):
         ''' Invalid mem_hier type. '''
-        with self.assertRaisesRegexp(TypeError, 'Cost: .*mem_hier.*'):
+        with self.assertRaisesRegex(TypeError, 'Cost: .*mem_hier.*'):
             _ = Cost(mac_op=1,
                      mem_hier=200,
                      noc_hop=10,
                      idl_unit=0,
                     )
-        with self.assertRaisesRegexp(TypeError, 'Cost: .*mem_hier.*'):
+        with self.assertRaisesRegex(TypeError, 'Cost: .*mem_hier.*'):
             _ = Cost(mac_op=1,
                      mem_hier=[200, 6, 2, 1],
                      noc_hop=10,
@@ -59,7 +59,7 @@ class TestCost(unittest.TestCase):
 
     def test_invalid_mem_hier_len(self):
         ''' Invalid mem_hier len. '''
-        with self.assertRaisesRegexp(ValueError, 'Cost: .*mem_hier.*'):
+        with self.assertRaisesRegex(ValueError, 'Cost: .*mem_hier.*'):
             _ = Cost(mac_op=1,
                      mem_hier=(200, 6),
                      noc_hop=10,
@@ -68,7 +68,7 @@ class TestCost(unittest.TestCase):
 
     def test_invalid_noc_hop(self):
         ''' Invalid noc_hop. '''
-        with self.assertRaisesRegexp(TypeError, 'Cost: .*noc_hop.*'):
+        with self.assertRaisesRegex(TypeError, 'Cost: .*noc_hop.*'):
             _ = Cost(mac_op=1,
                      mem_hier=(200, 6, 2, 1),
                      noc_hop=[10, 10],
@@ -77,7 +77,7 @@ class TestCost(unittest.TestCase):
 
     def test_invalid_idl_unit(self):
         ''' Invalid idl_unit. '''
-        with self.assertRaisesRegexp(TypeError, 'Cost: .*idl_unit.*'):
+        with self.assertRaisesRegex(TypeError, 'Cost: .*idl_unit.*'):
             _ = Cost(mac_op=1,
                      mem_hier=(200, 6, 2, 1),
                      noc_hop=10,

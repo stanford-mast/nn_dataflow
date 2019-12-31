@@ -53,7 +53,7 @@ def gen_partition(layer, batch_size, dim_nodes, options, guaranteed=False):
         # Batch partitoning.
         if (not options.partition_batch) and pdims[pe.BATP].size() > 1:
             continue
-        elif batch_size % pdims[pe.BATP].size() != 0:
+        if batch_size % pdims[pe.BATP].size() != 0:
             continue
 
         # Force each partitioning to fully utilize one dimension before
@@ -72,14 +72,13 @@ def gen_partition(layer, batch_size, dim_nodes, options, guaranteed=False):
 
             if (not options.partition_ifmaps) and pdims[pe.INPP].size() > 1:
                 continue
-            else:
-                if isinstance(layer, ConvLayer):
-                    if not util.approx_dividable(layer.nifm,
-                                                 pdims[pe.INPP].size()):
-                        continue
-                elif isinstance(layer, LocalRegionLayer):
-                    if pdims[pe.INPP].size() > 1:
-                        continue
+            if isinstance(layer, ConvLayer):
+                if not util.approx_dividable(layer.nifm,
+                                             pdims[pe.INPP].size()):
+                    continue
+            elif isinstance(layer, LocalRegionLayer):
+                if pdims[pe.INPP].size() > 1:
+                    continue
         else:
             assert not options.partition_ifmaps
             if pdims[pe.INPP].size() != 1:
@@ -325,7 +324,7 @@ def _unit_nhops_to_fil(layer, filter_nodes, fil_dict, fwd=False):
                 # Each forward step, get the min-distance pair of source and
                 # destination.
                 src, dst = min(itertools.product(src_set, dst_set),
-                               key=lambda (s, d): d.hop_dist(s))
+                               key=lambda sd: sd[1].hop_dist(sd[0]))
                 dst_set.remove(dst)
                 src_set.add(dst)
                 nhops += fil_size * dst.hop_dist(src)

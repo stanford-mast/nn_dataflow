@@ -136,7 +136,7 @@ class SchedulingResult(namedtuple('SchedulingResult',
         return self.scheme['num_nodes']
 
 
-class Scheduling(object):
+class Scheduling():
     '''
     Layer scheduling.
     '''
@@ -325,7 +325,7 @@ class Scheduling(object):
         scheme['fetch'] = lbs.fetch
 
         # Loop blocking.
-        lp_ts = zip(*lbs.bl_ts)
+        lp_ts = list(zip(*lbs.bl_ts))
         scheme['ti'] = tuple(lp_ts[le.IFM])
         scheme['to'] = tuple(lp_ts[le.OFM])
         scheme['tb'] = tuple(lp_ts[le.BAT])

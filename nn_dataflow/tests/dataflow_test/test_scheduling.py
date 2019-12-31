@@ -93,23 +93,23 @@ class TestScheduling(unittest.TestCase):
 
     def test_invalid_layer(self):
         ''' Invalid layer argument. '''
-        with self.assertRaisesRegexp(TypeError, 'Scheduling: .*layer.*'):
+        with self.assertRaisesRegex(TypeError, 'Scheduling: .*layer.*'):
             _ = Scheduling((64, 128, 28, 3), self.batch_size, self.cost,
                            MapStrategyEyeriss)
 
     def test_invalid_cost(self):
         ''' Invalid cost argument. '''
-        with self.assertRaisesRegexp(TypeError, 'Scheduling: .*cost.*'):
+        with self.assertRaisesRegex(TypeError, 'Scheduling: .*cost.*'):
             _ = Scheduling(self.layers['BASE'], self.batch_size,
                            tuple(self.cost), MapStrategyEyeriss)
 
     def test_invalid_map_strategy(self):
         ''' Invalid cost argument. '''
-        class _DummyClass(object):  # pylint: disable=too-few-public-methods
+        class _DummyClass():  # pylint: disable=too-few-public-methods
             pass
 
-        with self.assertRaisesRegexp(TypeError,
-                                     'Scheduling: .*map_strategy_class.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'Scheduling: .*map_strategy_class.*'):
             _ = Scheduling(self.layers['BASE'], self.batch_size, self.cost,
                            _DummyClass)
 
@@ -180,7 +180,7 @@ class TestScheduling(unittest.TestCase):
                               for r in self.ifmap_layouts['BASE'].regions)),
             sched_seq=self.sched_seq)
 
-        with self.assertRaisesRegexp(ValueError, 'Scheduling: .*ifmap.*'):
+        with self.assertRaisesRegex(ValueError, 'Scheduling: .*ifmap.*'):
             _ = schd.schedule_search(condition, self.options)
 
         # Not match layer.
@@ -190,7 +190,7 @@ class TestScheduling(unittest.TestCase):
             ifmap_layout=self.ifmap_layouts['POOL'],
             sched_seq=self.sched_seq)
 
-        with self.assertRaisesRegexp(ValueError, 'Scheduling: .*ifmap.*'):
+        with self.assertRaisesRegex(ValueError, 'Scheduling: .*ifmap.*'):
             _ = schd.schedule_search(condition, self.options)
 
     def test_schedule_search_nolbs(self):

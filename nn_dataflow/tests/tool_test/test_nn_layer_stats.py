@@ -28,7 +28,7 @@ class TestNNLayerStats(unittest.TestCase):
         self.assertTrue(os.path.isdir(
             os.path.join(self.cwd, 'nn_dataflow', 'tools')))
 
-        self.args = ['python', 'nn_dataflow/tools/nn_layer_stats.py',
+        self.args = ['python', '-m', 'nn_dataflow.tools.nn_layer_stats',
                      'alex_net', '-b', '16']
 
     def test_default_invoke(self):
@@ -37,7 +37,9 @@ class TestNNLayerStats(unittest.TestCase):
         self.assertEqual(ret, 0)
 
     def _call(self, args):
-        return subprocess.call(args, cwd=self.cwd,
-                               stderr=subprocess.STDOUT,
-                               stdout=open(os.devnull, 'w'))
+        with open(os.devnull, 'w') as output:
+            result = subprocess.call(args, cwd=self.cwd,
+                                     stderr=subprocess.STDOUT,
+                                     stdout=output)
+        return result
 

@@ -346,7 +346,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
                             for lpe in range(le.NUM) if t_bs[lpe] > 1],
                            key=lambda tpl: ord_bs[tpl[0]],
                            reverse=True) \
-                  + sorted([(lpe, t_x[lpe] / t_bs[lpe])
+                  + sorted([(lpe, t_x[lpe] // t_bs[lpe])
                             for lpe in range(le.NUM) if t_x[lpe] > t_bs[lpe]],
                            key=lambda tpl: ord_x[tpl[0]],
                            reverse=True)
@@ -354,7 +354,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
         return subgrp_size, rot_unit_cnt, lp_t_list
 
 
-    class _SimBuffer(object):
+    class _SimBuffer():
         ''' A data buffer model for simulation. '''
 
         def __init__(self, dce, buf_cnt_pr, unit_size, bypass=False):
@@ -478,12 +478,11 @@ class TestLoopBlockingFixture(unittest.TestCase):
                         cur_buf_cap -= rem_frac
                         rem_frac = 0.
                         break
-                    else:
-                        # Partially fits.
-                        centroid += cur_buf_idx * cur_buf_cap
-                        rem_frac -= cur_buf_cap
-                        cur_buf_cap = self.buf_subrng_num
-                        cur_buf_idx += 1
+                    # Partially fits.
+                    centroid += cur_buf_idx * cur_buf_cap
+                    rem_frac -= cur_buf_cap
+                    cur_buf_cap = self.buf_subrng_num
+                    cur_buf_idx += 1
                 self.buf_subrng_centroid.append(centroid)
 
             # Rotation unit.
@@ -517,7 +516,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
             ''' Get number of rotation rounds. '''
 
             # Ensure all ranges have the same rotation steps.
-            steps_list = self.rot_step_cnt.values()
+            steps_list = tuple(self.rot_step_cnt.values())
             if not steps_list:
                 return 0
             assert all(s == steps_list[0] for s in steps_list)
@@ -719,7 +718,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
 
         data_loops = lbs.nld.data_loops
 
-        lpts = zip(*lbs.bl_ts)
+        lpts = tuple(zip(*lbs.bl_ts))
 
         subgrp_size, rot_unit_cnt, lp_t_list = self._bufshr_params(lbs)
         data_loops = lbs.nld.data_loops
@@ -815,17 +814,16 @@ class TestLoopBlockingFixture(unittest.TestCase):
             return dram_access, gbuf_access, \
                     (rotation_access, wide_fetch_access, rotation_rounds)
 
-        else:
-            for dce in range(de.NUM):
-                self.assertAlmostEqual(gbufs[dce].rotation_access_size(), 0,
-                                       msg='_sim_access_conv: non-0 '
-                                           'rotation access with no bufshr.')
-                self.assertAlmostEqual(gbufs[dce].wide_fetch_access_size(), 0,
-                                       msg='_sim_access_conv: non-0 '
-                                           'wide fetch access with no bufshr.')
-                self.assertEqual(gbufs[dce].rotation_rounds(), 0,
-                                 msg='_sim_access_conv: non-0 '
-                                     'rotation rounds with no bufshr.')
+        for dce in range(de.NUM):
+            self.assertAlmostEqual(gbufs[dce].rotation_access_size(), 0,
+                                   msg='_sim_access_conv: non-0 '
+                                       'rotation access with no bufshr.')
+            self.assertAlmostEqual(gbufs[dce].wide_fetch_access_size(), 0,
+                                   msg='_sim_access_conv: non-0 '
+                                       'wide fetch access with no bufshr.')
+            self.assertEqual(gbufs[dce].rotation_rounds(), 0,
+                             msg='_sim_access_conv: non-0 '
+                                 'rotation rounds with no bufshr.')
 
         return dram_access, gbuf_access
 
@@ -953,7 +951,7 @@ class TestLoopBlockingFixture(unittest.TestCase):
 
         outer_level_innermost_loop = None
 
-        for t_, ord_ in itertools.izip_longest(bl_ts, bl_ords, fillvalue=None):
+        for t_, ord_ in itertools.zip_longest(bl_ts, bl_ords, fillvalue=None):
 
             # Non-trivial loops and trivial loops of this level.
             ntlp_list = sorted(lpe for lpe in range(le.NUM)

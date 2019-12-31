@@ -37,7 +37,7 @@ class TestNNs(unittest.TestCase):
 
     def test_import_network_invalid(self):
         ''' Get import_network invalid. '''
-        with self.assertRaisesRegexp(ImportError, 'nns: .*defined.*'):
+        with self.assertRaisesRegex(ImportError, 'nns: .*defined.*'):
             _ = nns.import_network('aaa')
 
     def test_add_lstm_cell(self):
@@ -61,7 +61,7 @@ class TestNNs(unittest.TestCase):
 
     def test_add_lstm_cell_invalid_type(self):
         ''' Add LSTM cell with invalid type. '''
-        with self.assertRaisesRegexp(TypeError, 'add_lstm_cell: .*network.*'):
+        with self.assertRaisesRegex(TypeError, 'add_lstm_cell: .*network.*'):
             _ = nns.add_lstm_cell(InputLayer(512, 1), 'cell0', 512,
                                   None, None, None)
 
@@ -69,21 +69,21 @@ class TestNNs(unittest.TestCase):
         ''' Add LSTM cell input not in. '''
         net = Network('LSTM')
         net.set_input_layer(InputLayer(512, 1))
-        with self.assertRaisesRegexp(ValueError, 'add_lstm_cell: .*in.*'):
+        with self.assertRaisesRegex(ValueError, 'add_lstm_cell: .*in.*'):
             _ = nns.add_lstm_cell(net, 'cell0', 512,
                                   'a', net.INPUT_LAYER_KEY,
                                   net.INPUT_LAYER_KEY)
 
         net = Network('LSTM')
         net.set_input_layer(InputLayer(512, 1))
-        with self.assertRaisesRegexp(ValueError, 'add_lstm_cell: .*in.*'):
+        with self.assertRaisesRegex(ValueError, 'add_lstm_cell: .*in.*'):
             _ = nns.add_lstm_cell(net, 'cell0', 512,
                                   net.INPUT_LAYER_KEY, 'a',
                                   net.INPUT_LAYER_KEY)
 
         net = Network('LSTM')
         net.set_input_layer(InputLayer(512, 1))
-        with self.assertRaisesRegexp(ValueError, 'add_lstm_cell: .*in.*'):
+        with self.assertRaisesRegex(ValueError, 'add_lstm_cell: .*in.*'):
             _ = nns.add_lstm_cell(net, 'cell0', 512,
                                   net.INPUT_LAYER_KEY, net.INPUT_LAYER_KEY,
                                   'a')

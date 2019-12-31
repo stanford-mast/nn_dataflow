@@ -21,8 +21,7 @@ import subprocess
 from . import __version__
 
 def _command_output(args, cwd):
-    with subprocess.Popen(args, cwd=cwd, stdout=subprocess.PIPE).stdout as fh:
-        return fh.read().strip()
+    return subprocess.check_output(args, cwd=cwd).strip()
 
 def get_version(with_local=False):
     ''' Get the version number, optionally with the local version number. '''
@@ -32,15 +31,17 @@ def get_version(with_local=False):
     if with_local:
         cwd = os.path.dirname(os.path.abspath(__file__))
 
-        if subprocess.call(['git', 'rev-parse'], cwd=cwd,
-                           stderr=subprocess.STDOUT,
-                           stdout=open(os.devnull, 'w')) != 0:
+        with open(os.devnull, 'w') as devnull:
+            result = subprocess.call(['git', 'rev-parse'], cwd=cwd,
+                                     stderr=subprocess.STDOUT,
+                                     stdout=devnull)
+        if result != 0:
             # Not in git repo.
             return version  # pragma: no cover
 
         # Dirty summary.
         short_stat = _command_output(['git', 'diff', 'HEAD', '--shortstat'],
-                                     cwd) \
+                                     cwd).decode() \
                 .replace('files changed', 'fc').replace('file changed', 'fc') \
                 .replace('insertions(+)', 'a').replace(' insertion(+)', 'a') \
                 .replace('deletions(-)', 'd').replace(' deletion(-)', 'd') \
@@ -52,8 +53,7 @@ def get_version(with_local=False):
         # Git describe.
         desc = _command_output(['git', 'describe', '--tags', '--always',
                                 '--dirty={}'.format(dirty)],
-                               cwd)
-
+                               cwd).decode()
         version += '+' + desc
 
     assert not any(w in version for w in string.whitespace)

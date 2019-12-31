@@ -58,7 +58,7 @@ class TestResource(unittest.TestCase):
 
     def test_invalid_proc_region(self):
         ''' Invalid proc_region. '''
-        with self.assertRaisesRegexp(TypeError, 'Resource: .*proc_region.*'):
+        with self.assertRaisesRegex(TypeError, 'Resource: .*proc_region.*'):
             _ = Resource(proc_region=PhyDim2(2, 2),
                          dram_region=self.dram_region,
                          src_data_region=self.src_data_region,
@@ -73,7 +73,7 @@ class TestResource(unittest.TestCase):
 
     def test_invalid_proc_region_dram(self):
         ''' Invalid proc_region with type DRAM. '''
-        with self.assertRaisesRegexp(ValueError, 'Resource: .*proc_.*type.*'):
+        with self.assertRaisesRegex(ValueError, 'Resource: .*proc_.*type.*'):
             _ = Resource(proc_region=NodeRegion(dim=PhyDim2(2, 2),
                                                 origin=PhyDim2(0, 0),
                                                 type=NodeRegion.DRAM),
@@ -90,7 +90,7 @@ class TestResource(unittest.TestCase):
 
     def test_invalid_dram_region(self):
         ''' Invalid dram_region. '''
-        with self.assertRaisesRegexp(TypeError, 'Resource: .*dram_region.*'):
+        with self.assertRaisesRegex(TypeError, 'Resource: .*dram_region.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=PhyDim2(2, 2),
                          src_data_region=self.src_data_region,
@@ -105,7 +105,7 @@ class TestResource(unittest.TestCase):
 
     def test_invalid_dram_region_proc(self):
         ''' Invalid dram_region with type DRAM. '''
-        with self.assertRaisesRegexp(ValueError, 'Resource: .*dram_.*type.*'):
+        with self.assertRaisesRegex(ValueError, 'Resource: .*dram_.*type.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=NodeRegion(dim=PhyDim2(2, 2),
                                                 origin=PhyDim2(0, 0),
@@ -122,7 +122,7 @@ class TestResource(unittest.TestCase):
 
     def test_invalid_data_region(self):
         ''' Invalid src/dst_proc_region. '''
-        with self.assertRaisesRegexp(TypeError, 'Resource: .*src_data_.*'):
+        with self.assertRaisesRegex(TypeError, 'Resource: .*src_data_.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=self.dram_region,
                          src_data_region=PhyDim2(2, 1),
@@ -134,7 +134,7 @@ class TestResource(unittest.TestCase):
                          dram_bandwidth=128,
                          no_time_mux=False,
                         )
-        with self.assertRaisesRegexp(TypeError, 'Resource: .*dst_data_.*'):
+        with self.assertRaisesRegex(TypeError, 'Resource: .*dst_data_.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=self.dram_region,
                          src_data_region=self.src_data_region,
@@ -149,7 +149,7 @@ class TestResource(unittest.TestCase):
 
     def test_invalid_dim_array(self):
         ''' Invalid dim_array. '''
-        with self.assertRaisesRegexp(TypeError, 'Resource: .*dim_array.*'):
+        with self.assertRaisesRegex(TypeError, 'Resource: .*dim_array.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=self.dram_region,
                          src_data_region=self.src_data_region,
@@ -164,7 +164,7 @@ class TestResource(unittest.TestCase):
 
     def test_invalid_size_gbuf(self):
         ''' Invalid size_gbuf. '''
-        with self.assertRaisesRegexp(TypeError, 'Resource: .*size_gbuf.*'):
+        with self.assertRaisesRegex(TypeError, 'Resource: .*size_gbuf.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=self.dram_region,
                          src_data_region=self.src_data_region,
@@ -179,7 +179,7 @@ class TestResource(unittest.TestCase):
 
     def test_invalid_size_regf(self):
         ''' Invalid size_regf. '''
-        with self.assertRaisesRegexp(TypeError, 'Resource: .*size_regf.*'):
+        with self.assertRaisesRegex(TypeError, 'Resource: .*size_regf.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=self.dram_region,
                          src_data_region=self.src_data_region,
@@ -194,8 +194,8 @@ class TestResource(unittest.TestCase):
 
     def test_invalid_array_bus_width(self):
         ''' Invalid array_bus_width. '''
-        with self.assertRaisesRegexp(TypeError,
-                                     'Resource: .*array_bus_width.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'Resource: .*array_bus_width.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=self.dram_region,
                          src_data_region=self.src_data_region,
@@ -207,8 +207,8 @@ class TestResource(unittest.TestCase):
                          dram_bandwidth=128,
                          no_time_mux=False,
                         )
-        with self.assertRaisesRegexp(ValueError,
-                                     'Resource: .*array_bus_width.*'):
+        with self.assertRaisesRegex(ValueError,
+                                    'Resource: .*array_bus_width.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=self.dram_region,
                          src_data_region=self.src_data_region,
@@ -220,8 +220,8 @@ class TestResource(unittest.TestCase):
                          dram_bandwidth=128,
                          no_time_mux=False,
                         )
-        with self.assertRaisesRegexp(ValueError,
-                                     'Resource: .*array_bus_width.*'):
+        with self.assertRaisesRegex(ValueError,
+                                    'Resource: .*array_bus_width.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=self.dram_region,
                          src_data_region=self.src_data_region,
@@ -236,8 +236,8 @@ class TestResource(unittest.TestCase):
 
     def test_invalid_dram_bandwidth(self):
         ''' Invalid dram_bandwidth. '''
-        with self.assertRaisesRegexp(TypeError,
-                                     'Resource: .*dram_bandwidth.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'Resource: .*dram_bandwidth.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=self.dram_region,
                          src_data_region=self.src_data_region,
@@ -249,8 +249,8 @@ class TestResource(unittest.TestCase):
                          dram_bandwidth=None,
                          no_time_mux=False,
                         )
-        with self.assertRaisesRegexp(ValueError,
-                                     'Resource: .*dram_bandwidth.*'):
+        with self.assertRaisesRegex(ValueError,
+                                    'Resource: .*dram_bandwidth.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=self.dram_region,
                          src_data_region=self.src_data_region,
@@ -262,8 +262,8 @@ class TestResource(unittest.TestCase):
                          dram_bandwidth=-3,
                          no_time_mux=False,
                         )
-        with self.assertRaisesRegexp(ValueError,
-                                     'Resource: .*dram_bandwidth.*'):
+        with self.assertRaisesRegex(ValueError,
+                                    'Resource: .*dram_bandwidth.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=self.dram_region,
                          src_data_region=self.src_data_region,
@@ -278,8 +278,8 @@ class TestResource(unittest.TestCase):
 
     def test_invalid_no_time_mux(self):
         ''' Invalid no_time_mux. '''
-        with self.assertRaisesRegexp(TypeError,
-                                     'Resource: .*no_time_mux.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'Resource: .*no_time_mux.*'):
             _ = Resource(proc_region=self.proc_region,
                          dram_region=self.dram_region,
                          src_data_region=self.src_data_region,

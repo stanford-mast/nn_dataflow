@@ -129,21 +129,30 @@ class FmapRange(namedtuple('FmapRange', ['fp_beg', 'fp_end'])):
         '''
         Whether the given FmapPosition is in the FmapRange.
         '''
-        return all(p >= b and p < e for p, b, e
+        return all(b <= p < e for p, b, e
                    in zip(fpos, self.fp_beg, self.fp_end))
 
     def __lt__(self, other):
-        if isinstance(other, self.__class__):
-            return self._compare(other) < 0
-        return NotImplemented
+        assert isinstance(other, self.__class__), \
+                "FmapRange: invalid type to compare: {}".format(type(other))
+        return self._compare(other) < 0
 
     def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            try:
-                return self._compare(other) == 0
-            except ValueError:
-                return False
-        return NotImplemented
+        assert isinstance(other, self.__class__), \
+                "FmapRange: invalid type to compare: {}".format(type(other))
+        try:
+            return self._compare(other) == 0
+        except ValueError:
+            return False
+
+    def __hash__(self):
+        '''
+        If a class does not define an __eq__() method, it should not define a
+        __hash__() operation either; if it defines __eq__() but not __hash__(),
+        its instances will not be usable as items in hashable collections.
+        See https://docs.python.org/3.1/reference/datamodel.html?highlight=hash#object.__hash__
+        '''
+        return hash((self.fp_beg, self.fp_end))
 
     def _compare(self, other):
         # Identical ranges.
@@ -155,7 +164,7 @@ class FmapRange(namedtuple('FmapRange', ['fp_beg', 'fp_end'])):
             if other.size() == 0:
                 return 0
             return -1
-        elif other.size() == 0:
+        if other.size() == 0:
             return 1
 
         # Overlap check.
@@ -181,31 +190,21 @@ class FmapRange(namedtuple('FmapRange', ['fp_beg', 'fp_end'])):
 
     def __ne__(self, other):
         r = self.__eq__(other)
-        if r is NotImplemented:
-            # "not" NotImplemented will be True.
-            return r
         return not r
 
     def __gt__(self, other):
         r = self.__lt__(other)
-        if r is NotImplemented:
-            # NotImplemented "and" X will be X.
-            return r
         return not r and self.__ne__(other)
 
     def __le__(self, other):
-        # NotImplemented "or" X is safe.
         return self.__lt__(other) or self.__eq__(other)
 
     def __ge__(self, other):
         r = self.__lt__(other)
-        if r is NotImplemented:
-            # "not" NotImplemented will be True.
-            return r
         return not r
 
 
-class FmapRangeMap(object):
+class FmapRangeMap():
     '''
     A map with key as type FmapPosition, and the keys within a FmapRange all
     map to the same value.

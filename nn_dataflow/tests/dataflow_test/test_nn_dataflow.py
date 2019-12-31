@@ -15,7 +15,8 @@ program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 
 import unittest
 import sys
-import StringIO
+
+from io import StringIO
 
 from nn_dataflow.core import Cost
 from nn_dataflow.core import InputLayer, ConvLayer, FCLayer
@@ -88,30 +89,30 @@ class TestNNDataflow(unittest.TestCase):
 
     def test_invalid_network(self):
         ''' Invalid network argument. '''
-        with self.assertRaisesRegexp(TypeError, 'NNDataflow: .*network.*'):
+        with self.assertRaisesRegex(TypeError, 'NNDataflow: .*network.*'):
             _ = NNDataflow(self.alex_net.input_layer(), 4,
                            self.resource, self.cost, self.map_strategy)
 
     def test_invalid_resource(self):
         ''' Invalid network argument. '''
-        with self.assertRaisesRegexp(TypeError, 'NNDataflow: .*resource.*'):
+        with self.assertRaisesRegex(TypeError, 'NNDataflow: .*resource.*'):
             _ = NNDataflow(self.alex_net, 4,
                            self.resource.proc_region, self.cost,
                            self.map_strategy)
 
     def test_invalid_cost(self):
         ''' Invalid network argument. '''
-        with self.assertRaisesRegexp(TypeError, 'NNDataflow: .*cost.*'):
+        with self.assertRaisesRegex(TypeError, 'NNDataflow: .*cost.*'):
             _ = NNDataflow(self.alex_net, 4,
                            self.resource, self.cost._asdict(),
                            self.map_strategy)
 
     def test_invalid_map_strategy(self):
         ''' Invalid map_strategy argument. '''
-        class _DummyClass(object):  # pylint: disable=too-few-public-methods
+        class _DummyClass():  # pylint: disable=too-few-public-methods
             pass
 
-        with self.assertRaisesRegexp(TypeError, 'NNDataflow: .*map_strategy.*'):
+        with self.assertRaisesRegex(TypeError, 'NNDataflow: .*map_strategy.*'):
             _ = NNDataflow(self.alex_net, 4,
                            self.resource, self.cost, _DummyClass)
 
@@ -130,8 +131,8 @@ class TestNNDataflow(unittest.TestCase):
 
         old_stdout = sys.stdout
         old_stderr = sys.stderr
-        sys.stdout = stdout = StringIO.StringIO()
-        sys.stderr = stderr = StringIO.StringIO()
+        sys.stdout = stdout = StringIO()
+        sys.stderr = stderr = StringIO()
 
         tops, _ = nnd.schedule_search(options)
 
@@ -408,8 +409,8 @@ class TestNNDataflow(unittest.TestCase):
 
         old_stdout = sys.stdout
         old_stderr = sys.stderr
-        sys.stdout = stdout = StringIO.StringIO()
-        sys.stderr = stderr = StringIO.StringIO()
+        sys.stdout = stdout = StringIO()
+        sys.stderr = stderr = StringIO()
 
         with self.assertRaises(NotImplementedError):
             _ = nnd.schedule_search(self.options)

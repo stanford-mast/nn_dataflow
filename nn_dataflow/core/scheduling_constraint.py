@@ -106,7 +106,7 @@ class SchedulingConstraint(util.ContentHashClass):
     def _filter_gen(gen, topt=0):
         ''' Get a new generator which filters the top factor. '''
         for tpl in gen:
-            if topt == 0 or tpl[0] == topt:
+            if topt in (0, tpl[0]):
                 yield tpl
 
     def __repr__(self):
@@ -143,14 +143,14 @@ class SchedulingConstraintLayerPipeline(SchedulingConstraint):
 
         if fbifm:
             # Fully-buffered IFM <=> topifm = 1.
-            if topifm != 0 and topifm != 1:
+            if topifm not in (0, 1):
                 raise ValueError('SchedulingConstraintLayerPipeline: '
                                  'fully-buffered IFM implies topifm = 1.')
             topifm = 1
 
         if fbofm:
             # Fully-buffered OFM <=> topofm = 1.
-            if topofm != 0 and topofm != 1:
+            if topofm not in (0, 1):
                 raise ValueError('SchedulingConstraintLayerPipeline: '
                                  'fully-buffered OFM implies topofm = 1.')
             topofm = 1

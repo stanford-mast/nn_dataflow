@@ -20,7 +20,7 @@ from .network import Network
 from .pipeline_segment import PipelineSegment
 from .resource import Resource
 
-class InterLayerPipeline(object):
+class InterLayerPipeline():
     '''
     Inter-layer pipeline.
     '''

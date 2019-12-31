@@ -366,7 +366,7 @@ class TestPipelineFixture(unittest.TestCase):
 
         seg_layers = set(l for ltpl in segment for l in ltpl)
 
-        class OutAccPat(object):
+        class OutAccPat():
             ''' Output data access pattern types. '''
             # pylint: disable=too-few-public-methods
             ANY = 0   # can access in any way
@@ -434,7 +434,9 @@ class TestPipelineFixture(unittest.TestCase):
                 seq = None
                 # str is greater than all numbers, see
                 # https://docs.python.org/2/library/stdtypes.html#comparisons
-                seq_prev_oaps = [poap for poap in prev_oaps if poap > 0]
+                seq_prev_oaps = [poap for poap in prev_oaps \
+                                 if isinstance(poap, str) or \
+                                    (isinstance(poap, int) and poap > 0)]
                 if seq_prev_oaps:
                     self.assertEqual(len(seq_prev_oaps), 1,
                                      '_validate_constraint: layer {} ({}) '
@@ -481,13 +483,12 @@ class TestPipelineFixture(unittest.TestCase):
                     if any(pl in ltpl for pl in prev_layers):
                         # Local source.
                         lcl_poap = avail_data[sp_idx][1]
-                        self.assertTrue(lcl_poap == OutAccPat.DBF
-                                        or lcl_poap == OutAccPat.ANY,
-                                        '_validate_constraint: layer {} ({}) '
-                                        'local source data {} must fully '
-                                        'buffer output.'
-                                        .format(layer, (sp_idx, tm_idx),
-                                                lcl_poap))
+                        self.assertIn(lcl_poap, (OutAccPat.DBF, OutAccPat.ANY),
+                                      '_validate_constraint: layer {} ({}) '
+                                      'local source data {} must fully '
+                                      'buffer output.'
+                                      .format(layer, (sp_idx, tm_idx),
+                                              lcl_poap))
 
                     # DBF source.
                     if OutAccPat.DBF in prev_oaps:

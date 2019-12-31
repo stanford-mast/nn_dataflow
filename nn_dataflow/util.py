@@ -13,6 +13,7 @@ You should have received a copy of the Modified BSD-3 License along with this
 program. If not, see <https://opensource.org/licenses/BSD-3-Clause>.
 """
 
+from functools import reduce
 import math
 from operator import mul
 
@@ -20,7 +21,7 @@ from operator import mul
 Utilities.
 '''
 
-class ContentHashClass(object):
+class ContentHashClass():
     '''
     Class using the content instead of the object ID for hash.
 
@@ -123,10 +124,14 @@ def prod(lst):
     return reduce(mul, lst, 1)
 
 
-def approx_dividable(total, num, overhead=0.1):
+def approx_dividable(total, num, rel_overhead=0.1, abs_overhead=1):
     ''' Whether it is reasonable to divide `total` into `num` parts.
-    `overhead` is the allowed max padding overhead.  '''
-    return idivc(total, num) * num <= total * (1 + overhead)
+    `rel_overhead` is the allowed max padding overhead measured
+    relatively; `abs_overhead` is the allowed max padding
+    overhead measured by absolute value.'''
+    return total >= num and isclose(
+        idivc(total, num) * num, total,
+        rel_tol=rel_overhead, abs_tol=abs_overhead)
 
 
 def factorize(value, num, limits=None):
@@ -158,9 +163,8 @@ def factorize(value, num, limits=None):
             factors[lvl] += 1
             if prod(factors[:lvl+1]) <= value:
                 break
-            else:
-                factors[lvl] = 1
-                lvl -= 1
+            factors[lvl] = 1
+            lvl -= 1
         if lvl < 0:
             return
 
@@ -211,8 +215,8 @@ def get_ith_range(rng, idx, num):
     Divide the full range `rng` into `num` parts, and get the `idx`-th range.
     '''
     length = rng[1] - rng[0]
-    beg = rng[0] + idx * length / num
-    end = rng[0] + (idx + 1) * length / num
+    beg = rng[0] + idx * length // num
+    end = rng[0] + (idx + 1) * length // num
     assert end <= rng[1]
     return beg, end
 
@@ -275,4 +279,10 @@ def assert_float_eq_int(vfloat, vint, message=''):
     '''
     if abs(vfloat - vint) > 1:
         raise AssertionError(message + ' {} != {}'.format(vfloat, vint))
+
+def apply(func, argv):
+    '''
+    Similar to python2 built-in apply function.
+    '''
+    return func(*argv)
 

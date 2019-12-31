@@ -22,7 +22,7 @@ from . import mem_hier_enum as me
 from .node_region import NodeRegion
 from .. import util
 
-class LoopBlockingScheme(object):
+class LoopBlockingScheme():
     '''
     Loop blocking scheme.
 
@@ -30,7 +30,7 @@ class LoopBlockingScheme(object):
     '''
     # pylint: disable=too-many-instance-attributes
 
-    class BL(object):  # pylint: disable=too-few-public-methods
+    class BL():  # pylint: disable=too-few-public-methods
         '''
         Blocking-level enum. Only used locally.
         '''
@@ -91,7 +91,8 @@ class LoopBlockingScheme(object):
                 'LoopBlockingScheme: bl_ts elements have invalid length.'
         assert len(bl_ords) == BL.NUM, \
                 'LoopBlockingScheme: bl_ords has invalid length.'
-        assert all(sorted(bl_ord) == range(le.NUM) for bl_ord in bl_ords), \
+        assert all(tuple(sorted(bl_ord)) == tuple(range(le.NUM)) \
+                   for bl_ord in bl_ords), \
                 'LoopBlockingScheme: bl_ords elements are invalid.'
 
         self.bl_ts = [tuple(bl_t) for bl_t in bl_ts]
@@ -133,8 +134,7 @@ class LoopBlockingScheme(object):
                 or self.data_size(BL.GBUF) > resource.size_gbuf:
             self.valid = False
             return
-        else:
-            self.valid = True
+        self.valid = True
 
         # Data fetch calculation.
         self._set_fetch()
@@ -143,13 +143,7 @@ class LoopBlockingScheme(object):
         self.src_is_dram = (resource.src_data_region.type == NodeRegion.DRAM)
         self.dst_is_dram = (resource.dst_data_region.type == NodeRegion.DRAM)
 
-        # Check resource for filter pinning.
         self.filter_pinned = False
-        if resource.no_time_mux:
-            if all(self.bl_ts[0][lpe] == 1 for lpe
-                   in self.nld.data_loops[de.FIL].loops()):
-                self.filter_pinned = True
-                self.fetch[0][de.FIL] = 0
 
         # If data regions are not DRAM, can only access once, no spilling.
         if not self.src_is_dram:
@@ -214,6 +208,13 @@ class LoopBlockingScheme(object):
 
         # Remote gbuf access.
         self.remote_gbuf_access = [0.] * de.NUM
+
+        # Check resource for filter pinning.
+        if resource.no_time_mux:
+            if all(self.bl_ts[0][lpe] == 1 for lpe
+                   in self.nld.data_loops[de.FIL].loops()):
+                self.filter_pinned = True
+                self.fetch[0][de.FIL] = 0
 
     def is_valid(self):
         '''
@@ -572,7 +573,7 @@ class LoopBlockingScheme(object):
         gens = [None] * le.NUM
         rev_order = [le.NUM - 1 - o for o in order_x]
         for lpe in range(le.NUM):
-            gens[rev_order[lpe]] = xrange(t_x[lpe])
+            gens[rev_order[lpe]] = range(t_x[lpe])
 
         for idx in itertools.product(*gens):
             # Index now is in the loop order from outer to inner. Reorder to be

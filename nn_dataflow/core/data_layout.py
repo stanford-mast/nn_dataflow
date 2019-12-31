@@ -131,7 +131,7 @@ class DataLayout(namedtuple('DataLayout', DATA_LAYOUT_LIST)):
                 # Each forward step, get the min-distance pair of source and
                 # destination.
                 src, dst = min(itertools.product(src_set, dst_set),
-                               key=lambda (s, d): d.hop_dist(s))
+                               key=lambda sd: sd[1].hop_dist(sd[0]))
                 dst_set.remove(dst)
                 src_set.add(dst)
                 nhops += total_size * dst.hop_dist(src)

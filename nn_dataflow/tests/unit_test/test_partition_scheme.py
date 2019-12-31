@@ -31,7 +31,7 @@ class TestPartitionScheme(unittest.TestCase):
     def setUp(self):
         self.ps1 = PartitionScheme(order=[pe.BATP, pe.OUTP, pe.OFMP, pe.INPP],
                                    pdims=[(2, 3), (3, 1), (1, 5), (5, 2)])
-        self.ps2 = PartitionScheme(order=range(pe.NUM),
+        self.ps2 = PartitionScheme(order=list(range(pe.NUM)),
                                    pdims=[(2, 2), (5, 5), (3, 3), (1, 1)])
 
         self.nr1 = NodeRegion(origin=PhyDim2(0, 0), dim=self.ps1.dim(),
@@ -41,30 +41,30 @@ class TestPartitionScheme(unittest.TestCase):
 
     def test_invalid_order(self):
         ''' Invalid order. '''
-        with self.assertRaisesRegexp(ValueError, 'PartitionScheme: .*order.*'):
-            _ = PartitionScheme(order=range(pe.NUM - 1),
+        with self.assertRaisesRegex(ValueError, 'PartitionScheme: .*order.*'):
+            _ = PartitionScheme(order=list(range(pe.NUM - 1)),
                                 pdims=[(1, 1)] * pe.NUM)
 
-        with self.assertRaisesRegexp(ValueError, 'PartitionScheme: .*order.*'):
-            _ = PartitionScheme(order=[0] + range(2, pe.NUM),
+        with self.assertRaisesRegex(ValueError, 'PartitionScheme: .*order.*'):
+            _ = PartitionScheme(order=[0] + list(range(2, pe.NUM)),
                                 pdims=[(1, 1)] * pe.NUM)
 
-        with self.assertRaisesRegexp(ValueError, 'PartitionScheme: .*order.*'):
-            _ = PartitionScheme(order=[1] + range(pe.NUM),
+        with self.assertRaisesRegex(ValueError, 'PartitionScheme: .*order.*'):
+            _ = PartitionScheme(order=[1] + list(range(pe.NUM)),
                                 pdims=[(1, 1)] * pe.NUM)
 
-        with self.assertRaisesRegexp(ValueError, 'PartitionScheme: .*order.*'):
-            _ = PartitionScheme(order=range(4, 4 + pe.NUM),
+        with self.assertRaisesRegex(ValueError, 'PartitionScheme: .*order.*'):
+            _ = PartitionScheme(order=list(range(4, 4 + pe.NUM)),
                                 pdims=[(1, 1)] * pe.NUM)
 
     def test_invalid_pdims(self):
         ''' Invalid pdims. '''
-        with self.assertRaisesRegexp(ValueError, 'PartitionScheme: .*pdims.*'):
-            _ = PartitionScheme(order=range(pe.NUM),
+        with self.assertRaisesRegex(ValueError, 'PartitionScheme: .*pdims.*'):
+            _ = PartitionScheme(order=list(range(pe.NUM)),
                                 pdims=[(1, 1)] * (pe.NUM - 1))
 
-        with self.assertRaisesRegexp(ValueError, 'PartitionScheme: .*pdims.*'):
-            _ = PartitionScheme(order=range(pe.NUM),
+        with self.assertRaisesRegex(ValueError, 'PartitionScheme: .*pdims.*'):
+            _ = PartitionScheme(order=list(range(pe.NUM)),
                                 pdims=[(1, 1), (1, 1), (2, 1, 1), (1, 1)])
 
     def test_dim(self):
@@ -226,7 +226,7 @@ class TestPartitionScheme(unittest.TestCase):
 
     def test_part_layer_invalid_inpart(self):
         ''' Get part_layer invalid INPP. '''
-        with self.assertRaisesRegexp(ValueError, 'PartitionScheme: .*input.*'):
+        with self.assertRaisesRegex(ValueError, 'PartitionScheme: .*input.*'):
             _ = self.ps1.part_layer(PoolingLayer(self.ps1.size(pe.OUTP),
                                                  self.ps1.size(pe.OFMP), 2),
                                     self.ps1.size(pe.BATP))
@@ -246,7 +246,7 @@ class TestPartitionScheme(unittest.TestCase):
         self.assertEqual(layer.total_ops(), 0)
         self.assertIsNone(_Layer.data_loops())
 
-        with self.assertRaisesRegexp(TypeError, 'PartitionScheme: .*layer.*'):
+        with self.assertRaisesRegex(TypeError, 'PartitionScheme: .*layer.*'):
             _ = self.ps1.part_layer(layer, self.ps1.size(pe.BATP))
 
     def test_part_neighbor_dist(self):
@@ -377,7 +377,7 @@ class TestPartitionScheme(unittest.TestCase):
 
     def test_projection_empty_region(self):
         ''' Get projection with empty region. '''
-        with self.assertRaisesRegexp(ValueError, 'PartitionScheme: .*region.*'):
+        with self.assertRaisesRegex(ValueError, 'PartitionScheme: .*region.*'):
             _ = self.ps1.projection(NodeRegion(origin=PhyDim2(0, 0),
                                                dim=PhyDim2(0, 0),
                                                type=NodeRegion.DRAM))

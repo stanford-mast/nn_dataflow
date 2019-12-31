@@ -49,32 +49,32 @@ class TestDataLayout(unittest.TestCase):
 
     def test_invalid_args(self):
         ''' Invalid arguments. '''
-        with self.assertRaisesRegexp(TypeError, 'DataLayout: .*frngs.*'):
+        with self.assertRaisesRegex(TypeError, 'DataLayout: .*frngs.*'):
             _ = DataLayout(frngs=None,
                            regions=(self.region1,),
                            parts=(self.part1,))
-        with self.assertRaisesRegexp(TypeError,
-                                     'DataLayout: .*elements in frngs.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'DataLayout: .*elements in frngs.*'):
             _ = DataLayout(frngs=(None,),
                            regions=(self.region1,),
                            parts=(self.part1,))
 
-        with self.assertRaisesRegexp(TypeError, 'DataLayout: .*regions.*'):
+        with self.assertRaisesRegex(TypeError, 'DataLayout: .*regions.*'):
             _ = DataLayout(frngs=(self.frng1,),
                            regions=None,
                            parts=(self.part1,))
-        with self.assertRaisesRegexp(TypeError,
-                                     'DataLayout: .*elements in regions.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'DataLayout: .*elements in regions.*'):
             _ = DataLayout(frngs=(self.frng1,),
                            regions=self.region1,
                            parts=(self.part1,))
 
-        with self.assertRaisesRegexp(TypeError, 'DataLayout: .*parts.*'):
+        with self.assertRaisesRegex(TypeError, 'DataLayout: .*parts.*'):
             _ = DataLayout(frngs=(self.frng1,),
                            regions=(self.region1,),
                            parts=None)
-        with self.assertRaisesRegexp(TypeError,
-                                     'DataLayout: .*elements in parts.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'DataLayout: .*elements in parts.*'):
             _ = DataLayout(frngs=(self.frng1,),
                            regions=(self.region1,),
                            parts=self.part1)
@@ -82,37 +82,37 @@ class TestDataLayout(unittest.TestCase):
     def test_invalid_frngs(self):
         ''' Invalid frngs. '''
         # No frngs.
-        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*frng.*'):
+        with self.assertRaisesRegex(ValueError, 'DataLayout: .*frng.*'):
             _ = DataLayout(frngs=tuple(),
                            regions=(self.region1,),
                            parts=(self.part1,))
 
         # Not begin at 0.
-        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*frng.*'):
+        with self.assertRaisesRegex(ValueError, 'DataLayout: .*frng.*'):
             _ = DataLayout(frngs=(FmapRange((0, 4, 0, 0), (4, 8, 16, 16)),
                                   self.frng1),
                            regions=(self.region1, self.region2),
                            parts=(self.part1, self.part2))
 
         # b, h, w mismatch.
-        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*frng.*'):
+        with self.assertRaisesRegex(ValueError, 'DataLayout: .*frng.*'):
             _ = DataLayout(frngs=(self.frng1,
                                   FmapRange((0, 4, 0, 0), (3, 8, 16, 16))),
                            regions=(self.region1, self.region2),
                            parts=(self.part1, self.part2))
-        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*frng.*'):
+        with self.assertRaisesRegex(ValueError, 'DataLayout: .*frng.*'):
             _ = DataLayout(frngs=(self.frng1,
                                   FmapRange((0, 4, 0, 0), (4, 8, 12, 16))),
                            regions=(self.region1, self.region2),
                            parts=(self.part1, self.part2))
-        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*frng.*'):
+        with self.assertRaisesRegex(ValueError, 'DataLayout: .*frng.*'):
             _ = DataLayout(frngs=(self.frng1,
                                   FmapRange((0, 4, 0, 0), (4, 8, 16, 12))),
                            regions=(self.region1, self.region2),
                            parts=(self.part1, self.part2))
 
         # n discontinuous.
-        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*frng.*'):
+        with self.assertRaisesRegex(ValueError, 'DataLayout: .*frng.*'):
             _ = DataLayout(frngs=(self.frng1,
                                   FmapRange((0, 5, 0, 0), (4, 8, 16, 16))),
                            regions=(self.region1, self.region2),
@@ -120,7 +120,7 @@ class TestDataLayout(unittest.TestCase):
 
     def test_invalid_parts(self):
         ''' Invalid parts. '''
-        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*part.*'):
+        with self.assertRaisesRegex(ValueError, 'DataLayout: .*part.*'):
             _ = DataLayout(frngs=(self.frng1,),
                            regions=(self.region1,),
                            parts=(PartitionScheme(order=range(pe.NUM),
@@ -129,7 +129,7 @@ class TestDataLayout(unittest.TestCase):
                                                          PhyDim2(1, 1),
                                                          PhyDim2(2, 1))),))
 
-        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*part.*'):
+        with self.assertRaisesRegex(ValueError, 'DataLayout: .*part.*'):
             _ = DataLayout(frngs=(self.frng1,
                                   FmapRange((0, 4, 0, 0), (4, 8, 16, 16))),
                            regions=(self.region2, self.region1),
@@ -137,7 +137,7 @@ class TestDataLayout(unittest.TestCase):
 
     def test_invalid_args_length(self):
         ''' Invalid args length. '''
-        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*length.*'):
+        with self.assertRaisesRegex(ValueError, 'DataLayout: .*length.*'):
             _ = DataLayout(frngs=(self.frng1,),
                            regions=(self.region1, self.region2),
                            parts=(self.part1,))
@@ -255,7 +255,7 @@ class TestDataLayout(unittest.TestCase):
     def test_nhops_to_invalid_kwargs(self):
         ''' Get nhops_to invalid kwargs. '''
         fr = FmapRange((0,) * 4, (4, 4, 16, 16))
-        with self.assertRaisesRegexp(ValueError, 'DataLayout: .*keyword.*'):
+        with self.assertRaisesRegex(ValueError, 'DataLayout: .*keyword.*'):
             _ = self.dl1.nhops_to(fr, PhyDim2(1, 1), f=True)
 
     def test_is_in(self):
@@ -348,9 +348,9 @@ class TestDataLayout(unittest.TestCase):
 
     def test_concat_invalid_type(self):
         ''' Concat invalid type. '''
-        with self.assertRaisesRegexp(TypeError, 'DataLayout: .*concat.*'):
+        with self.assertRaisesRegex(TypeError, 'DataLayout: .*concat.*'):
             _ = DataLayout.concat(self.dl1, self.frng1)
-        with self.assertRaisesRegexp(TypeError, 'DataLayout: .*concat.*'):
+        with self.assertRaisesRegex(TypeError, 'DataLayout: .*concat.*'):
             _ = DataLayout.concat(self.dl1, PhyDim2(1, 3))
 
     def test_concat_unmatch(self):
@@ -361,6 +361,6 @@ class TestDataLayout(unittest.TestCase):
             dl = DataLayout(frngs=(fr,), regions=(self.region1,),
                             parts=(self.part1,))
 
-            with self.assertRaisesRegexp(ValueError, 'DataLayout: .*match.*'):
+            with self.assertRaisesRegex(ValueError, 'DataLayout: .*match.*'):
                 _ = DataLayout.concat(self.dl1, dl)
 

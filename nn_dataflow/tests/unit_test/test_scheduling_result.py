@@ -70,30 +70,30 @@ class TestSchedulingResult(unittest.TestCase):
 
     def test_invalid_scheme(self):
         ''' Invalid scheme. '''
-        with self.assertRaisesRegexp(TypeError,
-                                     'SchedulingResult: .*scheme.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'SchedulingResult: .*scheme.*'):
             _ = SchedulingResult(scheme={},
                                  ofmap_layout=self.ofmap_layout,
                                  sched_seq=self.sched_seq)
 
     def test_invalid_ofmap_layout(self):
         ''' Invalid ofmap_layout. '''
-        with self.assertRaisesRegexp(TypeError,
-                                     'SchedulingResult: .*ofmap_layout.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'SchedulingResult: .*ofmap_layout.*'):
             _ = SchedulingResult(scheme=self.scheme,
                                  ofmap_layout=None,
                                  sched_seq=self.sched_seq)
 
     def test_invalid_sched_seq(self):
         ''' Invalid sched_seq. '''
-        with self.assertRaisesRegexp(TypeError,
-                                     'SchedulingResult: .*sched_seq.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'SchedulingResult: .*sched_seq.*'):
             _ = SchedulingResult(scheme=self.scheme,
                                  ofmap_layout=self.ofmap_layout,
                                  sched_seq=list(self.sched_seq))
 
-        with self.assertRaisesRegexp(ValueError,
-                                     'SchedulingResult: .*sched_seq.*'):
+        with self.assertRaisesRegex(ValueError,
+                                    'SchedulingResult: .*sched_seq.*'):
             _ = SchedulingResult(scheme=self.scheme,
                                  ofmap_layout=self.ofmap_layout,
                                  sched_seq=self.sched_seq[:-1])

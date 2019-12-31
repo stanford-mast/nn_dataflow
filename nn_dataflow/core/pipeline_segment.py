@@ -28,7 +28,7 @@ from .network import Network
 from .resource import Resource
 from .scheduling_constraint import SchedulingConstraintLayerPipeline as Cstr
 
-class PipelineSegment(object):
+class PipelineSegment():
     '''
     Inter-layer pipeline segment.
 
@@ -112,6 +112,7 @@ class PipelineSegment(object):
         # hint A are larger than the corresponding values in hint B, A will be
         # generated after B.
         vals = [sorted(v) for v in vals]
+        syms = list(syms)
 
         if self.cstr_topbat_idx is not None:
             # Tovhd =  (1 + 1/to + 1 + 1/to + ...) / tb
@@ -124,7 +125,8 @@ class PipelineSegment(object):
 
             constraint = tuple()
 
-            for atpl in self._subs_symargs(self.cstr_symargs, zip(syms, valp)):
+            for atpl in self._subs_symargs(self.cstr_symargs,
+                                           tuple(zip(syms, valp))):
                 ctpl = tuple()
                 for a in atpl:
                     # Construct kwargs, adjust the types of the values.
@@ -905,6 +907,7 @@ class PipelineSegment(object):
 
     class TopOfmUpdateLambda(symbasic):
         ''' A sympifi-able lambda function to lazily update topofm. '''
+        # pylint: disable=no-init
         def __new__(cls, *args):
             return super(PipelineSegment.TopOfmUpdateLambda, cls).__new__(cls)
         def __call__(self, arg_s, arg_r):

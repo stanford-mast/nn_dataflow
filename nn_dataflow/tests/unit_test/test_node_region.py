@@ -88,21 +88,21 @@ class TestNodeRegion(unittest.TestCase):
 
     def test_invalid_dim(self):
         ''' Invalid dim. '''
-        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*dim.*'):
+        with self.assertRaisesRegex(TypeError, 'NodeRegion: .*dim.*'):
             _ = NodeRegion(dim=(4, 4),
                            origin=PhyDim2(1, 3),
                            type=NodeRegion.PROC)
 
     def test_invalid_origin(self):
         ''' Invalid origin. '''
-        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*origin.*'):
+        with self.assertRaisesRegex(TypeError, 'NodeRegion: .*origin.*'):
             _ = NodeRegion(dim=PhyDim2(4, 4),
                            origin=(1, 3),
                            type=NodeRegion.PROC)
 
     def test_invalid_dist(self):
         ''' Invalid dist. '''
-        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*dist.*'):
+        with self.assertRaisesRegex(TypeError, 'NodeRegion: .*dist.*'):
             _ = NodeRegion(dim=PhyDim2(4, 4),
                            origin=PhyDim2(1, 3),
                            dist=(1, 1),
@@ -110,14 +110,14 @@ class TestNodeRegion(unittest.TestCase):
 
     def test_invalid_type(self):
         ''' Invalid type. '''
-        with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*type.*'):
+        with self.assertRaisesRegex(ValueError, 'NodeRegion: .*type.*'):
             _ = NodeRegion(dim=PhyDim2(4, 4),
                            origin=PhyDim2(1, 3),
                            type=NodeRegion.NUM)
 
     def test_invalid_wtot_type(self):
         ''' Invalid wtot type. '''
-        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*wtot.*'):
+        with self.assertRaisesRegex(TypeError, 'NodeRegion: .*wtot.*'):
             _ = NodeRegion(dim=PhyDim2(4, 4),
                            origin=PhyDim2(1, 3),
                            type=NodeRegion.PROC,
@@ -125,7 +125,7 @@ class TestNodeRegion(unittest.TestCase):
 
     def test_invalid_wbeg_type(self):
         ''' Invalid wbeg type. '''
-        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*wbeg.*'):
+        with self.assertRaisesRegex(TypeError, 'NodeRegion: .*wbeg.*'):
             _ = NodeRegion(dim=PhyDim2(4, 4),
                            origin=PhyDim2(1, 3),
                            type=NodeRegion.PROC,
@@ -133,21 +133,21 @@ class TestNodeRegion(unittest.TestCase):
 
     def test_invalid_wbeg(self):
         ''' Invalid wbeg. '''
-        with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*wbeg.*'):
+        with self.assertRaisesRegex(ValueError, 'NodeRegion: .*wbeg.*'):
             _ = NodeRegion(dim=PhyDim2(4, 4),
                            origin=PhyDim2(1, 3),
                            type=NodeRegion.PROC,
                            wtot=4,
                            wbeg=5)
 
-        with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*wbeg.*'):
+        with self.assertRaisesRegex(ValueError, 'NodeRegion: .*wbeg.*'):
             _ = NodeRegion(dim=PhyDim2(4, 4),
                            origin=PhyDim2(1, 3),
                            type=NodeRegion.PROC,
                            wtot=4,
                            wbeg=-5)
 
-        with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*wbeg.*'):
+        with self.assertRaisesRegex(ValueError, 'NodeRegion: .*wbeg.*'):
             _ = NodeRegion(dim=PhyDim2(4, 4),
                            origin=PhyDim2(1, 3),
                            type=NodeRegion.PROC,
@@ -215,10 +215,10 @@ class TestNodeRegion(unittest.TestCase):
                         origin=PhyDim2(1, 3),
                         type=NodeRegion.PROC)
 
-        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*PhyDim2.*'):
+        with self.assertRaisesRegex(TypeError, 'NodeRegion: .*PhyDim2.*'):
             _ = nr.rel2abs((0, 0))
 
-        with self.assertRaisesRegexp(TypeError, 'NodeRegion: .*PhyDim2.*'):
+        with self.assertRaisesRegex(TypeError, 'NodeRegion: .*PhyDim2.*'):
             _ = nr.rel2abs(1)
 
     def test_rel2abs_not_in(self):
@@ -227,10 +227,10 @@ class TestNodeRegion(unittest.TestCase):
                         origin=PhyDim2(1, 3),
                         type=NodeRegion.PROC)
 
-        with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*not in.*'):
+        with self.assertRaisesRegex(ValueError, 'NodeRegion: .*not in.*'):
             _ = nr.rel2abs(PhyDim2(-1, 0))
 
-        with self.assertRaisesRegexp(ValueError, 'NodeRegion: .*not in.*'):
+        with self.assertRaisesRegex(ValueError, 'NodeRegion: .*not in.*'):
             _ = nr.rel2abs(PhyDim2(0, 4))
 
     def test_rel2abs_folded(self):

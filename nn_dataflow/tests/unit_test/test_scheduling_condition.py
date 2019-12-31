@@ -66,8 +66,8 @@ class TestSchedulingCondition(unittest.TestCase):
 
     def test_invalid_resource(self):
         ''' Invalid resource. '''
-        with self.assertRaisesRegexp(TypeError,
-                                     'SchedulingCondition: .*resource.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'SchedulingCondition: .*resource.*'):
             _ = SchedulingCondition(resource=None,
                                     constraint=self.none_cstr,
                                     ifmap_layout=self.ifmap_layout,
@@ -75,8 +75,8 @@ class TestSchedulingCondition(unittest.TestCase):
 
     def test_invalid_constraint(self):
         ''' Invalid constraint. '''
-        with self.assertRaisesRegexp(TypeError,
-                                     'SchedulingCondition: .*constraint.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'SchedulingCondition: .*constraint.*'):
             _ = SchedulingCondition(resource=self.resource,
                                     constraint=None,
                                     ifmap_layout=self.ifmap_layout,
@@ -84,8 +84,8 @@ class TestSchedulingCondition(unittest.TestCase):
 
     def test_invalid_ifmap_layout(self):
         ''' Invalid ifmap_layout. '''
-        with self.assertRaisesRegexp(TypeError,
-                                     'SchedulingCondition: .*ifmap_layout.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'SchedulingCondition: .*ifmap_layout.*'):
             _ = SchedulingCondition(resource=self.resource,
                                     constraint=self.none_cstr,
                                     ifmap_layout=None,
@@ -93,15 +93,15 @@ class TestSchedulingCondition(unittest.TestCase):
 
     def test_invalid_sched_seq(self):
         ''' Invalid sched_seq. '''
-        with self.assertRaisesRegexp(TypeError,
-                                     'SchedulingCondition: .*sched_seq.*'):
+        with self.assertRaisesRegex(TypeError,
+                                    'SchedulingCondition: .*sched_seq.*'):
             _ = SchedulingCondition(resource=self.resource,
                                     constraint=self.none_cstr,
                                     ifmap_layout=self.ifmap_layout,
                                     sched_seq=list(self.sched_seq))
 
-        with self.assertRaisesRegexp(ValueError,
-                                     'SchedulingCondition: .*sched_seq.*'):
+        with self.assertRaisesRegex(ValueError,
+                                    'SchedulingCondition: .*sched_seq.*'):
             _ = SchedulingCondition(resource=self.resource,
                                     constraint=self.none_cstr,
                                     ifmap_layout=self.ifmap_layout,

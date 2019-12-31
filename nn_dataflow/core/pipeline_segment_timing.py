@@ -20,7 +20,7 @@ from .loop_blocking_scheme import LoopBlockingScheme
 from .layer import ConvLayer
 from .network import Network
 
-class PipelineSegmentTiming(object):
+class PipelineSegmentTiming():
     ''' Timing information of a pipeline segment. '''
 
     # Each layer timing info is a tuple:
@@ -171,7 +171,7 @@ class PipelineSegmentTiming(object):
             top_ts[le.BAT] = ord_loops.pop(0)[1]
         if ord_loops:
             lpe, t = ord_loops.pop(0)
-            assert lpe == le.IFM or lpe == le.OFM
+            assert lpe in (le.IFM, le.OFM)
             top_ts[lpe] = t
 
         # Lazily update BAT group number.
