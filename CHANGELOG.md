@@ -1,6 +1,41 @@
 List of major changes and improvements
 ======================================
 
+## [v2.0 -- v2.1] -- 2010-12-31
+
+### Added
+
+- Workload models.
+
+  - Add ResNet-50.
+
+- Software engineering.
+
+  - Port code to Python 3; drop Python 2 support.
+
+  - Add pylintrc.
+
+
+### Changed
+
+- Software models.
+
+  - Share the same partition between input layer and external layers. For
+    layered LSTMs, the number of external layers could be quite a few (e.g.,
+    8). The complete combination of all partition choices of these external
+    layers is too high to explore. So we assume all input and external layers
+    share the same partition scheme.
+
+- Software engineering.
+
+  - Allow both relative and absolute overheads in `approx_dividable`.
+
+
+## Fixed
+
+- In `LoopBlockingScheme`, put weight-pinning code block after buffer sharing.
+
+
 ## [v1.6 -- v2.0] -- 2018-03-01
 
 ### Added
