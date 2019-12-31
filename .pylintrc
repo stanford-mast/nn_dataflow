@@ -1,0 +1,33 @@
+# pylint configuration file
+
+[MASTER]
+extension-pkg-whitelist=numpy
+
+[MESSAGES CONTROL]
+disable=
+    I0011,  # locally-disabled,
+    C0305,  # trailing-newlines,
+    C0325,  # superfluous-parens,
+    C0415,  # import-outside-toplevel,
+    W0105,  # pointless-string-statement,
+    W0141,  # bad-builtin,
+
+[BASIC]
+# Allow single-char and two-char variable names
+variable-rgx=[a-z_][a-z0-9_]*$
+
+[DESIGN]
+max-args=25
+max-attributes=15
+max-branches=25
+max-locals=50
+max-module-lines=2000
+max-statements=200
+
+[SIMILARITIES]
+ignore-imports=yes
+
+[TYPECHECK]
+ignored-modules=numpy
+ignored-classes=numpy
+

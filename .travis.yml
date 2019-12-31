@@ -6,11 +6,13 @@ python:
 install:
     - pip install .
     - pip install -r requirements.txt
+    - pip install pylint
     - pip install coveralls
 
 script:
     - pytest -n 12 --cov=nn_dataflow
 
 after_success:
+    - pylint --disable=R0801 nn_dataflow/
     - coveralls
 
