@@ -29,7 +29,7 @@ class TestNNDataflowSearch(unittest.TestCase):
         self.assertTrue(os.path.isdir(
             os.path.join(self.cwd, 'nn_dataflow', 'tools')))
 
-        self.args = ['python', '-m', 'nn_dataflow.tools.nn_dataflow_search',
+        self.args = ['python3', '-m', 'nn_dataflow.tools.nn_dataflow_search',
                      'alex_net', '--batch', '1',
                      '--node', '1', '1', '--array', '16', '16',
                      '--regf', '512', '--gbuf', '131072']

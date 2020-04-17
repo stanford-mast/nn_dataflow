@@ -29,7 +29,7 @@ class TestNNLayerStats(unittest.TestCase):
         self.assertTrue(os.path.isdir(
             os.path.join(self.cwd, 'nn_dataflow', 'tools')))
 
-        self.args = ['python', '-m', 'nn_dataflow.tools.nn_layer_stats',
+        self.args = ['python3', '-m', 'nn_dataflow.tools.nn_layer_stats',
                      'alex_net', '-b', '16']
 
     def test_default_invoke(self):
