@@ -201,10 +201,13 @@ class MapStrategyEyeriss(MapStrategy):
             # Loop occupancies affect accesses.
             aocc = [util.prod(data_loops[dce].take(locc))
                     for dce in range(de.NUM)]
-            # Replication uses the single DRAM, gbuf, itcn.
-            for mhe in [me.DRAM, me.GBUF, me.ITCN]:
+            # Replication uses the single DRAM, gbuf.
+            for mhe in [me.DRAM, me.GBUF]:
                 uaccess[mhe] = tuple(a * n * o for a, n, o
                                      in zip(access_unitpass[mhe], rcnt, aocc))
+            # Itcn access is replicated across all PEs.
+            uaccess[me.ITCN] = tuple(a * rsz * o for a, o
+                                     in zip(access_unitpass[me.ITCN], aocc))
             # Replication uses different PEs. regf scales with op replication,
             # i.e., affected by all loop occupancies. Also consider external
             # occupancy.
